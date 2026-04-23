@@ -145,6 +145,58 @@ body.view-read .filter-row { display: none; }
 .card-title { font-weight: 600; margin-bottom: 2px; }
 .card-meta  { color: var(--muted); font-size: 11px; }
 
+/* Tag chips in detail card */
+.tag-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(96, 165, 250, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 10px;
+  font-size: 10px;
+  color: #93c5fd;
+  white-space: nowrap;
+}
+.rating-stars { color: #fbbf24; font-size: 12px; }
+.info-row { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.info-row strong { color: var(--fg); font-weight: 500; margin-right: 4px; }
+.card-excerpt { margin-top: 6px; font-size: 12px; line-height: 1.45; color: #d1d5db; }
+
+/* Course card */
+.course-card { cursor: pointer; position: relative; }
+.course-card.active { border-color: var(--chip-active); background: rgba(37, 99, 235, 0.15); }
+.course-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--chip-active);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  margin-right: 6px;
+}
+
+/* Language toggle */
+.lang-toggle {
+  position: fixed;
+  top: max(env(safe-area-inset-top, 0), 14px);
+  right: 12px;
+  z-index: 11;
+  display: flex;
+  gap: 4px;
+}
+.lang-toggle a {
+  padding: 4px 8px;
+  background: var(--chip-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--muted);
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+.lang-toggle a.active { background: var(--chip-active); color: white; border-color: var(--chip-active); }
+
 /* FAB: 내 위치 */
 .fab {
   position: fixed;

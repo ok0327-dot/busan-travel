@@ -11,24 +11,30 @@ from dotenv import load_dotenv
 
 from config import DB_PATH
 from sources import (
-    busan_attraction,
     busan_festival,
-    busan_food,
     gov_info_office,
     gov_tour,
     naver_blogs,
+    visitbusan,
 )
 from storage.db import Event, connect, upsert_events
 
 # KOPIS 는 공연시설/기획제작사만 가입 가능해 사용 불가 — sources/kopis.py 는 보존
 # 해수욕장(gov_beach)은 측정 시계열이라 별도 cron, 기상/대기질도 별도
+# busan_attraction/busan_food (KTO) 는 visitbusan 이 같은 데이터 + 스토리/태그/평점으로 대체
 SOURCES = [
-    ("busan_festival",    busan_festival.fetch),
-    ("busan_food",        busan_food.fetch),
-    ("busan_attraction",  busan_attraction.fetch),
-    ("busan_info_office", gov_info_office.fetch),
-    ("tour_api",          gov_tour.fetch),
-    ("naver_blogs",       naver_blogs.fetch),
+    ("busan_festival",         busan_festival.fetch),
+    ("busan_info_office",      gov_info_office.fetch),
+    ("tour_api",               gov_tour.fetch),
+    ("naver_blogs",            naver_blogs.fetch),
+    # VisitBusan.net 큐레이션 (Phase 5)
+    ("vb_attraction",          visitbusan.fetch_attractions),
+    ("vb_food_curated",        visitbusan.fetch_food_curated),
+    ("vb_lodging",             visitbusan.fetch_lodging),
+    ("vb_shopping",            visitbusan.fetch_shopping),
+    ("vb_festival_curated",    visitbusan.fetch_festival_curated),
+    ("vb_theme",               visitbusan.fetch_themes),
+    ("vb_schedule_board",      visitbusan.fetch_schedule_board),
 ]
 
 
@@ -46,6 +52,13 @@ def run() -> int:
         total_new += ins
         total_upd += upd
         print(f"[{name}] fetched={len(events)} new={ins} updated={upd}")
+
+    # 일정여행 코스 — 별도 vb_courses 테이블 사용
+    try:
+        c_ins, c_upd = visitbusan.fetch_courses_as_table()
+        print(f"[vb_courses] new={c_ins} updated={c_upd}")
+    except Exception as exc:
+        print(f"[vb_courses] FAILED: {exc}", file=sys.stderr)
 
     today = date.today().isoformat()
     upcoming = conn.execute(

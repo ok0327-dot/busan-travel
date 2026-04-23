@@ -12,7 +12,17 @@ const CATEGORIES = {
   attraction:  { label: "명소",     emoji: "🏛", color: "#3b82f6" },
   food:        { label: "맛집",     emoji: "🍜", color: "#f97316" },
   beach:       { label: "해수욕장", emoji: "🏖", color: "#06b6d4" },
+  shopping:    { label: "쇼핑",     emoji: "🛍", color: "#a855f7" },
+  lodging:     { label: "숙박",     emoji: "🏨", color: "#10b981" },
+  theme:       { label: "테마",     emoji: "💡", color: "#f59e0b" },
   info_office: { label: "안내소",   emoji: "ℹ️", color: "#6b7280" },
+};
+const HOTEL_GRADE_BADGE = {
+  "관광호텔 5성": "⭐⭐⭐⭐⭐",
+  "관광호텔 4성": "⭐⭐⭐⭐",
+  "관광호텔 3성": "⭐⭐⭐",
+  "관광호텔 2성": "⭐⭐",
+  "관광호텔 1성": "⭐",
 };
 
 const SKY_TXT = { 1: "☀️ 맑음", 3: "⛅ 구름많음", 4: "☁️ 흐림" };
@@ -27,6 +37,9 @@ let allMarkers = {}; // category → [{marker, poi}]
 let weatherIndex = null; // cellKey(`nx_ny`) → sorted list
 let weatherOverlays = []; // CustomOverlay[] 현재 표시 중 날씨 배지
 let currentTargetDate = new Date(); // 현재 선택된 날짜 (chip preset)
+let coursesData = null; // courses.json
+let activeCourseId = null; // 현재 활성 코스 uc_seq
+let courseOverlay = { polyline: null, highlights: [] }; // 활성 코스 시각화
 
 // ───────── SDK + 데이터 로딩 ─────────
 function loadKakaoSDK() {
@@ -149,7 +162,7 @@ function buildMarkerSet(items, cat) {
   return { markers, clusterer };
 }
 
-function renderMarkers(places, beaches, festivalEvents) {
+function renderMarkers(places, beaches, festivalEvents, lodging) {
   // beaches → POI 형태
   const beachRows = (beaches.beaches || []).map(b => ({
     id: "beach:" + b.name,
@@ -160,9 +173,10 @@ function renderMarkers(places, beaches, festivalEvents) {
     latest_water: b.latest_water,
   }));
 
-  // places (food/attraction/info_office) + beaches + festival events
+  // places 는 food/attraction/info_office/shopping/theme 혼합
   const all = [
     ...(places.places || []),
+    ...(lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
     ...beachRows,
     ...festivalEvents.map(e => ({ ...e, category: "festival" })),
   ];
@@ -253,7 +267,23 @@ function refreshWeatherBadges(targetDate) {
   }
 }
 
-// ───────── 상세 드로어 ─────────
+// ───────── 상세 드로어 (enriched) ─────────
+function renderStars(rating) {
+  if (!rating) return "";
+  const n = Math.round(rating);
+  return `<span class="rating-stars">${"★".repeat(n)}${"☆".repeat(5 - n)}</span> <span class="card-meta">${rating.toFixed(1)}</span>`;
+}
+
+function renderTags(tags) {
+  if (!tags || !tags.length) return "";
+  return `<div class="tag-chips">${tags.slice(0, 8).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>`;
+}
+
+function infoRow(label, value) {
+  if (!value) return "";
+  return `<div class="info-row"><strong>${label}</strong>${escape(String(value).slice(0, 300))}</div>`;
+}
+
 function showDetail(poi) {
   const catDef = CATEGORIES[poi.category] || {};
   const now = new Date();
@@ -267,20 +297,36 @@ function showDetail(poi) {
   const beachLine = poi.latest_water?.comment
     ? `<div class="card-meta">🌊 ${escape(poi.latest_water.comment)}</div>`
     : "";
+  const hotelGrade = poi.subtype && HOTEL_GRADE_BADGE[poi.subtype]
+    ? `<span style="margin-left:6px">${HOTEL_GRADE_BADGE[poi.subtype]}</span>`
+    : "";
+  const ratingLine = poi.rating
+    ? `<div class="card-meta" style="margin-top:4px">${renderStars(poi.rating)}${poi.views ? ` · 조회 ${poi.views.toLocaleString()}` : ""}${poi.reviews ? ` · 리뷰 ${poi.reviews}` : ""}</div>`
+    : "";
+  const excerpt = poi.excerpt || poi.description;
 
   const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
 
   $list.innerHTML = `
     <div class="card" style="border-left:3px solid ${catDef.color || "#888"}">
-      <div class="card-title">${catDef.emoji || ""} ${escape(poi.title)}</div>
-      <div class="card-meta">${catDef.label || poi.category}${poi.address ? " · " + escape(poi.address) : ""}</div>
+      <div class="card-title">${catDef.emoji || ""} ${escape(poi.title)}${hotelGrade}</div>
+      <div class="card-meta">${catDef.label || poi.category}${poi.subtype && !HOTEL_GRADE_BADGE[poi.subtype] ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
+      ${ratingLine}
       ${dateLine}
       ${weatherLine}
       ${beachLine}
-      ${poi.description ? `<div class="card-meta" style="margin-top:6px">${escape(poi.description.slice(0, 200))}</div>` : ""}
+      ${excerpt ? `<div class="card-excerpt">${escape(excerpt.slice(0, 280))}</div>` : ""}
+      ${renderTags(poi.tags)}
+      ${infoRow("🕐 영업", poi.hours)}
+      ${infoRow("🚫 휴무", poi.holiday)}
+      ${infoRow("💰 요금", poi.fee || poi.price)}
+      ${infoRow("🚌 교통", poi.transport)}
+      ${infoRow("💡 팁", poi.tip)}
+      ${infoRow("📞 전화", poi.phone)}
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">🗺️ 카카오맵 길찾기</a>
-        ${poi.url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">🔗 상세 페이지</a>` : ""}
+        ${poi.story_url ? `<a href="${escape(poi.story_url)}" target="_blank" style="padding:6px 10px;background:#0ea5e9;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">📖 비짓부산</a>` : ""}
+        ${poi.url && poi.url !== poi.story_url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">🔗 홈페이지</a>` : ""}
       </div>
     </div>
   `;
@@ -306,12 +352,15 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, lodging, courses] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
     fetchJson("./data/beaches.json"),
+    fetchJson("./data/lodging.json").catch(() => ({ lodging: [] })),
+    fetchJson("./data/courses.json").catch(() => ({ courses: [] })),
   ]);
+  coursesData = courses;
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -337,9 +386,9 @@ async function init() {
   window.__blogPosts = allBlogPosts;
 
   weatherIndex = buildWeatherIndex(weatherShort);
-  window.__data = { manifest, places, weatherShort, beaches, festivalEvents: allFestivalEvents };
+  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, festivalEvents: allFestivalEvents };
 
-  renderMarkers(places, beaches, allFestivalEvents);
+  renderMarkers(places, beaches, allFestivalEvents, lodging);
 
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
   $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
@@ -411,7 +460,7 @@ async function init() {
   // Bottom sheet 터치 드래그 (peek ↔ half ↔ full)
   enableSheetDrag();
 
-  // 탭 전환 (지도 ↔ 읽을거리)
+  // 탭 전환 (지도 ↔ 코스 ↔ 읽을거리)
   document.querySelectorAll(".tab[data-view]").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tab[data-view]").forEach(b => b.classList.remove("active"));
@@ -419,22 +468,154 @@ async function init() {
       setViewMode(btn.dataset.view);
     });
   });
+
+  // 언어 토글: URL ?lang=en/ja/zh 면 모든 비짓부산 deep-link 를 해당 언어 경로로 다시 씀
+  const urlLang = new URLSearchParams(location.search).get("lang") || "ko";
+  window.__lang = urlLang;
+  document.querySelectorAll(".lang-toggle a").forEach(a => {
+    const isActive = a.dataset.lang === urlLang;
+    a.classList.toggle("active", isActive);
+  });
+  if (urlLang !== "ko") {
+    rewriteStoryUrls(urlLang);
+  }
+}
+
+// 비짓부산 URL 의 lang_cd 파라미터 교체 (en/ja/zhs/zht 지원)
+function rewriteStoryUrls(lang) {
+  const map = { en: "en", ja: "ja", zh: "zhs" };
+  const target = map[lang] || "ko";
+  const rewrite = (url) => {
+    if (!url || !url.includes("visitbusan.net")) return url;
+    return url
+      .replace(/\/kr\//, `/${target}/`)
+      .replace(/lang_cd=ko/, `lang_cd=${target}`);
+  };
+  // places + lodging + courses 의 URL 들 일괄 재작성
+  const d = window.__data;
+  for (const p of (d.places?.places || [])) {
+    p.story_url = rewrite(p.story_url);
+    p.url = rewrite(p.url);
+  }
+  for (const l of (d.lodging?.lodging || [])) {
+    l.story_url = rewrite(l.story_url);
+    l.url = rewrite(l.url);
+  }
+  for (const c of (d.courses?.courses || [])) {
+    c.story_url = rewrite(c.story_url);
+  }
 }
 
 function setViewMode(mode) {
-  document.body.classList.toggle("view-read", mode === "read");
+  document.body.classList.toggle("view-read", mode === "read" || mode === "course");
   const sheet = document.getElementById("sheet");
   if (mode === "read") {
-    // 읽을거리 모드: 시트 full 올림 + 블로그 카드 리스트
     ["sheet-peek", "sheet-half"].forEach(c => sheet.classList.remove(c));
     sheet.classList.add("sheet-full");
     renderBlogFeed();
+  } else if (mode === "course") {
+    ["sheet-peek", "sheet-half"].forEach(c => sheet.classList.remove(c));
+    sheet.classList.add("sheet-full");
+    renderCourseList();
   } else {
     sheet.classList.remove("sheet-full");
     sheet.classList.add("sheet-peek");
-    // 카드 리스트를 카테고리 요약으로 되돌림
     renderCategorySummary();
+    clearCourseOverlay();
   }
+}
+
+// ───────── Course 모드 ─────────
+function renderCourseList() {
+  const courses = coursesData?.courses || [];
+  if (!courses.length) {
+    $list.innerHTML = `<div class="card"><div class="card-meta">코스 데이터가 아직 준비되지 않았습니다.</div></div>`;
+    return;
+  }
+  $list.innerHTML = courses.slice(0, 50).map(c => {
+    const poisCount = (c.pois || []).length;
+    const active = c.uc_seq === activeCourseId ? "active" : "";
+    return `<div class="card course-card ${active}" data-uc="${c.uc_seq}">
+      <div class="card-title">
+        ${c.duration ? `<span class="course-badge">${escape(c.duration)}</span>` : ""}
+        ${escape(c.title || "")}
+      </div>
+      <div class="card-meta">${poisCount}개 POI${c.views ? ` · 조회 ${c.views.toLocaleString()}` : ""}${c.rating ? ` · ★${c.rating}` : ""}</div>
+      ${c.excerpt ? `<div class="card-excerpt">${escape(c.excerpt.slice(0, 160))}</div>` : ""}
+      ${(c.tags || []).length ? `<div class="tag-chips">${c.tags.slice(0, 5).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  $list.querySelectorAll(".course-card").forEach(el => {
+    el.addEventListener("click", () => {
+      const uc = Number(el.dataset.uc);
+      activateCourse(uc);
+    });
+  });
+}
+
+function clearCourseOverlay() {
+  if (courseOverlay.polyline) {
+    courseOverlay.polyline.setMap(null);
+    courseOverlay.polyline = null;
+  }
+  for (const h of courseOverlay.highlights) {
+    h.setMap(null);
+  }
+  courseOverlay.highlights = [];
+  activeCourseId = null;
+}
+
+function activateCourse(uc_seq) {
+  clearCourseOverlay();
+  const course = (coursesData?.courses || []).find(c => c.uc_seq === uc_seq);
+  if (!course) return;
+  activeCourseId = uc_seq;
+
+  // POI 이름 기반으로 places 에서 매칭 시도 (loose: 앞 6글자 일치)
+  const allPlaces = [
+    ...(window.__data.places.places || []),
+    ...(window.__data.lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
+  ];
+  const path = [];
+  for (const p of course.pois || []) {
+    const name = (p.name || "").trim();
+    if (!name) continue;
+    const key = name.slice(0, 6);
+    const match = allPlaces.find(pl => pl.title && pl.title.includes(key));
+    if (match && match.lat && match.lon) {
+      path.push(new kakao.maps.LatLng(match.lat, match.lon));
+      // Highlight circle
+      const circle = new kakao.maps.Circle({
+        center: new kakao.maps.LatLng(match.lat, match.lon),
+        radius: 80,
+        strokeWeight: 3,
+        strokeColor: "#fbbf24",
+        strokeOpacity: 0.9,
+        fillColor: "#fbbf24",
+        fillOpacity: 0.25,
+      });
+      circle.setMap(map);
+      courseOverlay.highlights.push(circle);
+    }
+  }
+  if (path.length >= 2) {
+    courseOverlay.polyline = new kakao.maps.Polyline({
+      path,
+      strokeWeight: 4,
+      strokeColor: "#fbbf24",
+      strokeOpacity: 0.8,
+      strokeStyle: "solid",
+    });
+    courseOverlay.polyline.setMap(map);
+    // 지도 bounds 조정
+    const bounds = new kakao.maps.LatLngBounds();
+    path.forEach(p => bounds.extend(p));
+    map.setBounds(bounds);
+  } else if (path.length === 1) {
+    map.panTo(path[0]);
+  }
+  renderCourseList(); // 선택 상태 반영 재렌더
 }
 
 function renderBlogFeed() {

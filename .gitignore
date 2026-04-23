@@ -14,3 +14,7 @@ venv/
 /data/
 /reports/
 .DS_Store
+# vendored gov-api-kr 는 readonly: 내부 캐시/출력물은 커밋 안 함
+vendor/gov-api-kr/.cache/
+vendor/gov-api-kr/*.db
+vendor/gov-api-kr/data/

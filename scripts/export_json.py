@@ -20,16 +20,34 @@ ROOT = Path(__file__).parent.parent
 DB_PATH = ROOT / "data" / "events.db"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 
-PLACE_CATEGORIES = {"food", "attraction", "info_office", "beach"}
+PLACE_CATEGORIES = {"food", "attraction", "info_office", "beach", "shopping", "theme"}
+LODGING_CATEGORIES = {"lodging"}
 EVENT_CATEGORIES = {"festival", "blog_post"}
 
 
+def _col(row: sqlite3.Row, key: str, default=None):
+    try:
+        v = row[key]
+        return v if v is not None else default
+    except (IndexError, KeyError):
+        return default
+
+
 def _jsonable(row: sqlite3.Row) -> dict:
-    """Whitelist-safe dict (raw_json/민감 필드 제외)."""
+    """Whitelist-safe dict (raw_json/민감 필드 제외) + VisitBusan enrichment."""
+    import json as _json
+    tags = None
+    tj = _col(row, "tags_json")
+    if tj:
+        try:
+            tags = _json.loads(tj)
+        except (ValueError, TypeError):
+            tags = None
     return {
         "id": row["id"],
         "source": row["source"],
         "category": row["category"],
+        "subtype": _col(row, "subtype"),
         "title": row["title"],
         "venue": row["venue"],
         "address": row["address"],
@@ -42,20 +60,91 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "ny": row["ny"],
         "start": row["start_date"],
         "end": row["end_date"],
-        "price": row["price"] if "price" in row.keys() else None,
+        "price": _col(row, "price"),
+        # VisitBusan enrichment
+        "rating": _col(row, "rating"),
+        "views": _col(row, "view_count"),
+        "reviews": _col(row, "review_count"),
+        "tags": tags,
+        "story_url": _col(row, "story_url"),
+        "excerpt": _col(row, "story_excerpt"),
+        "hours": _col(row, "hours"),
+        "holiday": _col(row, "holiday"),
+        "fee": _col(row, "fee"),
+        "transport": _col(row, "transport"),
+        "tip": _col(row, "tip"),
+        "phone": _col(row, "phone"),
     }
 
 
 def export_places(conn: sqlite3.Connection) -> int:
+    """Places: food + attraction + info_office + beach + shopping + theme.
+
+    중복 제거 (dedup): 같은 POI 를 여러 source (KTO + VisitBusan) 에서 수집할 수 있음.
+    → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
+    """
+    rows_raw = list(conn.execute(
+        "SELECT * FROM events WHERE category IN ('food','attraction','info_office','beach','shopping','theme') "
+        "AND lat IS NOT NULL "
+        # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
+        "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
+    ))
+    seen: dict[tuple, dict] = {}
+    for r in rows_raw:
+        if r["lat"] is None or r["lon"] is None:
+            continue
+        key = (round(r["lat"], 3), round(r["lon"], 3), (r["title"] or "")[:4])
+        if key in seen:
+            continue
+        seen[key] = _jsonable(r)
+    rows = list(seen.values())
+    (OUT_DIR / "places.json").write_text(
+        json.dumps({"count": len(rows), "places": rows}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    return len(rows)
+
+
+def export_lodging(conn: sqlite3.Connection) -> int:
+    """숙박 전용 파일 — 별 등급 + 지역. 기본 off, 토글 on 시 로드."""
     rows = [
         _jsonable(r)
         for r in conn.execute(
-            "SELECT * FROM events WHERE category IN ('food','attraction','info_office','beach') "
-            "AND lat IS NOT NULL ORDER BY category, title"
+            "SELECT * FROM events WHERE category='lodging' AND lat IS NOT NULL "
+            "ORDER BY subtype DESC, title"
         )
     ]
-    (OUT_DIR / "places.json").write_text(
-        json.dumps({"count": len(rows), "places": rows}, ensure_ascii=False, separators=(",", ":")),
+    (OUT_DIR / "lodging.json").write_text(
+        json.dumps({"count": len(rows), "lodging": rows}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    return len(rows)
+
+
+def export_courses(conn: sqlite3.Connection) -> int:
+    """vb_courses → courses.json. 일정여행 코스 + 포함 POI 리스트."""
+    import json as _json
+    rows = []
+    for r in conn.execute(
+        "SELECT uc_seq, title, subtitle, duration, rating, view_count, image_url, "
+        "       story_url, story_excerpt, tags_json, pois_json "
+        "FROM vb_courses ORDER BY view_count DESC NULLS LAST"
+    ):
+        rows.append({
+            "uc_seq": r[0],
+            "title": r[1],
+            "subtitle": r[2],
+            "duration": r[3],
+            "rating": r[4],
+            "views": r[5],
+            "image": r[6],
+            "story_url": r[7],
+            "excerpt": r[8],
+            "tags": _json.loads(r[9]) if r[9] else [],
+            "pois": _json.loads(r[10]) if r[10] else [],
+        })
+    (OUT_DIR / "courses.json").write_text(
+        json.dumps({"count": len(rows), "courses": rows}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     return len(rows)
@@ -173,6 +262,8 @@ def main():
 
     places = export_places(conn)
     events = export_events(conn)
+    lodging = export_lodging(conn)
+    courses = export_courses(conn)
     w_short = export_weather_short(conn)
     w_mid = export_weather_mid(conn)
     air = export_air_quality(conn)
@@ -183,6 +274,8 @@ def main():
         "version": now.replace(":", "").replace("-", "")[:15],
         "counts": {
             "places": places,
+            "lodging": lodging,
+            "courses": courses,
             "events_by_month": events,
             "weather_short_rows": w_short,
             "weather_mid_rows": w_mid,

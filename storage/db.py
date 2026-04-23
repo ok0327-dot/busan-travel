@@ -64,6 +64,21 @@ _MIGRATIONS = {
     "nx":                   "INTEGER",
     "ny":                   "INTEGER",
     "geocoded_at":          "TEXT",
+    # VisitBusan enrichment (Phase 5)
+    "rating":               "REAL",
+    "view_count":           "INTEGER",
+    "review_count":         "INTEGER",
+    "tags_json":            "TEXT",
+    "story_url":            "TEXT",
+    "story_excerpt":        "TEXT",
+    "hours":                "TEXT",
+    "holiday":              "TEXT",
+    "fee":                  "TEXT",
+    "transport":            "TEXT",
+    "tip":                  "TEXT",
+    "etiquette":            "TEXT",
+    "phone":                "TEXT",
+    "subtype":              "TEXT",  # 호텔 등급, 음식 장르 등 세부 분류
 }
 
 EXTRA_TABLES_SQL = """
@@ -129,6 +144,24 @@ CREATE TABLE IF NOT EXISTS beach_poi (
 );
 CREATE INDEX IF NOT EXISTS idx_weather_ts ON weather_fcst(fcst_ts);
 CREATE INDEX IF NOT EXISTS idx_air_ts     ON air_quality(ts);
+
+-- VisitBusan 일정여행 코스 (Phase 5)
+CREATE TABLE IF NOT EXISTS vb_courses (
+    uc_seq        INTEGER PRIMARY KEY,
+    title         TEXT NOT NULL,
+    subtitle      TEXT,
+    duration      TEXT,
+    rating        REAL,
+    view_count    INTEGER,
+    image_url     TEXT,
+    story_url     TEXT,
+    story_excerpt TEXT,
+    tags_json     TEXT,
+    pois_json     TEXT,
+    first_seen    TEXT NOT NULL,
+    last_seen     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_vb_courses_dur ON vb_courses(duration);
 """
 
 
@@ -158,6 +191,21 @@ class Event:
     nx: int | None = None
     ny: int | None = None
     geocoded_at: str | None = None
+    # VisitBusan enrichment
+    rating: float | None = None
+    view_count: int | None = None
+    review_count: int | None = None
+    tags_json: str | None = None
+    story_url: str | None = None
+    story_excerpt: str | None = None
+    hours: str | None = None
+    holiday: str | None = None
+    fee: str | None = None
+    transport: str | None = None
+    tip: str | None = None
+    etiquette: str | None = None
+    phone: str | None = None
+    subtype: str | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -179,6 +227,40 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def upsert_course(conn: sqlite3.Connection, course: dict) -> None:
+    """vb_courses 테이블 upsert. course dict 는 어댑터에서 만든 형식."""
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    row = conn.execute(
+        "SELECT uc_seq FROM vb_courses WHERE uc_seq=?", (course["uc_seq"],)
+    ).fetchone()
+    fields = (
+        course.get("title"), course.get("subtitle"), course.get("duration"),
+        course.get("rating"), course.get("view_count"),
+        course.get("image_url"), course.get("story_url"), course.get("story_excerpt"),
+        json.dumps(course.get("tags", []), ensure_ascii=False),
+        json.dumps(course.get("pois", []), ensure_ascii=False),
+    )
+    if row:
+        conn.execute(
+            """UPDATE vb_courses SET
+                title=?, subtitle=?, duration=?, rating=?, view_count=?,
+                image_url=?, story_url=?, story_excerpt=?, tags_json=?, pois_json=?,
+                last_seen=?
+               WHERE uc_seq=?""",
+            (*fields, now, course["uc_seq"]),
+        )
+    else:
+        conn.execute(
+            """INSERT INTO vb_courses (
+                uc_seq, title, subtitle, duration, rating, view_count,
+                image_url, story_url, story_excerpt, tags_json, pois_json,
+                first_seen, last_seen
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (course["uc_seq"], *fields, now, now),
+        )
+    conn.commit()
+
+
 def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[int, int]:
     """Upsert events. Returns (inserted, updated)."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -190,12 +272,17 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
         ).fetchone()
         payload = asdict(e)
         raw_json = json.dumps(payload.pop("raw"), ensure_ascii=False)
-        fields = (
+        core_fields = (
             e.category, e.title, e.start_date, e.end_date, e.event_date,
             e.booking_opens_at, e.booking_deadline, e.booking_required,
             e.venue, e.address, e.url, e.price, e.image_url, e.description,
             e.family_score, e.couple_evening_score, e.hype_level,
-            e.lat, e.lon, e.nx, e.ny, e.geocoded_at, raw_json,
+            e.lat, e.lon, e.nx, e.ny, e.geocoded_at,
+        )
+        vb_fields = (
+            e.rating, e.view_count, e.review_count, e.tags_json,
+            e.story_url, e.story_excerpt, e.hours, e.holiday, e.fee,
+            e.transport, e.tip, e.etiquette, e.phone, e.subtype,
         )
         if row:
             conn.execute(
@@ -209,9 +296,23 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     lat=COALESCE(?, lat), lon=COALESCE(?, lon),
                     nx=COALESCE(?, nx), ny=COALESCE(?, ny),
                     geocoded_at=COALESCE(?, geocoded_at),
+                    rating=COALESCE(?, rating),
+                    view_count=COALESCE(?, view_count),
+                    review_count=COALESCE(?, review_count),
+                    tags_json=COALESCE(?, tags_json),
+                    story_url=COALESCE(?, story_url),
+                    story_excerpt=COALESCE(?, story_excerpt),
+                    hours=COALESCE(?, hours),
+                    holiday=COALESCE(?, holiday),
+                    fee=COALESCE(?, fee),
+                    transport=COALESCE(?, transport),
+                    tip=COALESCE(?, tip),
+                    etiquette=COALESCE(?, etiquette),
+                    phone=COALESCE(?, phone),
+                    subtype=COALESCE(?, subtype),
                     raw_json=?, last_seen=?
                    WHERE id=?""",
-                (*fields, now, row["id"]),
+                (*core_fields, *vb_fields, raw_json, now, row["id"]),
             )
             updated += 1
         else:
@@ -222,9 +323,12 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     venue, address, url, price, image_url, description,
                     family_score, couple_evening_score, hype_level,
                     lat, lon, nx, ny, geocoded_at,
+                    rating, view_count, review_count, tags_json,
+                    story_url, story_excerpt, hours, holiday, fee,
+                    transport, tip, etiquette, phone, subtype,
                     raw_json, first_seen, last_seen
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (e.source, e.source_id, *fields, now, now),
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (e.source, e.source_id, *core_fields, *vb_fields, raw_json, now, now),
             )
             inserted += 1
     conn.commit()
