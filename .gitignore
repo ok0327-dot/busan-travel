@@ -2,6 +2,8 @@
 *.db
 *.db-journal
 *.db.bak-*
+# Session handoff (local only) / 세션 인수인계 (로컬 전용)
+HANDOFF.md
 # config.js 는 배포 필수 (Kakao JS 키 담김). private repo + 도메인 제한으로 안전.
 # gitignore 에서 제외.
 __pycache__/
