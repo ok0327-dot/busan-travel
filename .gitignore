@@ -1,0 +1,13 @@
+.env
+*.db
+*.db-journal
+*.db.bak-*
+frontend/public/config.js
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+/data/
+/reports/
+.DS_Store

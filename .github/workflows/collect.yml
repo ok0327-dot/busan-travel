@@ -1,0 +1,125 @@
+name: busan-travel collector
+
+# 데이터 수집 + 프론트엔드 JSON export + self-commit.
+# KST 06:23 매일 전체 수집, 3시간마다 단기예보 갱신.
+
+on:
+  schedule:
+    - cron: '23 21 * * *'     # 매일 KST 06:23 — 전체 수집
+    - cron: '37 */3 * * *'    # 3시간마다 — 날씨만
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '실행 모드'
+        required: true
+        default: 'all'
+        type: choice
+        options: [all, events-only, weather-only]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: busan-travel-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify vendored gov-api-kr
+        run: |
+          if [ ! -f vendor/gov-api-kr/snippets/_caller_template.py ]; then
+            echo "::error::vendor/gov-api-kr/ 누락"; exit 1
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Restore SQLite cache
+        uses: actions/cache@v4
+        with:
+          path: data/events.db
+          key: busan-travel-db-v1-${{ github.run_id }}
+          restore-keys: busan-travel-db-v1-
+
+      - name: Ensure data dirs
+        run: mkdir -p data frontend/public/data
+
+      - name: Determine mode
+        id: mode
+        run: |
+          INPUT="${{ github.event.inputs.mode }}"
+          CRON="${{ github.event.schedule }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${INPUT:-all}"
+          elif [ "$CRON" = "23 21 * * *" ]; then
+            MODE="all"
+          elif [ "$CRON" = "37 */3 * * *" ]; then
+            MODE="weather-only"
+          else
+            MODE="all"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "-> mode=$MODE"
+
+      - name: Events + POIs
+        if: steps.mode.outputs.mode != 'weather-only'
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python main.py
+
+      - name: Seed beach POIs
+        if: steps.mode.outputs.mode != 'weather-only'
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python -m sources.gov_beach
+
+      - name: KMA short-range weather
+        if: steps.mode.outputs.mode != 'events-only'
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python -m sources.weather_kma_short
+
+      - name: KMA mid-range (승인 전 SKIP)
+        if: steps.mode.outputs.mode != 'events-only'
+        continue-on-error: true
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python -m sources.weather_kma_mid
+
+      - name: Air quality (승인 전 SKIP)
+        if: steps.mode.outputs.mode != 'events-only'
+        continue-on-error: true
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python -m sources.air_korea
+
+      - name: Export JSON
+        run: python scripts/export_json.py
+
+      - name: Commit & push data
+        run: |
+          git config user.email "claude-bot@users.noreply.github.com"
+          git config user.name "busan-travel-bot"
+          git add frontend/public/data/
+          if git diff --staged --quiet; then
+            echo "no data changes"
+          else
+            TS=$(date -u +'%Y-%m-%dT%H:%MZ')
+            git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }}) [skip ci]"
+            git push
+          fi

@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0",                                                                                                                                                                                               
+  "key_model": "unified",
+  "key_model_confirmed_at": "2026-04-23",                                                                                                                                                                                
+  "key_model_evidence": "부산 맛집(15063472) + 명소(15063481) 두 API의 Decoding 키 prefix 8자(4VXUa3CB) + suffix 4자(1A==) 완전 일치",
+  "default_key_env": "DATA_GO_KR_KEY",                                                                                                                                                                                   
+  "apis": {
+    "15063472": {                                                                                                                                                                                                        
+      "name": "부산광역시_부산맛집정보 서비스",           
+      "organization": "부산광역시",                                                                                                                                                                                      
+      "organization_code": "6260000",                     
+      "base_url": "http://apis.data.go.kr/6260000/FoodService",                                                                                                                                                          
+      "operations": {                                                                                                                                                                                                    
+        "getFoodKr": {                                                                                                                                                                                                   
+          "path": "/getFoodKr",                                                                                                                                                                                          
+          "required_params": ["ServiceKey", "pageNo", "numOfRows"],                                                                                                                                                      
+          "optional_params": ["resultType", "UC_SEQ"],                                                                                                                                                                   
+          "formats": ["XML", "JSON"],                                                                                                                                                                                    
+          "daily_limit_dev": 10000,                                                                                                                                                                                      
+          "notes": "resultType=json 지정 시 JSON 반환"                                                                                                                                                                   
+        }                                                                                                                                                                                                                
+      },                                                                                                                                                                                                                 
+      "approved_at": "2026-04-23",                                                                                                                                                                                       
+      "review_type": "자동승인"                           
+    },                                                                                                                                                                                                                   
+    "15063481": {
+      "name": "부산광역시_부산명소정보 서비스",                                                                                                                                                                          
+      "organization": "부산광역시",                                                                                                                                                                                      
+      "organization_code": "6260000",
+      "base_url": "http://apis.data.go.kr/6260000/AttractionService",                                                                                                                                                    
+      "operations": {                                                                                                                                                                                                    
+        "getAttractionKr": {
+          "path": "/getAttractionKr",                                                                                                                                                                                    
+          "required_params": ["ServiceKey", "pageNo", "numOfRows"],
+          "optional_params": ["resultType", "UC_SEQ"],                                                                                                                                                                   
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000                                                                                                                                                                                       
+        }                                                                                                                                                                                                                
+      },
+      "approved_at": "2026-04-23",                                                                                                                                                                                       
+      "review_type": "자동승인"                           
+    },
+    "15063500": {
+      "name": "부산광역시_부산축제정보 서비스",
+      "organization": "부산광역시",                                                                                                                                                                                      
+      "organization_code": "6260000",
+      "base_url": "http://apis.data.go.kr/6260000/FestivalService",                                                                                                                                                      
+      "operations": {                                                                                                                                                                                                    
+        "getFestivalKr": {
+          "path": "/getFestivalKr",                                                                                                                                                                                      
+          "required_params": ["ServiceKey", "pageNo", "numOfRows"],
+          "optional_params": ["resultType", "UC_SEQ"],                                                                                                                                                                   
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000,                                                                                                                                                                                      
+          "notes": "축제 특유 필드: USAGE_DAY(운영기간), USAGE_AMOUNT(요금), MAIN_PLACE, MIDDLE_SIZE_RM1(편의시설)"                                                                                                      
+        }                                                                                                                                                                                                                
+      },                                                                                                                                                                                                                 
+      "approved_at": "2026-04-23",
+      "review_type": "자동승인"
+    },
+    "15034080": {                                                                                                                                                                                                        
+      "name": "부산광역시_해수욕장 수질 정보",                                                                                                                                                                           
+      "organization": "부산광역시",                                                                                                                                                                                      
+      "organization_code": "6260000",
+      "base_url": "http://apis.data.go.kr/6260000/BusanBeachInfoService",                                                                                                                                                
+      "operations": {                                                                                                                                                                                                    
+        "getBeachInfo": {                                                                                                                                                                                                
+          "path": "/getBeachInfo",                                                                                                                                                                                       
+          "required_params": ["ServiceKey", "pageNo", "numOfRows"],
+          "optional_params": ["resultType", "inspecArea"],                                                                                                                                                               
+          "formats": ["XML", "JSON"],                                                                                                                                                                                    
+          "daily_limit_dev": 10000,                                                                                                                                                                                      
+          "notes": "inspecArea로 측정지점 필터(예: '송정 3'). 응답 필드: inspecYm/inspecDivision/inspecArea/water01(장구균)/water02(대장균)/waterComment"                                                                
+        }                                                                                                                                                                                                                
+      },
+      "approved_at": "2026-04-23",                                                                                                                                                                                       
+      "review_type": "자동승인",
+      "applied_pending": true,
+      "applied_pending_note": "register-confirm 실전 검증용으로 사전 등록. 사용자 활용신청 클릭 후 call_api 가능",
+      "registered_via": "skill:/gov-api register-confirm"
+    },
+    "15101578": {
+      "name": "한국관광공사_국문 관광정보 서비스 (TourAPI 4.0)",
+      "organization": "한국관광공사",
+      "organization_code": "B551011",
+      "base_url": "http://apis.data.go.kr/B551011/KorService2",
+      "operations": {
+        "searchFestival2": {
+          "path": "/searchFestival2",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows", "MobileOS", "MobileApp", "eventStartDate"],
+          "optional_params": ["_type", "arrange", "areaCode", "sigunguCode", "eventEndDate"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 1000,
+          "notes": "JSON 원하면 _type=json (resultType 아님). MobileOS=ETC, MobileApp=앱이름 필수. 부산 areaCode=6"
+        },
+        "areaBasedList2": {
+          "path": "/areaBasedList2",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows", "MobileOS", "MobileApp"],
+          "optional_params": ["_type", "arrange", "contentTypeId", "areaCode", "sigunguCode"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 1000
+        }
+      },
+      "approved_at": "2026-04-23",
+      "review_type": "자동승인",
+      "registered_via": "manual-spec-from-tourapi4-docs"
+    },
+    "15084084": {
+      "name": "기상청_단기예보 ((구)_동네예보) 조회서비스",
+      "organization": "기상청",
+      "organization_code": "1360000",
+      "base_url": "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0",
+      "operations": {
+        "getUltraSrtNcst": {
+          "path": "/getUltraSrtNcst",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows", "base_date", "base_time", "nx", "ny"],
+          "optional_params": ["dataType"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000,
+          "notes": "초단기실황. dataType=JSON, base_time 매시 30분 기준"
+        },
+        "getUltraSrtFcst": {
+          "path": "/getUltraSrtFcst",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows", "base_date", "base_time", "nx", "ny"],
+          "optional_params": ["dataType"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000
+        },
+        "getVilageFcst": {
+          "path": "/getVilageFcst",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows", "base_date", "base_time", "nx", "ny"],
+          "optional_params": ["dataType"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000,
+          "notes": "단기예보 3일. 부산 주요 좌표: 해운대 nx=99 ny=77, 중구 nx=98 ny=76"
+        }
+      },
+      "approved_at": "2026-04-23",
+      "review_type": "자동승인",
+      "registered_via": "manual-spec-from-webfetch"
+    },
+    "15063445": {
+      "name": "부산광역시_관광안내소정보 서비스",
+      "organization": "부산광역시",
+      "organization_code": "6260000",
+      "base_url": "http://apis.data.go.kr/6260000/InfoOfficeService",
+      "operations": {
+        "getInfoOfficeKr": {
+          "path": "/getInfoOfficeKr",
+          "required_params": ["ServiceKey", "pageNo", "numOfRows"],
+          "optional_params": ["resultType", "UC_SEQ"],
+          "formats": ["XML", "JSON"],
+          "daily_limit_dev": 10000,
+          "notes": "통합 키(부산시 6260000) 확정. 맛집·명소·축제와 동일 스킴"
+        }
+      },
+      "approved_at": "2026-04-23",
+      "review_type": "자동승인"
+    }
+  }
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="부산" />
+  <title>부산 트래블</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <!-- Map container (full viewport) -->
+  <div id="map" aria-label="부산 지도"></div>
+
+  <!-- Top chip bar (date presets) -->
+  <header id="topbar">
+    <div class="chip-row" role="tablist" aria-label="날짜 선택">
+      <button class="chip active" data-preset="today">오늘</button>
+      <button class="chip" data-preset="tomorrow">내일</button>
+      <button class="chip" data-preset="weekend">이번 주말</button>
+      <button class="chip" data-preset="next-weekend">다음 주말</button>
+      <button class="chip" data-preset="custom">날짜 선택</button>
+    </div>
+  </header>
+
+  <!-- Bottom sheet (category filters + card list) -->
+  <aside id="sheet" class="sheet-peek" aria-label="카테고리 및 상세">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <div class="tab-row" role="tablist">
+        <button class="tab active" data-view="map">🗺 지도</button>
+        <button class="tab" data-view="read">📖 읽을거리</button>
+      </div>
+      <div class="filter-row" role="group" aria-label="카테고리 필터">
+        <label class="filter"><input type="checkbox" data-cat="festival" checked> 🎪 축제</label>
+        <label class="filter"><input type="checkbox" data-cat="attraction" checked> 🏛 명소</label>
+        <label class="filter"><input type="checkbox" data-cat="food" checked> 🍜 맛집</label>
+        <label class="filter"><input type="checkbox" data-cat="beach" checked> 🏖 해수욕장</label>
+        <label class="filter"><input type="checkbox" data-cat="info_office"> ℹ️ 안내소</label>
+      </div>
+      <div class="status-row">
+        <span id="status">로딩 중…</span>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <div id="card-list" class="card-list" aria-live="polite"></div>
+    </div>
+  </aside>
+
+  <!-- Floating action button: 내 위치 -->
+  <button id="fab-locate" class="fab" aria-label="내 위치로 이동">📍</button>
+
+  <!-- Config + main -->
+  <script src="./config.js"></script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

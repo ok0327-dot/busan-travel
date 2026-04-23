@@ -1,0 +1,15 @@
+{
+  "name": "부산 트래블",
+  "short_name": "부산",
+  "description": "부산 축제·명소·맛집·날씨를 날짜별로 한눈에",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "ko",
+  "scope": "/",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
