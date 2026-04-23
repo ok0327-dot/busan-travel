@@ -16,21 +16,29 @@ import sys
 from pathlib import Path
 
 _CANDIDATES = (
-    Path.home() / "my_playground" / "gov-api-kr",                 # 로컬 dev (monorepo sibling)
-    Path("/root/workspace/gov-api-kr"),                           # RunPod 기타
-    Path(__file__).resolve().parent.parent / "vendor" / "gov-api-kr",  # CI/배포 (vendored)
+    Path(__file__).resolve().parent.parent / "vendor" / "gov-api-kr",  # CI/배포 (vendored) — 1순위
+    Path.home() / "my_playground" / "gov-api-kr",                      # 로컬 dev (monorepo sibling)
+    Path("/root/workspace/gov-api-kr"),                                # RunPod 기타
 )
+
+
+def _has_caller_template(p: Path) -> bool:
+    """exists() 호출 시 PermissionError/OSError 가 나면 False 로 취급."""
+    try:
+        return (p / "snippets" / "_caller_template.py").exists()
+    except (OSError, PermissionError):
+        return False
 
 
 def _resolve_home() -> Path:
     env = os.environ.get("GOV_API_KR_HOME")
     if env:
         p = Path(env)
-        if (p / "snippets" / "_caller_template.py").exists():
+        if _has_caller_template(p):
             return p
         raise RuntimeError(f"GOV_API_KR_HOME={env} 에 snippets/_caller_template.py 없음")
     for p in _CANDIDATES:
-        if (p / "snippets" / "_caller_template.py").exists():
+        if _has_caller_template(p):
             return p
     raise RuntimeError(
         "gov-api-kr 를 찾을 수 없음. GOV_API_KR_HOME 환경변수 설정 필요.\n"
