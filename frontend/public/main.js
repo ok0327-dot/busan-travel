@@ -286,6 +286,20 @@ function infoRow(label, value) {
   return `<div class="info-row"><strong>${label}</strong>${escape(String(value).slice(0, 300))}</div>`;
 }
 
+// P0/P2 — 이미지 태그 생성 (onerror 로 자동 숨김). URL 이 없으면 빈 문자열.
+// visitbusan.net thumbL 썸네일(417×320) → Worker 프록시로 원본(최대 4K) 로드.
+function busanImgUrl(url) {
+  if (!url) return url;
+  const m = String(url).match(/visitbusan\.net\/uploadImgs\/files\/cntnts\/(\d{14,20})(?:_thumb[LMS])?/);
+  if (m) return `/img-proxy/visitbusan/${m[1]}`;
+  return url;
+}
+function imageTag(url, cls = "card-image") {
+  if (!url) return "";
+  const src = busanImgUrl(url);
+  return `<img class="${cls}" src="${escape(src)}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`;
+}
+
 function showDetail(poi) {
   const catDef = CATEGORIES[poi.category] || {};
   const now = new Date();
@@ -311,6 +325,7 @@ function showDetail(poi) {
 
   $list.innerHTML = `
     <div class="card" style="border-left:3px solid ${catDef.color || "#888"}">
+      ${imageTag(poi.image)}
       <div class="card-title">${catDef.emoji || ""} ${escape(poi.title)}${hotelGrade}</div>
       <div class="card-meta">${catDef.label || poi.category}${poi.subtype && !HOTEL_GRADE_BADGE[poi.subtype] ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
       ${ratingLine}
@@ -477,8 +492,17 @@ async function init() {
       document.querySelectorAll(".tab[data-view]").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       setViewMode(btn.dataset.view);
+      if (btn.dataset.view !== "map") history.replaceState(null, "", "#" + btn.dataset.view);
+      else history.replaceState(null, "", location.pathname + location.search);
     });
   });
+
+  // URL 해시 기반 초기 뷰 (#read / #course / #map) — 공유용 링크 + 테스트
+  const hashView = (location.hash || "").replace("#", "");
+  if (hashView === "read" || hashView === "course") {
+    const btn = document.querySelector(`.tab[data-view="${hashView}"]`);
+    if (btn) btn.click();
+  }
 
   // 언어 토글: URL ?lang=en/ja/zh 면 모든 비짓부산 deep-link 를 해당 언어 경로로 다시 씀
   const urlLang = new URLSearchParams(location.search).get("lang") || "ko";
@@ -519,6 +543,8 @@ function rewriteStoryUrls(lang) {
 
 function setViewMode(mode) {
   document.body.classList.toggle("view-read", mode === "read" || mode === "course");
+  document.body.classList.toggle("view-blog", mode === "read");
+  document.body.classList.toggle("view-course", mode === "course");
   const sheet = document.getElementById("sheet");
   if (mode === "read") {
     ["sheet-peek", "sheet-half"].forEach(c => sheet.classList.remove(c));
@@ -546,14 +572,21 @@ function renderCourseList() {
   $list.innerHTML = courses.slice(0, 50).map(c => {
     const poisCount = (c.pois || []).length;
     const active = c.uc_seq === activeCourseId ? "active" : "";
-    return `<div class="card course-card ${active}" data-uc="${c.uc_seq}">
-      <div class="card-title">
-        ${c.duration ? `<span class="course-badge">${escape(c.duration)}</span>` : ""}
-        ${escape(c.title || "")}
+    const hasThumb = !!c.image;
+    const thumb = hasThumb
+      ? `<img class="course-thumb" src="${escape(busanImgUrl(c.image))}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`
+      : "";
+    return `<div class="card course-card ${active}${hasThumb ? " with-thumb" : ""}" data-uc="${c.uc_seq}">
+      ${thumb}
+      <div class="course-body">
+        <div class="card-title">
+          ${c.duration ? `<span class="course-badge">${escape(c.duration)}</span>` : ""}
+          ${escape(c.title || "")}
+        </div>
+        <div class="card-meta">${poisCount}개 POI${c.views ? ` · 조회 ${c.views.toLocaleString()}` : ""}${c.rating ? ` · ★${c.rating}` : ""}</div>
+        ${c.excerpt ? `<div class="card-excerpt">${escape(c.excerpt.slice(0, 160))}</div>` : ""}
+        ${(c.tags || []).length ? `<div class="tag-chips">${c.tags.slice(0, 5).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>` : ""}
       </div>
-      <div class="card-meta">${poisCount}개 POI${c.views ? ` · 조회 ${c.views.toLocaleString()}` : ""}${c.rating ? ` · ★${c.rating}` : ""}</div>
-      ${c.excerpt ? `<div class="card-excerpt">${escape(c.excerpt.slice(0, 160))}</div>` : ""}
-      ${(c.tags || []).length ? `<div class="tag-chips">${c.tags.slice(0, 5).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>` : ""}
     </div>`;
   }).join("");
 
@@ -635,28 +668,77 @@ function renderBlogFeed() {
     $list.innerHTML = `<div class="card"><div class="card-meta">읽을거리 데이터 없음</div></div>`;
     return;
   }
-  $list.innerHTML = posts.slice(0, 100).map(p => {
+
+  // P3 — Culture Trip 에디토리얼 스타일: 첫 카드 featured, 나머지 매거진 카드
+  $list.innerHTML = posts.slice(0, 100).map((p, i) => {
     const src = (p.source || "").replace("naver_blog:", "");
-    const date = p.start || "";
-    return `<div class="card">
-      <div class="card-title">${escape(p.title)}</div>
-      <div class="card-meta">${src} · ${date}</div>
-      ${p.description ? `<div class="card-meta" style="margin-top:4px">${escape(p.description.slice(0,120))}</div>` : ""}
-      ${p.url ? `<a href="${escape(p.url)}" target="_blank" style="display:inline-block;margin-top:8px;padding:4px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:11px">원문 보기</a>` : ""}
-    </div>`;
+    const date = (p.start || "").slice(0, 10);
+    const label = p.category === "festival" ? "FESTIVAL · 축제"
+                : p.subtype === "performance" ? "PERFORMANCE · 공연"
+                : p.subtype === "exhibition" ? "EXHIBITION · 전시"
+                : "JOURNAL · 에디토리얼";
+    const leadLen = i === 0 ? 240 : 140;
+    const lead = p.description
+      ? escape(p.description.slice(0, leadLen)) + (p.description.length > leadLen ? "…" : "")
+      : "";
+    const featured = i === 0 ? " blog-card-featured" : "";
+    return `<article class="blog-card${featured}">
+      <div class="blog-card-category">${escape(label)}</div>
+      <h3 class="blog-card-title">${escape(p.title)}</h3>
+      ${lead ? `<p class="blog-card-lead">${lead}</p>` : ""}
+      <div class="blog-card-meta">
+        <span>${escape(src)}${date ? " · " + escape(date) : ""}</span>
+        ${p.url ? `<a class="blog-card-readmore" href="${escape(p.url)}" target="_blank" rel="noopener">원문 →</a>` : ""}
+      </div>
+    </article>`;
   }).join("");
+}
+
+// P3 — 월간 내러티브 Hero (Faroe 스타일): 이번 달 부산 이야기 1건 큐레이션
+function renderNarrativeHero() {
+  const posts = window.__blogPosts || [];
+  if (!posts.length) return "";
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  // 이번 달 게시글 우선 → 없으면 가장 최근
+  const pick = posts.find(p => (p.start || "").startsWith(ym)) || posts[0];
+  if (!pick) return "";
+  const lead = pick.description
+    ? escape(pick.description.slice(0, 150)) + (pick.description.length > 150 ? "…" : "")
+    : "";
+  const monthLabel = `${now.getFullYear()}년 ${now.getMonth() + 1}월 · STORY OF THE MONTH`;
+  return `<article class="narrative-hero" role="button" tabindex="0">
+    <div class="narrative-hero-label">${escape(monthLabel)}</div>
+    <h2 class="narrative-hero-title">${escape(pick.title)}</h2>
+    ${lead ? `<p class="narrative-hero-lead">${lead}</p>` : ""}
+    <span class="narrative-hero-cta">📖 이번 달의 부산 이야기 · 읽을거리에서 전체 보기 →</span>
+  </article>`;
 }
 
 function renderCategorySummary() {
   const counts = Object.fromEntries(
     Object.keys(CATEGORIES).map(c => [c, (allMarkers[c] || []).length])
   );
-  $list.innerHTML = Object.entries(counts)
+  const summaryHTML = Object.entries(counts)
     .filter(([, n]) => n > 0)
     .map(([c, n]) => {
       const cd = CATEGORIES[c];
       return `<div class="card"><div class="card-title">${cd.emoji} ${cd.label}</div><div class="card-meta">${n}개 · 지도 마커를 탭하면 상세 보기</div></div>`;
     }).join("");
+  $list.innerHTML = renderNarrativeHero() + summaryHTML;
+
+  // Narrative Hero 클릭 → 읽을거리 탭으로 전환
+  const hero = $list.querySelector(".narrative-hero");
+  if (hero) {
+    const goBlog = () => {
+      const btn = document.querySelector('.tab[data-view="read"]');
+      if (btn) btn.click();
+    };
+    hero.addEventListener("click", goBlog);
+    hero.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goBlog(); }
+    });
+  }
 }
 
 function openCustomDatePicker(chipBtn) {

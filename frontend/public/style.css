@@ -1,4 +1,16 @@
+/* ═══ P1 — Fonts (Pretendard body + GmarketSans display) ═══ */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
+@font-face {
+  font-family: "GmarketSans";
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.4/GmarketSansBold.woff") format("woff");
+}
+
 :root {
+  /* ─── Color tokens ─── */
   --bg: #0b1220;
   --fg: #e5e7eb;
   --muted: #9ca3af;
@@ -6,9 +18,43 @@
   --surface: rgba(17, 24, 39, 0.92);
   --surface-hi: rgba(30, 41, 59, 0.95);
   --border: rgba(148, 163, 184, 0.2);
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   --chip-bg: rgba(30, 41, 59, 0.9);
   --chip-active: #2563eb;
+
+  /* ─── 부산 시그니처 팔레트 / Busan signature palette ─── */
+  --busan-sunset: #f4a261;   /* 해운대 일몰 orange */
+  --busan-night: #1d3557;    /* 광안대교 야경 네이비 */
+  --busan-pastel: #f1caa4;   /* 감천문화마을 파스텔 */
+  --busan-sea: #06b6d4;      /* 부산 바다 시안 */
+  --busan-magenta: #e76f51;  /* 해운대 선셋 마젠타 (hero gradient용) */
+
+  /* ─── Typography tokens ─── */
+  --font-body: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+               "Apple SD Gothic Neo", "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "GmarketSans", "Pretendard Variable", Pretendard, -apple-system,
+                  "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --fs-display: 28px;
+  --fs-h1: 20px;
+  --fs-h2: 16px;
+  --fs-body: 15px;
+  --fs-meta: 12px;
+  --fs-small: 11px;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* ─── Shadow tiers ─── */
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow: var(--shadow-lg); /* backwards compat */
+
+  /* ─── Radius tokens ─── */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,10 +62,20 @@
 html, body {
   width: 100%; height: 100%;
   background: var(--bg); color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-               "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   overflow: hidden;
+}
+
+/* Display 유틸리티 — Hero/타이틀 등 큰 텍스트에 GmarketSans Bold */
+.display {
+  font-family: var(--font-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.01em;
 }
 
 /* Use dynamic viewport (iOS Safari 주소창 대응) */
@@ -65,8 +121,8 @@ html, body {
 #sheet {
   position: fixed; left: 0; right: 0; bottom: 0;
   background: var(--surface);
-  border-top-left-radius: 16px; border-top-right-radius: 16px;
-  box-shadow: var(--shadow);
+  border-top-left-radius: var(--r-lg); border-top-right-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   z-index: 20;
   transition: transform 0.25s ease-out;
@@ -134,16 +190,212 @@ body.view-read .filter-row { display: none; }
   -webkit-overflow-scrolling: touch;
 }
 
-.card-list { display: flex; flex-direction: column; gap: 8px; }
+.card-list { display: flex; flex-direction: column; gap: 10px; }
 .card {
   padding: 10px 12px;
   background: var(--surface-hi);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   cursor: pointer;
+  overflow: hidden; /* card-image의 bleed radius 클립 */
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
 }
-.card-title { font-weight: 600; margin-bottom: 2px; }
-.card-meta  { color: var(--muted); font-size: 11px; }
+.card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.card-title {
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-bold);
+  line-height: 1.35;
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+.card-meta  { color: var(--muted); font-size: var(--fs-meta); line-height: 1.45; }
+
+/* ═══ P0 — 카드 이미지 렌더링 ═══ */
+/* POI 상세 카드: 상단 full-bleed 4:3 히어로 이미지 */
+.card-image {
+  display: block;
+  width: calc(100% + 24px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: linear-gradient(135deg, rgba(96,165,250,0.08), rgba(148,163,184,0.05));
+  margin: -10px -12px 10px;
+  border-radius: 10px 10px 0 0;
+  color: transparent; /* alt 텍스트 숨김 */
+}
+
+/* 코스 카드: 좌측 96×72 썸네일 + 우측 본문 그리드 */
+.course-card.with-thumb {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 10px;
+}
+.course-thumb {
+  width: 96px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.08);
+  display: block;
+  color: transparent;
+}
+.course-card.with-thumb .course-body { min-width: 0; }
+
+/* ═══ P3 — 블로그 에디토리얼 (Culture Trip 스타일) ═══ */
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px 16px;
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  border-left: 3px solid var(--busan-sunset);
+  cursor: pointer;
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-left-color 0.2s;
+}
+.blog-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-left-color: var(--busan-magenta);
+}
+.blog-card-category {
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--busan-sunset);
+}
+.blog-card-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: var(--fw-bold);
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  margin: 0;
+}
+.blog-card-lead {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #d1d5db;
+  margin: 0;
+}
+.blog-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+.blog-card-readmore {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: var(--fw-medium);
+  font-size: var(--fs-meta);
+  white-space: nowrap;
+}
+.blog-card-readmore:hover { text-decoration: underline; }
+
+/* Featured hero 카드 (첫 번째 블로그) */
+.blog-card-featured {
+  padding: 26px 24px 22px;
+  border-left: none;
+  border: 1px solid rgba(244, 162, 97, 0.3);
+  background:
+    linear-gradient(135deg, rgba(244, 162, 97, 0.1), rgba(29, 53, 87, 0.25)),
+    var(--surface-hi);
+}
+.blog-card-featured .blog-card-title { font-size: 26px; line-height: 1.22; }
+.blog-card-featured .blog-card-lead  { font-size: 14px; line-height: 1.65; color: #e5e7eb; }
+.blog-card-featured:hover { border-left: none; border-color: rgba(244, 162, 97, 0.5); }
+
+/* ═══ P3 — 월간 내러티브 Hero (Faroe 스타일) ═══ */
+/* 홈(지도) 뷰 peek/half 상태에서 카드 리스트 최상단에 고정 — 이번 달 부산 이야기 */
+.narrative-hero {
+  position: relative;
+  padding: 24px 22px 22px;
+  margin-bottom: 12px;
+  border-radius: var(--r-lg);
+  background:
+    linear-gradient(135deg, rgba(244, 162, 97, 0.22) 0%, rgba(29, 53, 87, 0.55) 55%, rgba(231, 111, 81, 0.28) 100%),
+    #141a28;
+  border: 1px solid rgba(244, 162, 97, 0.3);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s ease-out, box-shadow 0.2s, border-color 0.2s;
+}
+.narrative-hero::before {
+  content: "";
+  position: absolute;
+  top: -40%; right: -20%;
+  width: 65%; height: 180%;
+  background: radial-gradient(ellipse, rgba(244, 162, 97, 0.22) 0%, transparent 70%);
+  pointer-events: none;
+}
+.narrative-hero::after {
+  content: "";
+  position: absolute;
+  bottom: -30%; left: -10%;
+  width: 50%; height: 140%;
+  background: radial-gradient(ellipse, rgba(231, 111, 81, 0.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.narrative-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(244, 162, 97, 0.55);
+}
+.narrative-hero:focus-visible {
+  outline: 2px solid var(--busan-sunset);
+  outline-offset: 2px;
+}
+.narrative-hero-label {
+  position: relative;
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--busan-sunset);
+  margin-bottom: 10px;
+}
+.narrative-hero-title {
+  position: relative;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: var(--fw-bold);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  margin: 0 0 10px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+.narrative-hero-lead {
+  position: relative;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #e5e7eb;
+  margin: 0 0 14px;
+}
+.narrative-hero-cta {
+  position: relative;
+  display: inline-block;
+  font-size: var(--fs-meta);
+  font-weight: var(--fw-medium);
+  color: var(--busan-sunset);
+}
+
+@media (min-width: 900px) {
+  .narrative-hero-title { font-size: 24px; }
+  .narrative-hero { padding: 28px 26px 24px; }
+}
 
 /* Tag chips in detail card */
 .tag-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -157,10 +409,10 @@ body.view-read .filter-row { display: none; }
   color: #93c5fd;
   white-space: nowrap;
 }
-.rating-stars { color: #fbbf24; font-size: 12px; }
-.info-row { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.4; }
-.info-row strong { color: var(--fg); font-weight: 500; margin-right: 4px; }
-.card-excerpt { margin-top: 6px; font-size: 12px; line-height: 1.45; color: #d1d5db; }
+.rating-stars { color: #fbbf24; font-size: var(--fs-meta); }
+.info-row { margin-top: 6px; color: var(--muted); font-size: var(--fs-small); line-height: 1.45; }
+.info-row strong { color: var(--fg); font-weight: var(--fw-medium); margin-right: 4px; }
+.card-excerpt { margin-top: 8px; font-size: var(--fs-meta); line-height: 1.5; color: #d1d5db; }
 
 /* Course card */
 .course-card { cursor: pointer; position: relative; }
@@ -214,3 +466,58 @@ body.view-read .filter-row { display: none; }
   backdrop-filter: blur(8px);
 }
 .fab:active { transform: scale(0.92); }
+
+/* ═══ P1 — 반응형 레이아웃 (데스크톱 ≥ 900px) ═══ */
+/* 모바일 기본: 풀스크린 맵 + 하단 드래그 시트 */
+/* 데스크톱: 풀스크린 맵 + 우측 420px 고정 사이드 패널 */
+@media (min-width: 900px) {
+  #sheet {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 420px;
+    max-height: 100dvh;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.45);
+  }
+  /* peek/half/full 스냅은 데스크톱에서 의미 없음 — transform 고정 */
+  #sheet.sheet-peek,
+  #sheet.sheet-half,
+  #sheet.sheet-full { transform: none; }
+  .sheet-handle { display: none; }
+  .sheet-header { padding-top: 12px; }
+
+  /* 상단 칩바·언어 토글·FAB: 사이드 패널 공간 비우기 */
+  #topbar { right: 420px; }
+  .lang-toggle { right: 436px; }
+  .fab { right: 436px; bottom: 24px; }
+
+  /* 읽을거리(블로그) 뷰에서 2컬럼 매거진 그리드 — 에디토리얼 매거진 룩 */
+  body.view-blog .card-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  /* featured 카드는 2컬럼 가로 전체 차지 (hero) */
+  body.view-blog .card-list .blog-card-featured {
+    grid-column: 1 / -1;
+  }
+  /* 코스 뷰는 단일 컬럼 유지 (좌썸네일 가로카드 포맷) */
+
+  /* 데스크톱에선 카드 패딩·타이포 살짝 강화 */
+  .card { padding: 12px 14px; }
+  .card-title { font-size: 17px; }
+
+  /* POI 상세 카드 이미지: 데스크톱에선 좀 더 와이드하게 (16:10) */
+  .card-image { aspect-ratio: 16 / 10; }
+}
+
+/* 대화면 랩탑 (≥ 1280px): 사이드 패널 조금 더 넓게 */
+@media (min-width: 1280px) {
+  #sheet { width: 480px; }
+  #topbar { right: 480px; }
+  .lang-toggle { right: 496px; }
+  .fab { right: 496px; }
+}

@@ -18,3 +18,5 @@ venv/
 vendor/gov-api-kr/.cache/
 vendor/gov-api-kr/*.db
 vendor/gov-api-kr/data/
+# Wrangler 로컬 캐시/임시 빌드 산출물 — 커밋 대상 아님
+.wrangler/
