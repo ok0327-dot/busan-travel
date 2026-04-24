@@ -1,10 +1,8 @@
 {
-  "generated_at": "2026-04-24T08:34:33+00:00",
-  "version": "20260424T083433",
+  "generated_at": "2026-04-24T10:52:33+00:00",
+  "version": "20260424T105233",
   "counts": {
-    "places": 616,
-    "lodging": 0,
-    "foodie": 0,
+    "places": 608,
     "courses": 0,
     "events_by_month": {
       "undated": 4,
