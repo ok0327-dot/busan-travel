@@ -464,6 +464,18 @@ html, body {
   text-decoration: underline;
 }
 
+/* ─── 시트 하단 크레딧 ─── */
+.sheet-credit {
+  padding: 12px 16px 24px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  font-family: var(--font-body);
+  text-transform: lowercase;
+}
+
 /* ─── Phase 2.5: 향토음식 row 배지 ─── */
 .festival-row.foodie-row { border-left-color: #db2777; }
 .festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }
