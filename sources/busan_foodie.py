@@ -1,80 +1,113 @@
-"""Busan Foodie Tour API (data.go.kr) — 부산 향토음식·대표 메뉴 정보.
+"""Busan Foodie Tour API — 부산 향토음식 에세이·대표 지역 먹거리.
 
-부산광역시가 제공하는 '부산푸디투어정보 서비스' API.
-현재 registry.json 에 API_ID 등록 대기 중 (TBD). 등록 완료 후 FOODIE_API_ID 상수 교체.
+End Point: https://apis.data.go.kr/6260000/FoodieService/getFoodieKr
+데이터명: 부산광역시_부산푸디투어정보 서비스 (활용기간 2026-04-24 ~ 2028-04-24)
 
-부산 6260000 기관 API 표준 필드 (맛집·명소 API 와 동일 패턴):
-- TITLE / PLACE / ADDR1 / LAT / LNG
-- MAIN_IMG_NORMAL / MAIN_IMG_THUMB
-- ITEMCNTNTS (설명) / SUBTITLE
-- HOMEPAGE_URL / CNTCT_TEL
-- UC_SEQ (고유 식별자)
-- USAGE_DAY_WEEK_AND_TIME / HLDY_INFO (영업시간/휴무)
-- ReceNTMN / RPRSNTV_MENU (대표메뉴) — foodie 특화 추정 필드
+특징 / Notes:
+- 맛집 API(FoodService) 와 달리 **위·경도·주소 필드가 없음**
+- "밀면", "초량 돼지갈비 골목", "동래파전" 처럼 **지역·대표 음식 에세이** 성격
+- 지도 마커 대신 시트 '오늘의 부산' 하이라이트 리스트로 노출
+- 향후 Phase 3: Kakao 주소검색 API 로 PLACE 문자열 → 좌표 자동화 가능
+
+응답 필드 (실측):
+  UC_SEQ / TITLE / MAIN_TITLE / SUBTITLE / PLACE / ITEMCNTNTS
+  MAIN_IMG_NORMAL / MAIN_IMG_THUMB
+
+정식 API_ID(data.go.kr 8자리) 는 사용자 공유 대기 중. 받는 즉시 registry.json
+등록 + gov-api-kr call_api 기반으로 전환 예정. 현재는 requests 직접 호출.
 """
 from __future__ import annotations
 
+import os
 import sys
+from pathlib import Path
 
-from sources._gov_api import call_api
-from sources._parsers import busan_latlon
+import requests
+
 from storage.db import Event
 
 SOURCE = "busan_foodie"
-
-# TODO: data.go.kr 등록 후 확정. registry.json 에도 함께 등록 필요.
-FOODIE_API_ID = "TBD"
-FOODIE_OP = "getFoodieTourKr"  # 부산 API 네이밍 패턴(getFoodKr/getAttractionKr) 기반 추정
+ENDPOINT = "https://apis.data.go.kr/6260000/FoodieService/getFoodieKr"
 PAGE_SIZE = 100
-MAX_PAGES = 20
+MAX_PAGES = 5
+
+
+def _load_key() -> str | None:
+    """DATA_GO_KR_KEY 를 env 또는 gov-api-kr/.env 에서 로드."""
+    k = os.environ.get("DATA_GO_KR_KEY")
+    if k:
+        return k
+    candidates = (
+        Path.home() / "my_playground" / "gov-api-kr" / ".env",
+        Path(__file__).resolve().parent.parent / "vendor" / "gov-api-kr" / ".env",
+    )
+    for path in candidates:
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines():
+            s = line.strip()
+            if s.startswith("DATA_GO_KR_KEY="):
+                return s.split("=", 1)[1].strip().strip('"').strip("'")
+    return None
 
 
 def _parse_item(raw: dict) -> Event:
-    lat, lon = busan_latlon(raw.get("LAT"), raw.get("LNG"))
-    # 대표 메뉴는 subtype 에 담아 UI 에서 배지로 표시 가능
-    rpr_menu = (raw.get("RPRSNTV_MENU") or raw.get("REPRESENT_MENU") or "").strip() or None
+    # SUBTITLE 을 subtype 에 저장 (UI 배지로 노출: "초량에서 고기 즐기기" 등)
+    subtitle = (raw.get("SUBTITLE") or "").strip() or None
     return Event(
         source=SOURCE,
         source_id=str(raw.get("UC_SEQ") or raw.get("TITLE") or ""),
         category="foodie",
-        title=(raw.get("TITLE") or "").strip(),
+        title=(raw.get("TITLE") or raw.get("MAIN_TITLE") or "").strip(),
         venue=raw.get("PLACE"),
-        address=raw.get("ADDR1"),
-        url=raw.get("HOMEPAGE_URL"),
-        phone=raw.get("CNTCT_TEL"),
         image_url=raw.get("MAIN_IMG_NORMAL") or raw.get("MAIN_IMG_THUMB"),
         description=raw.get("ITEMCNTNTS") or raw.get("SUBTITLE"),
-        hours=raw.get("USAGE_DAY_WEEK_AND_TIME"),
-        holiday=raw.get("HLDY_INFO"),
-        subtype=rpr_menu,
-        lat=lat,
-        lon=lon,
+        subtype=subtitle,
         raw=dict(raw),
     )
 
 
 def fetch(page_size: int = PAGE_SIZE, max_pages: int = MAX_PAGES) -> list[Event]:
-    if FOODIE_API_ID == "TBD":
-        print(
-            f"[{SOURCE}] SKIP: FOODIE_API_ID 미확정 — registry.json 등록 후 실행",
-            file=sys.stderr,
-        )
+    key = _load_key()
+    if not key:
+        print(f"[{SOURCE}] SKIP: DATA_GO_KR_KEY 미설정", file=sys.stderr)
         return []
 
     events: list[Event] = []
     for page in range(1, max_pages + 1):
-        r = call_api(FOODIE_API_ID, FOODIE_OP, pageNo=page, numOfRows=page_size)
-        code = r["result_code"]
-        if code == "PENDING":
-            print(f"[{SOURCE}] SKIP: {r['result_msg']}", file=sys.stderr)
-            return events
+        try:
+            r = requests.get(
+                ENDPOINT,
+                params={
+                    "ServiceKey": key,
+                    "pageNo": page,
+                    "numOfRows": page_size,
+                    "resultType": "json",
+                },
+                timeout=15,
+            )
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            print(f"[{SOURCE}] page={page} err: {e}", file=sys.stderr)
+            break
+
+        root = data.get("getFoodieKr", {}) if isinstance(data, dict) else {}
+        header = root.get("header", {})
+        code = header.get("code")
         if code != "00":
-            print(f"[{SOURCE}] page={page} err={code} {r['result_msg']}", file=sys.stderr)
+            print(f"[{SOURCE}] page={page} err code={code} {header.get('message')}", file=sys.stderr)
             break
-        page_items = r["items"]
-        if not page_items:
+
+        items = root.get("item") or []
+        if isinstance(items, dict):
+            items = [items]
+        if not items:
             break
-        events.extend(_parse_item(it) for it in page_items)
-        if len(page_items) < page_size or len(events) >= r["total_count"]:
+
+        total = int(root.get("totalCount") or 0)
+        events.extend(_parse_item(it) for it in items)
+        if len(items) < page_size or (total and len(events) >= total):
             break
+
     return events

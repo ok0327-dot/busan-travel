@@ -838,9 +838,9 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // Phase 2.5: 부산푸디투어 기반 향토음식 TOP 8 (데이터 있을 때만)
+  // Phase 2.5: 부산푸디투어 기반 향토음식 TOP 8 (좌표 없는 에세이형 데이터)
   let foodieHTML = "";
-  const foodieList = (window.__foodie?.foodie || []).filter(f => f && f.lat && f.lon).slice(0, 8);
+  const foodieList = (window.__foodie?.foodie || []).slice(0, 8);
   if (foodieList.length) {
     const rows = foodieList.map((p, i) => {
       const sub = p.subtype ? `<span class="fr-badge">🍲 ${escape(p.subtype)}</span>` : "";

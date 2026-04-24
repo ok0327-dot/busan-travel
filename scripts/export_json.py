@@ -196,12 +196,15 @@ def export_lodging(conn: sqlite3.Connection) -> int:
 
 
 def export_foodie(conn: sqlite3.Connection) -> int:
-    """향토음식 전용 파일 — 부산푸디투어 API 기반. food(일반 맛집) 과 분리된 레이어."""
+    """향토음식 전용 파일 — 부산푸디투어 API 기반. food(일반 맛집) 과 분리된 레이어.
+
+    NOTE: 이 API 는 좌표가 없어 지도 마커가 아닌 시트 하이라이트 리스트에만 노출.
+    따라서 lat IS NOT NULL 조건 없이 전체 수집.
+    """
     rows = [
         _jsonable(r)
         for r in conn.execute(
-            "SELECT * FROM events WHERE category='foodie' AND lat IS NOT NULL "
-            "ORDER BY title"
+            "SELECT * FROM events WHERE category='foodie' ORDER BY title"
         )
     ]
     (OUT_DIR / "foodie.json").write_text(
