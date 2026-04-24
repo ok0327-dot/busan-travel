@@ -16,6 +16,7 @@ from sources import (
     gov_info_office,
     gov_tour,
     naver_blogs,
+    naver_search,
     visitbusan,
 )
 from storage.db import Event, connect, upsert_events
@@ -29,6 +30,7 @@ SOURCES = [
     ("busan_info_office",      gov_info_office.fetch),
     ("tour_api",               gov_tour.fetch),
     ("naver_blogs",            naver_blogs.fetch),
+    ("naver_search",           naver_search.fetch),  # Phase 3: 검색 API (블로그+뉴스)
     # VisitBusan.net 큐레이션 (Phase 5)
     ("vb_attraction",          visitbusan.fetch_attractions),
     ("vb_food_curated",        visitbusan.fetch_food_curated),

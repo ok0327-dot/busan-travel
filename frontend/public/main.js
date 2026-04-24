@@ -228,24 +228,31 @@ function applyDateFilter(target) {
   currentTargetDate = target;
   const clusterer = clusterers.festival;
 
-  let active = 0, upcoming = 0, unknown = 0;
+  // 지도 마커 (좌표 있는 festival 만) — opacity 조정 + past 제거
   if (clusterer) {
     const showMarkers = [];
     for (const { marker, poi } of allMarkers.festival || []) {
       const kind = classifyFestival(poi, target);
-      if (kind === "active")   { active++;   showMarkers.push(marker); marker.setOpacity(1.0); }
-      else if (kind === "upcoming") { upcoming++; showMarkers.push(marker); marker.setOpacity(0.55); }
-      else if (kind === "unknown")  { unknown++;  showMarkers.push(marker); marker.setOpacity(0.55); }
-      // past 는 showMarkers 에 미포함 → 지도에서 사라짐
+      if (kind === "active")   { showMarkers.push(marker); marker.setOpacity(1.0); }
+      else if (kind === "upcoming") { showMarkers.push(marker); marker.setOpacity(0.55); }
+      else if (kind === "unknown")  { showMarkers.push(marker); marker.setOpacity(0.55); }
     }
     clusterer.clear();
     clusterer.addMarkers(showMarkers);
   }
 
+  // Phase 3: 시트·배지 카운트는 좌표 無 이벤트 포함 전체 기준 (naver_search 포함)
+  const all = window.__data?.allEventPoi || [];
+  let active = 0, upcoming = 0;
+  for (const poi of all) {
+    const kind = classifyFestival(poi, target);
+    if (kind === "active") active++;
+    else if (kind === "upcoming") upcoming++;
+  }
+
   const ymd = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
   $status.textContent = `📅 ${ymd} · 진행 ${active} · 2개월내 ${upcoming}`;
 
-  // Phase 2: 날짜 헤드라인 배지 + '오늘의 부산' 하이라이트 시트 동기화
   renderDateBadge(target, active, upcoming);
   const isMapView = !document.body.classList.contains("view-read") && !document.body.classList.contains("view-course");
   if (isMapView) renderTodayHighlights(target);
@@ -470,8 +477,13 @@ async function init() {
     .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
   window.__blogPosts = allBlogPosts;
 
+  // Phase 3: 좌표 없는 naver_search 행사도 시트에 노출하기 위해 카테고리 기반 전체 수집
+  const allEventPoi = allEvents.filter(e =>
+    ["festival", "exhibition", "performance"].includes(e.category)
+  );
+
   weatherIndex = buildWeatherIndex(weatherShort);
-  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, foodie, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers };
+  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, foodie, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers, allEventPoi };
 
   renderMarkers(places, beaches, allFestivalEvents, lodging, allBlogMarkers, foodie);
 
@@ -780,8 +792,10 @@ function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
 
+  // Phase 3: 좌표 없는 naver_search 이벤트도 포함 (window.__data.allEventPoi 기반)
+  const pool = window.__data?.allEventPoi || [];
   const active = [], upcoming = [];
-  for (const { poi } of allMarkers.festival || []) {
+  for (const poi of pool) {
     const kind = classifyFestival(poi, target);
     if (kind === "active") active.push(poi);
     else if (kind === "upcoming") upcoming.push(poi);
