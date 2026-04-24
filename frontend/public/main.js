@@ -825,22 +825,29 @@ function renderNarrativeHero() {
   </article>`;
 }
 
-// ───────── Phase 2: "오늘의 부산" 하이라이트 (카테고리 요약 대체) ─────────
-// 선택 날짜 기반: 진행 중 축제 + 2개월 내 다가오는 행사 + 월 제철 + 월간 STORY
+// ───────── Phase 2: "오늘의 부산" 하이라이트 — Hero Top 3 + Tail 칩 ─────────
+// 중요도 스코어(priority) 기반 재설계. 진행중+예정 합친 후 priority 내림차순,
+// 상위 3건은 이미지+D-x+태그 가진 Hero 카드, 나머지는 칩 리스트(기본 6 + 더보기).
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
 
-  // Phase 3: 좌표 없는 naver_search 이벤트도 포함 (window.__data.allEventPoi 기반)
   const pool = window.__data?.allEventPoi || [];
   const active = [], upcoming = [];
   for (const poi of pool) {
     const kind = classifyFestival(poi, target);
-    if (kind === "active") active.push(poi);
-    else if (kind === "upcoming") upcoming.push(poi);
+    if (kind === "active") active.push({ ...poi, _k: "active" });
+    else if (kind === "upcoming") upcoming.push({ ...poi, _k: "upcoming" });
   }
-  active.sort((a, b) => (a.end || a.start || "").localeCompare(b.end || b.start || ""));
-  upcoming.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  // Hero 통합 정렬: priority DESC, 같으면 시작일 ASC (임박 우선)
+  const combined = [...active, ...upcoming];
+  combined.sort((a, b) => {
+    const pa = a.priority ?? 0, pb = b.priority ?? 0;
+    if (pa !== pb) return pb - pa;
+    return (a.start || "").localeCompare(b.start || "");
+  });
+  const hero = combined.slice(0, 3);
+  const tail = combined.slice(3);
 
   const season = (window.__seasonal?.months || {})[month];
   const today = new Date();
@@ -849,29 +856,39 @@ function renderTodayHighlights(target) {
   const heroDate = isToday ? "오늘" : `${target.getMonth() + 1}월 ${target.getDate()}일 (${days[target.getDay()]})`;
   const heroSub = season?.title || "부산 여행";
 
-  const heroHTML = `<div class="highlight-hero">
+  const topBar = `<div class="highlight-hero">
     <div class="hh-date">${escape(heroDate)} · 부산</div>
-    <div class="hh-sub">${escape(heroSub)}</div>
+    <div class="hh-sub">${escape(heroSub)} · 진행 ${active.length} · 2개월내 ${upcoming.length}</div>
   </div>`;
 
-  let activeHTML;
-  if (active.length) {
-    activeHTML = `<div class="highlight-section">
-      <div class="hs-title">🎪 지금 진행 중 ${active.length}건</div>
-      ${active.slice(0, 8).map((p, i) => festivalRowHTML(p, "active", i)).join("")}
+  let heroHTML;
+  if (hero.length) {
+    heroHTML = `<div class="highlight-section hl-hero-section">
+      <div class="hs-title">⭐ 이번 주 주목 Top ${hero.length}</div>
+      <div class="hero-grid">
+        ${hero.map((p, i) => heroCardHTML(p, i, target)).join("")}
+      </div>
     </div>`;
   } else {
-    activeHTML = `<div class="highlight-section">
-      <div class="hs-title">🎪 이 날짜 진행 중 행사 없음</div>
-      <div class="hs-note">📅 다른 날을 선택하거나 '다가오는 행사' 를 참고하세요.</div>
+    heroHTML = `<div class="highlight-section">
+      <div class="hs-title">🎪 이 날짜 주목할 행사 없음</div>
+      <div class="hs-note">📅 다른 날을 선택하거나 달력에서 다가오는 날짜를 눌러보세요.</div>
     </div>`;
   }
 
-  let upcomingHTML = "";
-  if (upcoming.length) {
-    upcomingHTML = `<div class="highlight-section">
-      <div class="hs-title">📅 2개월 안에 열리는 행사 ${upcoming.length}건</div>
-      ${upcoming.slice(0, 6).map((p, i) => festivalRowHTML(p, "upcoming", i)).join("")}
+  let tailHTML = "";
+  if (tail.length) {
+    const initial = 6;
+    const firstBatch = tail.slice(0, initial);
+    const extra = tail.slice(initial);
+    const extraHTML = extra.length
+      ? `<div class="chip-extra" hidden>${extra.map((p, i) => chipHTML(p, i + initial, target)).join("")}</div>
+         <button class="chip-more" type="button">+${extra.length}건 더 보기</button>`
+      : "";
+    tailHTML = `<div class="highlight-section">
+      <div class="hs-title">📋 그 외 행사 ${tail.length}건</div>
+      <div class="chip-list">${firstBatch.map((p, i) => chipHTML(p, i, target)).join("")}</div>
+      ${extraHTML}
     </div>`;
   }
 
@@ -892,43 +909,92 @@ function renderTodayHighlights(target) {
 
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + storyHero;
+  $list.innerHTML = topBar + heroHTML + tailHTML + seasonHTML + storyHero;
 
-  // 축제 row 클릭 → POI 상세 (showDetail 은 pulse+pan+시트 half 를 자동 처리)
-  $list.querySelectorAll(".festival-row").forEach(btn => {
+  // Hero + chip 클릭 → POI 상세
+  $list.querySelectorAll(".hero-card, .chip").forEach(btn => {
     btn.addEventListener("click", () => {
-      const kind = btn.dataset.kind;
       const idx = Number(btn.dataset.idx);
-      const poi = kind === "active" ? active[idx] : upcoming[idx];
+      const poi = combined[idx];
       if (poi) showDetail(poi);
     });
   });
 
+  // 칩 더 보기 펼치기
+  const moreBtn = $list.querySelector(".chip-more");
+  if (moreBtn) {
+    moreBtn.addEventListener("click", () => {
+      const extra = $list.querySelector(".chip-extra");
+      if (extra) extra.hidden = false;
+      moreBtn.remove();
+    });
+  }
+
   // 월간 STORY 클릭 → 읽을거리 탭
-  const hero = $list.querySelector(".narrative-hero");
-  if (hero) {
+  const storyEl = $list.querySelector(".narrative-hero");
+  if (storyEl) {
     const goBlog = () => {
       const btn = document.querySelector('.tab[data-view="read"]');
       if (btn) btn.click();
     };
-    hero.addEventListener("click", goBlog);
-    hero.addEventListener("keydown", e => {
+    storyEl.addEventListener("click", goBlog);
+    storyEl.addEventListener("keydown", e => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goBlog(); }
     });
   }
 }
 
-function festivalRowHTML(p, kind, idx) {
+function _dBadge(p, target) {
+  // D-x 배지 문자열. active 는 "진행중 · ~종료일", upcoming 은 "D-x"
+  const start = parseDate(p.start);
+  const end = parseDate(p.end) || start;
+  if (!start) return "";
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const MS = 86400000;
+  if (p._k === "active") {
+    if (!end) return "진행중";
+    const daysLeft = Math.max(0, Math.round((end - t) / MS));
+    return daysLeft === 0 ? "오늘 종료" : `진행중 · D-${daysLeft}`;
+  }
+  const daysTo = Math.max(0, Math.round((start - t) / MS));
+  return daysTo === 0 ? "오늘 시작" : `D-${daysTo}`;
+}
+
+function heroCardHTML(p, idx, target) {
+  const img = p.image;
+  const tags = (p.hero_tags || []).slice(0, 2);
+  const tagHTML = tags.length
+    ? `<div class="hc-tags">${tags.map(t => `<span class="hc-tag">${escape(t)}</span>`).join("")}</div>`
+    : "";
+  const dBadge = _dBadge(p, target);
+  const venue = p.venue || p.address || "";
   const start = (p.start || "").slice(5);
   const end = (p.end || "").slice(5);
   const dateRange = start && end && end !== start ? `${start}~${end}`
-                  : start ? start
-                  : "";
-  const venue = p.venue || p.address || "";
-  const upcomingClass = kind === "upcoming" ? " is-upcoming" : "";
-  return `<button class="festival-row${upcomingClass}" data-kind="${kind}" data-idx="${idx}">
-    <span class="fr-title">${escape(p.title || "(제목 없음)")}</span>
-    <span class="fr-meta">${escape(dateRange)}${venue ? " · " + escape(venue) : ""}</span>
+                  : start ? start : "";
+  const imgHTML = img
+    ? `<img class="hc-img" src="${escape(img)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : `<div class="hc-img hc-img-placeholder">${icon("ph-confetti")}</div>`;
+  const activeClass = p._k === "active" ? " is-active" : "";
+  return `<button class="hero-card${activeClass}" data-idx="${idx}">
+    <div class="hc-media">
+      ${imgHTML}
+      ${dBadge ? `<span class="hc-dbadge">${escape(dBadge)}</span>` : ""}
+    </div>
+    <div class="hc-body">
+      ${tagHTML}
+      <h3 class="hc-title">${escape(p.title || "(제목 없음)")}</h3>
+      <div class="hc-meta">${escape(dateRange)}${venue ? " · " + escape(venue) : ""}</div>
+    </div>
+  </button>`;
+}
+
+function chipHTML(p, idx, target) {
+  const dBadge = _dBadge(p, target);
+  const activeClass = p._k === "active" ? " is-active" : "";
+  return `<button class="chip${activeClass}" data-idx="${idx}">
+    ${dBadge ? `<span class="chip-d">${escape(dBadge)}</span>` : ""}
+    <span class="chip-title">${escape(p.title || "(제목 없음)")}</span>
   </button>`;
 }
 

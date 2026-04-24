@@ -25,8 +25,13 @@ DROP_SOURCES: frozenset[str] = frozenset({
 # blog_post 카테고리를 쓸 수 있는 공식(신뢰) 블로그 — 외 소스의 blog_post 는 drop
 # 개인 블로그(naver_search:blog) 는 품질 편차 크고, 뉴스는 블로그 아님.
 OFFICIAL_BLOG_SOURCES: frozenset[str] = frozenset({
-    "naver_blog:bscf2009",     # 부산문화재단
-    "naver_blog:hudpr",        # 부산관광공사
+    "naver_blog:bscf2009",      # 부산문화재단
+    "naver_blog:hudpr",         # 해운대구청
+    "naver_blog:moca_busan",    # 부산현대미술관
+    "naver_blog:bsbukgusns",    # 부산 북구청
+    "naver_blog:bsjunggu",      # 부산 중구청
+    "naver_blog:yeonjegu",      # 부산 연제구청
+    "naver_blog:bsdonggublog",  # 부산 동구청
 })
 
 # 공식 관광 데이터 — 필터 건너뛰고 항상 keep (품질 신뢰)

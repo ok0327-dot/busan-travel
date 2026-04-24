@@ -13,13 +13,45 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 DB_PATH = ROOT / "data" / "events.db"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
+
+sys.path.insert(0, str(ROOT))
+from sources._tour_filter import importance_score, SCALE_POSITIVE_KEYWORDS  # noqa: E402
+
+
+def _duration_days(start: str | None, end: str | None) -> int | None:
+    """YYYY-MM-DD 문자열 페어 → 기간 일수 (포함). 미정 값은 None."""
+    if not start:
+        return None
+    try:
+        s = date.fromisoformat(start[:10])
+        e = date.fromisoformat((end or start)[:10])
+        return max(1, (e - s).days + 1)
+    except ValueError:
+        return None
+
+
+def _hero_tags(title: str | None, description: str | None) -> list[str]:
+    """제목/설명에 매칭되는 규모 태그 추출 ('국제', '전국', 'BIFF' 등)."""
+    blob = f"{title or ''} {description or ''}"
+    tags = [kw for kw in SCALE_POSITIVE_KEYWORDS if kw in blob]
+    # 중복 축소 + 최대 2개
+    seen = set()
+    out = []
+    for t in tags:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+        if len(out) >= 2:
+            break
+    return out
 
 PLACE_CATEGORIES = {"food", "cafe", "attraction", "theme"}
 EVENT_CATEGORIES = {"festival", "blog_post"}
@@ -108,7 +140,10 @@ def _col(row: sqlite3.Row, key: str, default=None):
 
 
 def _jsonable(row: sqlite3.Row) -> dict:
-    """Whitelist-safe dict (raw_json/민감 필드 제외) + VisitBusan enrichment."""
+    """Whitelist-safe dict (raw_json/민감 필드 제외) + VisitBusan enrichment.
+
+    이벤트 카테고리에는 Hero Top 3 용 priority 필드 추가 (importance_score 결과).
+    """
     import json as _json
     tags = None
     tj = _col(row, "tags_json")
@@ -117,6 +152,26 @@ def _jsonable(row: sqlite3.Row) -> dict:
             tags = _json.loads(tj)
         except (ValueError, TypeError):
             tags = None
+
+    # 이벤트 우선순위 스코어링 (festival/exhibition/performance/blog_post 에만 의미)
+    priority = None
+    hero_tags: list[str] = []
+    cat = row["category"]
+    if cat in ("festival", "exhibition", "performance", "blog_post"):
+        dur = _duration_days(row["start_date"], row["end_date"])
+        priority = importance_score(
+            title=row["title"],
+            description=row["description"],
+            venue=row["venue"],
+            image_url=row["image_url"],
+            lat=row["lat"],
+            lon=row["lon"],
+            rating=_col(row, "rating"),
+            view_count=_col(row, "view_count"),
+            duration_days=dur,
+        )
+        hero_tags = _hero_tags(row["title"], row["description"])
+
     return {
         "id": row["id"],
         "source": row["source"],
@@ -148,6 +203,9 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "transport": _col(row, "transport"),
         "tip": _col(row, "tip"),
         "phone": _col(row, "phone"),
+        # Hero Top 3 재설계용 (이벤트에만 값, places 는 None)
+        "priority": priority,
+        "hero_tags": hero_tags or None,
     }
 
 

@@ -228,6 +228,168 @@ html, body {
   100% { opacity: 0;   transform: scale(1.6); }
 }
 
+/* ─── Hero Top 3 카드 ─── */
+.hl-hero-section { padding-bottom: 18px; }
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.hero-card {
+  display: flex;
+  gap: 12px;
+  padding: 0;
+  background: var(--surface-hi);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: transform 0.12s, border-color 0.12s, box-shadow 0.15s;
+}
+.hero-card.is-active { border-left-color: var(--busan-sunset); }
+.hero-card:not(.is-active) { border-left-color: var(--busan-sea); }
+.hero-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+}
+.hc-media {
+  position: relative;
+  flex: 0 0 112px;
+  aspect-ratio: 1 / 1;
+  background: var(--surface-lo);
+}
+.hc-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hc-img-placeholder {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 32px;
+  background: linear-gradient(135deg, rgba(244,162,97,0.18), rgba(219,39,119,0.14));
+}
+.hc-dbadge {
+  position: absolute; left: 6px; bottom: 6px;
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  backdrop-filter: blur(6px);
+}
+.hero-card.is-active .hc-dbadge { background: rgba(220,38,38,0.92); }
+.hc-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px 10px 2px;
+  display: flex; flex-direction: column;
+  gap: 4px;
+}
+.hc-tags {
+  display: flex; gap: 4px;
+  flex-wrap: wrap;
+}
+.hc-tag {
+  padding: 1px 7px;
+  background: rgba(30,144,144,0.18);
+  color: var(--busan-sea);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+}
+.hc-title {
+  font-size: 15px;
+  font-weight: var(--fw-bold);
+  line-height: 1.3;
+  margin: 2px 0;
+  /* 2-line clamp */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hc-meta {
+  font-size: var(--fs-meta);
+  color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Desktop 2-col grid */
+@media (min-width: 900px) {
+  .hero-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hero-grid .hero-card:first-child { grid-column: 1 / -1; }
+}
+
+/* ─── Tail chip list ─── */
+.chip-list, .chip-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background 0.12s, border-color 0.12s;
+}
+.chip.is-active { border-left-color: var(--busan-sunset); }
+.chip:not(.is-active) { border-left-color: rgba(30,144,144,0.4); }
+.chip:hover { background: rgba(255,255,255,0.04); }
+.chip-d {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  border-radius: 8px;
+  text-align: center;
+  line-height: 1.4;
+}
+.chip.is-active .chip-d {
+  background: rgba(244,162,97,0.18);
+  color: var(--busan-sunset);
+}
+.chip-title {
+  flex: 1 1 auto;
+  font-size: var(--fs-body);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chip-more {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-family: var(--font-body);
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+.chip-more:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
+
 /* ─── Phase 2.5: 향토음식 row 배지 ─── */
 .festival-row.foodie-row { border-left-color: #db2777; }
 .festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }
