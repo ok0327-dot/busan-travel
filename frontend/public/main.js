@@ -421,6 +421,8 @@ function showDetail(poi) {
       ${dateLine}
       ${weatherLine}
       ${beachLine}
+      ${poi.menu ? `<div class="card-meta foody-menu">${icon("ph-bowl-food")} 대표메뉴 · ${escape(poi.menu)}</div>` : ""}
+      ${poi.gugun && !poi.address?.includes(poi.gugun) ? `<div class="card-meta">${icon("ph-map-pin")} ${escape(poi.gugun)}</div>` : ""}
       ${excerpt ? `<div class="card-excerpt">${escape(excerpt.slice(0, 280))}</div>` : ""}
       ${renderTags(poi.tags)}
       ${infoRow(icon("ph-clock") + " 영업", poi.hours)}
@@ -549,14 +551,19 @@ function renderBlogDetail(poi) {
 
 function formatBlogSource(source) {
   if (!source) return "";
+  // Phase A 정비: naver_search(개인블로그/뉴스 검색) 제거. 공식 지자체/문화기관 블로그만.
   const map = {
-    "naver_blog:cooolbusan": "네이버 블로그 · 부산시청",
-    "naver_blog:bscf2009": "네이버 블로그 · 부산문화재단",
-    "naver_blog:hudpr": "네이버 블로그 · 부산관광공사",
-    "naver_search:blog": "네이버 블로그 검색",
-    "naver_search:news": "네이버 뉴스",
+    "naver_blog:cooolbusan": "네이버 블로그 · 부산광역시",
+    "naver_blog:bscf2009":   "네이버 블로그 · 부산문화재단",
+    "naver_blog:hudpr":      "네이버 블로그 · 해운대구청",
+    "naver_blog:moca_busan": "네이버 블로그 · 부산현대미술관",
+    "naver_blog:bsbukgusns": "네이버 블로그 · 북구청",
+    "naver_blog:bsjunggu":   "네이버 블로그 · 중구청",
+    "naver_blog:yeonjegu":   "네이버 블로그 · 연제구청",
+    "naver_blog:bsdonggublog": "네이버 블로그 · 동구청",
+    "naver_search:news":     "뉴스",
   };
-  return map[source] || (source.startsWith("naver_") ? "네이버 콘텐츠" : source);
+  return map[source] || (source.startsWith("naver_") ? "네이버 공식 콘텐츠" : source);
 }
 
 function isBoilerplateVenue(v) {
@@ -727,6 +734,10 @@ async function init() {
 
   weatherIndex = buildWeatherIndex(weatherShort);
   const favArr = favorites?.favorites || [];
+
+  // Phase D — AI 요약 fetch (Gemini 2.5 Flash 매일 갱신, 미존재 시 무시)
+  window.__aiSummary = await fetchJson("./data/ai-summary.json").catch(() => null);
+
   window.__data = { manifest, places, weatherShort, beaches, courses, favorites: favArr, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers, allEventPoi };
 
   renderMarkers(places, beaches, allFestivalEvents, allBlogMarkers, favArr);
@@ -736,6 +747,19 @@ async function init() {
 
   // 초기: 오늘의 부산 하이라이트 (applyDateFilter 가 곧 다시 호출)
   renderTodayHighlights(new Date());
+
+  // Phase E — 카테고리 필터 collapse 토글 (default 닫힘, 헤더 슬림화)
+  const filterToggle = document.getElementById("filter-toggle");
+  const filterRow = document.getElementById("filter-row");
+  if (filterToggle && filterRow) {
+    filterToggle.addEventListener("click", () => {
+      const opening = filterRow.hidden;
+      filterRow.hidden = !opening;
+      filterToggle.setAttribute("aria-expanded", String(opening));
+      const caret = filterToggle.querySelector(".ft-caret");
+      if (caret) caret.textContent = opening ? "⏶" : "⏷";
+    });
+  }
 
   // 카테고리 필터 토글 — Phase 2: toggleCategoryVisibility 로 즉시 반응 보장
   document.querySelectorAll(".filter input[data-cat]").forEach(chk => {
@@ -996,9 +1020,47 @@ function renderNarrativeHero() {
   </article>`;
 }
 
-// ───────── Phase 2: "오늘의 부산" 하이라이트 — Hero Top 3 + Tail 칩 ─────────
-// 중요도 스코어(priority) 기반 재설계. 진행중+예정 합친 후 priority 내림차순,
-// 상위 3건은 이미지+D-x+태그 가진 Hero 카드, 나머지는 칩 리스트(기본 6 + 더보기).
+// ───────── 사전 예약 휴리스틱 ─────────
+// description/url/title 키워드로 booking_required 추정. DB 의 booking_required=1 우선.
+const _BOOKING_KEYWORDS = /예매|티켓팅|티켓 오픈|사전신청|사전 신청|선착|온라인 신청|예약 필수|예약필수|선예매|티켓 예매/;
+function _bookingRequired(p) {
+  if (p.booking_required === 1 || p.booking_required === true) return true;
+  const blob = `${p.title || ""} ${p.description || ""} ${p.url || ""}`;
+  return _BOOKING_KEYWORDS.test(blob);
+}
+
+// ───────── AI Pick 카드 (Phase D) — ai-summary.json 기반 ─────────
+function renderAiPickCard(target) {
+  const ai = window.__aiSummary;
+  if (!ai) return "";
+  const today = new Date();
+  const isToday = target.toDateString() === today.toDateString();
+  // 이번 주말 chip 시 weekend, 그 외 today
+  const seg = isToday && ai.today ? ai.today : (ai.weekend || ai.today);
+  if (!seg || !seg.summary) return "";
+  const tag = isToday ? "오늘" : "이번 주말";
+  const picksHTML = (seg.picks || []).slice(0, 3).map(p =>
+    `<li><strong>${escape(p.title || "")}</strong>${p.why ? ` — ${escape(p.why)}` : ""}</li>`
+  ).join("");
+  const courses = (ai.courses || []).slice(0, 3);
+  const courseTabs = courses.length
+    ? `<div class="ai-courses">${courses.map((c, i) =>
+        `<details class="ai-course"${i === 0 ? " open" : ""}>
+          <summary>${escape(c.label || "코스")}${c.title ? ` · ${escape(c.title)}` : ""}</summary>
+          ${(c.stops || []).length ? `<ol class="ai-stops">${c.stops.map(s => `<li>${escape(s)}</li>`).join("")}</ol>` : ""}
+          ${c.note ? `<p class="ai-course-note">${escape(c.note)}</p>` : ""}
+        </details>`).join("")}</div>`
+    : "";
+  return `<article class="ai-pick" aria-label="AI 오늘의 부산 추천">
+    <div class="ai-pick-label">🤖 AI Pick · ${escape(tag)}의 부산</div>
+    <p class="ai-pick-summary">${escape(seg.summary)}</p>
+    ${picksHTML ? `<ul class="ai-pick-list">${picksHTML}</ul>` : ""}
+    ${courseTabs}
+  </article>`;
+}
+
+// ───────── Phase E 재배치: 한눈에 들어오는 "오늘/이번주말 뭐할지" ─────────
+// 새 순서: ① AI Pick → ② Hero Top 3 → ③ D-30 사전 예약 → ④ 제철 → ⑤ 그 외 → ⑥ STORY
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
@@ -1020,6 +1082,21 @@ function renderTodayHighlights(target) {
   const hero = combined.slice(0, 3);
   const tail = combined.slice(3);
 
+  // D-30 사전 예약 — combined 인덱스 보존(클릭 시 detail 매핑)
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const reservations = [];
+  for (let i = 0; i < combined.length; i++) {
+    const p = combined[i];
+    if (p._k !== "upcoming") continue;
+    if (!_bookingRequired(p)) continue;
+    const start = parseDate(p.start);
+    if (!start) continue;
+    const daysTo = Math.round((start - t) / 86400000);
+    if (daysTo < 1 || daysTo > 30) continue;
+    reservations.push({ poi: p, idx: i, daysTo });
+  }
+  reservations.sort((a, b) => a.daysTo - b.daysTo);
+
   const season = (window.__seasonal?.months || {})[month];
   const today = new Date();
   const isToday = target.toDateString() === today.toDateString();
@@ -1029,13 +1106,17 @@ function renderTodayHighlights(target) {
 
   const topBar = `<div class="highlight-hero">
     <div class="hh-date">${escape(heroDate)} · 부산</div>
-    <div class="hh-sub">${escape(heroSub)} · 진행 ${active.length} · 2개월내 ${upcoming.length}</div>
+    <div class="hh-sub">${escape(heroSub)} · 추천 ${combined.length}건${reservations.length ? ` · 🗓 사전예약 ${reservations.length}` : ""}</div>
   </div>`;
 
+  // ① AI Pick
+  const aiPickHTML = renderAiPickCard(target);
+
+  // ② Hero Top 3
   let heroHTML;
   if (hero.length) {
     heroHTML = `<div class="highlight-section hl-hero-section">
-      <div class="hs-title">⭐ 이번 주 주목 Top ${hero.length}</div>
+      <div class="hs-title">⭐ ${isToday ? "오늘의" : "이 날의"} 추천 Top ${hero.length}</div>
       <div class="hero-grid">
         ${hero.map((p, i) => heroCardHTML(p, i, target)).join("")}
       </div>
@@ -1047,22 +1128,19 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  let tailHTML = "";
-  if (tail.length) {
-    const initial = 6;
-    const firstBatch = tail.slice(0, initial);
-    const extra = tail.slice(initial);
-    const extraHTML = extra.length
-      ? `<div class="chip-extra" hidden>${extra.map((p, i) => chipHTML(p, i + initial, target)).join("")}</div>
-         <button class="chip-more" type="button">+${extra.length}건 더 보기</button>`
-      : "";
-    tailHTML = `<div class="highlight-section">
-      <div class="hs-title">📋 그 외 행사 ${tail.length}건</div>
-      <div class="chip-list">${firstBatch.map((p, i) => chipHTML(p, i, target)).join("")}</div>
-      ${extraHTML}
+  // ③ D-30 사전 예약
+  let reservationHTML = "";
+  if (reservations.length) {
+    reservationHTML = `<div class="highlight-section reservation-section">
+      <div class="hs-title">🗓 사전 예약 권장 · D-30 이내 ${reservations.length}건</div>
+      <div class="hs-note">예매·티켓팅·사전신청 키워드 매칭. 미리 알아둬야 자리 잡혀요.</div>
+      <div class="chip-list">${reservations.map(({ poi, idx, daysTo }) =>
+        reservationChipHTML(poi, idx, daysTo)
+      ).join("")}</div>
     </div>`;
   }
 
+  // ④ 제철
   let seasonHTML = "";
   if (season) {
     const foods = (season.foods || []).map(f =>
@@ -1078,9 +1156,27 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
+  // ⑤ 그 외 행사
+  let tailHTML = "";
+  if (tail.length) {
+    const initial = 6;
+    const firstBatch = tail.slice(0, initial);
+    const extra = tail.slice(initial);
+    const extraHTML = extra.length
+      ? `<div class="chip-extra" hidden>${extra.map((p, i) => chipHTML(p, i + initial + 3, target)).join("")}</div>
+         <button class="chip-more" type="button">+${extra.length}건 더 보기</button>`
+      : "";
+    tailHTML = `<div class="highlight-section">
+      <div class="hs-title">📋 그 외 행사 ${tail.length}건</div>
+      <div class="chip-list">${firstBatch.map((p, i) => chipHTML(p, i + 3, target)).join("")}</div>
+      ${extraHTML}
+    </div>`;
+  }
+
+  // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = topBar + heroHTML + tailHTML + seasonHTML + storyHero;
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
 
   // Hero + chip 클릭 → POI 상세
   $list.querySelectorAll(".hero-card, .chip").forEach(btn => {
@@ -1169,6 +1265,15 @@ function chipHTML(p, idx, target) {
   </button>`;
 }
 
+// Phase C — D-30 마일스톤 색상 차별화 (D-7 빨강 / D-14 주황 / D-30 마젠타)
+function reservationChipHTML(p, idx, daysTo) {
+  const mile = daysTo <= 7 ? "d-7" : daysTo <= 14 ? "d-14" : "d-30";
+  return `<button class="chip chip-reservation chip-${mile}" data-idx="${idx}">
+    <span class="chip-d chip-d-${mile}">D-${daysTo}</span>
+    <span class="chip-title">${escape(p.title || "(제목 없음)")}</span>
+  </button>`;
+}
+
 // ───────── Phase 2: 선택 날짜 헤드라인 배지 (날씨 + 행사·제철 카운트) ─────────
 function renderDateBadge(target, active, upcoming) {
   const $badge = document.getElementById("date-badge");
@@ -1202,8 +1307,8 @@ function renderDateBadge(target, active, upcoming) {
   const seasonCount = season
     ? ((season.foods?.length || 0) + (season.blooms?.length || 0) + (season.scenes?.length || 0))
     : 0;
-  const activeN = active || 0, upcomingN = upcoming || 0;
-  const stats = `🎪 ${activeN}${upcomingN ? `+${upcomingN}` : ""} · 🍽 ${seasonCount}`;
+  const total = (active || 0) + (upcoming || 0);
+  const stats = `🎪 추천 ${total}${seasonCount ? ` · 🍽 제철 ${seasonCount}` : ""}`;
   parts.push(`<span class="db-sep">·</span><span class="db-stats">${stats}</span>`);
 
   $badge.innerHTML = parts.join("");

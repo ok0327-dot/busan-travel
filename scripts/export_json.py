@@ -25,20 +25,17 @@ OUT_DIR = ROOT / "frontend" / "public" / "data"
 sys.path.insert(0, str(ROOT))
 from sources._tour_filter import importance_score, is_major_venue, SCALE_POSITIVE_KEYWORDS  # noqa: E402
 
-# 읽을거리 탭 전용 소스 가중치 — 공식 블로그 강가점, 일반 보도 감점
-# 공식 블로그는 depth/trust 높고, 일반 뉴스는 단순 홍보 반복이 많음.
+# 읽을거리 탭 전용 소스 가중치 — 공식 블로그만 채택 (Phase A 정비, 2026-04-25)
+# naver_search(개인블로그/뉴스 검색)는 SOURCES 에서 제외돼 더 이상 유입되지 않음.
 BLOG_SOURCE_WEIGHTS = {
-    # 공식 네이버 블로그 (신뢰 + 큐레이션)
     "naver_blog:bscf2009":     +3,   # 부산문화재단
     "naver_blog:hudpr":        +3,   # 해운대구청
     "naver_blog:moca_busan":   +3,   # 부산현대미술관
-    "naver_blog:bsbukgusns":   +2,   # 북구청 (행정 혼재)
+    "naver_blog:bsbukgusns":   +2,   # 북구청
     "naver_blog:bsjunggu":     +2,   # 중구청
     "naver_blog:yeonjegu":     +2,   # 연제구청
     "naver_blog:bsdonggublog": +2,   # 동구청
-    # 일반 수집 채널
-    "naver_search:news":       -2,   # 보도 단발성 + 중복 도배
-    "naver_search:blog":       -1,   # 개인 블로그 편차
+    "naver_blog:cooolbusan":   +1,   # 부산광역시 공식
 }
 
 
@@ -196,6 +193,9 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "source": row["source"],
         "category": row["category"],
         "subtype": _col(row, "subtype"),
+        "trust_tier": _col(row, "trust_tier"),
+        "menu": _col(row, "menu"),
+        "gugun": _col(row, "gugun"),
         "title": row["title"],
         "venue": row["venue"],
         "address": row["address"],
@@ -209,6 +209,9 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "start": row["start_date"],
         "end": row["end_date"],
         "price": _col(row, "price"),
+        "booking_required": _col(row, "booking_required"),
+        "booking_deadline": _col(row, "booking_deadline"),
+        "booking_opens_at": _col(row, "booking_opens_at"),
         # VisitBusan enrichment
         "rating": _col(row, "rating"),
         "views": _col(row, "view_count"),
@@ -247,6 +250,15 @@ def export_places(conn: sqlite3.Connection) -> int:
             continue
         key = (round(r["lat"], 3), round(r["lon"], 3), (r["title"] or "")[:4])
         if key in seen:
+            # Phase B — 부산푸디(busan_food) 의 menu/gugun 을 vb_food 레코드에 머지
+            # vb_food_curated 가 우선 채택돼도 부산푸디 고유 메타(대표메뉴/구군)는 보존
+            existing = seen[key]
+            menu = _col(r, "menu")
+            gugun = _col(r, "gugun")
+            if menu and not existing.get("menu"):
+                existing["menu"] = menu
+            if gugun and not existing.get("gugun"):
+                existing["gugun"] = gugun
             continue
         seen[key] = _jsonable(r)
     rows = list(seen.values())

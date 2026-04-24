@@ -79,6 +79,11 @@ _MIGRATIONS = {
     "etiquette":            "TEXT",
     "phone":                "TEXT",
     "subtype":              "TEXT",  # 호텔 등급, 음식 장르 등 세부 분류
+    # Phase A — 데이터 신뢰도 메타 (S=공식 정부/공공 API, A=공식 지자체 블로그, B=뉴스 매체, X=비공식/검색기반)
+    "trust_tier":           "TEXT",
+    # Phase B — 부산푸디(15063472) enrichment: 대표메뉴, 구군
+    "menu":                 "TEXT",
+    "gugun":                "TEXT",
 }
 
 EXTRA_TABLES_SQL = """
@@ -206,6 +211,9 @@ class Event:
     etiquette: str | None = None
     phone: str | None = None
     subtype: str | None = None
+    trust_tier: str | None = None
+    menu: str | None = None
+    gugun: str | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -283,6 +291,7 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
             e.rating, e.view_count, e.review_count, e.tags_json,
             e.story_url, e.story_excerpt, e.hours, e.holiday, e.fee,
             e.transport, e.tip, e.etiquette, e.phone, e.subtype,
+            e.trust_tier, e.menu, e.gugun,
         )
         if row:
             conn.execute(
@@ -310,6 +319,9 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     etiquette=COALESCE(?, etiquette),
                     phone=COALESCE(?, phone),
                     subtype=COALESCE(?, subtype),
+                    trust_tier=COALESCE(?, trust_tier),
+                    menu=COALESCE(?, menu),
+                    gugun=COALESCE(?, gugun),
                     raw_json=?, last_seen=?
                    WHERE id=?""",
                 (*core_fields, *vb_fields, raw_json, now, row["id"]),
@@ -326,8 +338,9 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     rating, view_count, review_count, tags_json,
                     story_url, story_excerpt, hours, holiday, fee,
                     transport, tip, etiquette, phone, subtype,
+                    trust_tier, menu, gugun,
                     raw_json, first_seen, last_seen
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (e.source, e.source_id, *core_fields, *vb_fields, raw_json, now, now),
             )
             inserted += 1

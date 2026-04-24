@@ -974,3 +974,130 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   #topbar { right: 480px; }
   .fab { right: 496px; }
 }
+
+/* ───────── Phase E — 헤더 슬림화: 카테고리 필터 collapse 토글 ───────── */
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font: 500 12px/1 Pretendard, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.filter-toggle:hover { background: rgba(255, 255, 255, 0.1); }
+.filter-toggle .ft-caret { font-size: 10px; opacity: 0.7; }
+.filter-toggle[aria-expanded="true"] {
+  background: rgba(244, 162, 97, 0.15);
+  border-color: rgba(244, 162, 97, 0.4);
+  color: #f4a261;
+}
+
+/* ───────── Phase D — AI Pick 카드 ───────── */
+.ai-pick {
+  position: relative;
+  margin: 10px 0 14px;
+  padding: 16px 18px 14px;
+  background: linear-gradient(135deg, #1d3557 0%, #2a4a6e 50%, #3d2a4e 100%);
+  border: 1px solid rgba(244, 162, 97, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(29, 53, 87, 0.4);
+  overflow: hidden;
+}
+.ai-pick::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: radial-gradient(ellipse at center, rgba(244, 162, 97, 0.18) 0%, transparent 60%);
+  pointer-events: none;
+}
+.ai-pick-label {
+  font: 700 11px/1 GmarketSans, Pretendard, sans-serif;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #f4a261;
+  margin-bottom: 8px;
+  position: relative;
+}
+.ai-pick-summary {
+  margin: 0 0 10px;
+  font: 500 14px/1.55 Pretendard, sans-serif;
+  color: #f8fafc;
+  position: relative;
+}
+.ai-pick-list {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  font: 400 13px/1.55 Pretendard, sans-serif;
+  color: #e2e8f0;
+  position: relative;
+}
+.ai-pick-list li { margin-bottom: 4px; }
+.ai-pick-list strong { color: #fff; font-weight: 600; }
+
+.ai-courses {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+  position: relative;
+}
+.ai-course {
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+.ai-course summary {
+  font: 600 12px/1.4 Pretendard, sans-serif;
+  color: #fbbf24;
+  cursor: pointer;
+  list-style: none;
+}
+.ai-course summary::-webkit-details-marker { display: none; }
+.ai-course summary::before {
+  content: "▸ ";
+  display: inline-block;
+  margin-right: 4px;
+  transition: transform 0.15s;
+}
+.ai-course[open] summary::before { transform: rotate(90deg); }
+.ai-course[open] summary { color: #f4a261; }
+.ai-stops {
+  margin: 8px 0 0;
+  padding-left: 22px;
+  font: 400 12px/1.6 Pretendard, sans-serif;
+  color: #cbd5e1;
+}
+.ai-course-note {
+  margin: 6px 0 0;
+  padding-left: 4px;
+  font: 400 11px/1.5 Pretendard, sans-serif;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* ───────── Phase C — 사전 예약 (D-30 마일스톤) ───────── */
+.reservation-section {
+  border-left: 3px solid #f4a261;
+  padding-left: 10px;
+}
+.chip-reservation {
+  border-color: rgba(244, 162, 97, 0.4) !important;
+}
+.chip-d-d-7  { background: #ef4444 !important; color: #fff !important; }
+.chip-d-d-14 { background: #f97316 !important; color: #fff !important; }
+.chip-d-d-30 { background: #a855f7 !important; color: #fff !important; }
+
+/* ───────── Phase B — 부산푸디 대표메뉴 강조 ───────── */
+.foody-menu {
+  color: #f4a261 !important;
+  font-weight: 500;
+}

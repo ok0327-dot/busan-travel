@@ -111,6 +111,13 @@ jobs:
       - name: Export JSON
         run: python scripts/export_json.py
 
+      - name: AI summary (Gemini 2.5 Flash, 매일만)
+        if: steps.mode.outputs.mode == 'all'
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python scripts/ai_summary.py
+
       - name: Commit & push data
         run: |
           git config user.email "claude-bot@users.noreply.github.com"

@@ -20,19 +20,33 @@ MAX_PAGES = 20
 
 def _parse_item(raw: dict) -> Event:
     lat, lon = busan_latlon(raw.get("LAT"), raw.get("LNG"))
+    menu = (raw.get("RPRSNTV_MENU") or "").strip() or None
+    gugun = (raw.get("GUGUN_NM") or "").strip() or None
+    base_desc = (raw.get("ITEMCNTNTS") or raw.get("SUBTITLE") or "").strip()
+    # 부산푸디 고유 메타를 description 에 prepend → 카드/dedup 후에도 메뉴/구군 노출
+    head_bits = []
+    if menu:
+        head_bits.append(f"🍴 대표메뉴 · {menu}")
+    if gugun:
+        head_bits.append(f"📍 {gugun}")
+    head = " · ".join(head_bits)
+    description = f"{head}\n{base_desc}" if head and base_desc else (head or base_desc or None)
     return Event(
         source=SOURCE,
         source_id=str(raw.get("UC_SEQ") or raw.get("TITLE") or ""),
         category="food",
         title=(raw.get("TITLE") or raw.get("MAIN_TITLE") or "").strip(),
         start_date=None,
-        venue=raw.get("PLACE") or raw.get("GUGUN_NM"),
+        venue=raw.get("PLACE") or gugun,
         address=raw.get("ADDR1"),
         url=raw.get("HOMEPAGE_URL"),
         image_url=raw.get("MAIN_IMG_NORMAL") or raw.get("MAIN_IMG_THUMB"),
-        description=raw.get("ITEMCNTNTS") or raw.get("SUBTITLE"),
+        description=description,
         lat=lat,
         lon=lon,
+        menu=menu,
+        gugun=gugun,
+        trust_tier="S",  # 정부 API
         raw=dict(raw),
     )
 

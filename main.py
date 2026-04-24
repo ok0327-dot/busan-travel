@@ -1,6 +1,11 @@
 """Entry point: fetch all sources → upsert to SQLite → print summary.
 
-TODO next sources: kopis, tour_api, visitbusan, bscf, yes24, rss_feeds
+소스 수집 전략 (Phase A 정비, 2026-04-25):
+- 공식만 채택: 정부 API + 부산관광공사(visitbusan) + 부산시 직속 공식 블로그 8개.
+- naver_search(블로그/뉴스 키워드 검색)는 비공식 노이즈 비중이 높아 SOURCES 에서 제외.
+  파일은 sources/naver_search.py 로 보존(추후 공식 큐레이션 재활용 여지).
+- 부산푸디(15063472) = '부산광역시_부산맛집정보' API 재활성화: visitbusan 큐레이션엔
+  없는 대표메뉴(RPRSNTV_MENU)·구군(GUGUN_NM) 메타를 enrich 보강.
 """
 from __future__ import annotations
 
@@ -12,22 +17,21 @@ from dotenv import load_dotenv
 from config import DB_PATH
 from sources import (
     busan_festival,
+    busan_food,
     gov_tour,
     naver_blogs,
-    naver_search,
     visitbusan,
 )
 from storage.db import Event, connect, upsert_events
 
 # KOPIS 는 공연시설/기획제작사만 가입 가능해 사용 불가 — sources/kopis.py 는 보존
 # 해수욕장(gov_beach)은 측정 시계열이라 별도 cron, 기상/대기질도 별도
-# busan_attraction/busan_food (KTO) 는 visitbusan 이 같은 데이터 + 스토리/태그/평점으로 대체
 SOURCES = [
-    ("busan_festival",         busan_festival.fetch),
-    ("tour_api",               gov_tour.fetch),
-    ("naver_blogs",            naver_blogs.fetch),
-    ("naver_search",           naver_search.fetch),  # Phase 3: 검색 API (블로그+뉴스)
-    # VisitBusan.net 큐레이션 (Phase 5)
+    ("busan_festival",         busan_festival.fetch),       # 정부 API: 부산축제정보
+    ("busan_food",             busan_food.fetch),            # 정부 API: 부산푸디(부산맛집정보) 15063472 — 대표메뉴/구군 enrich
+    ("tour_api",               gov_tour.fetch),              # 정부 API: TourAPI 4.0 부산 축제
+    ("naver_blogs",            naver_blogs.fetch),           # 공식 지자체 블로그 8개 RSS
+    # VisitBusan.net 큐레이션 (부산관광공사)
     ("vb_attraction",          visitbusan.fetch_attractions),
     ("vb_food_curated",        visitbusan.fetch_food_curated),
     ("vb_festival_curated",    visitbusan.fetch_festival_curated),
