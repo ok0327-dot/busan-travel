@@ -230,16 +230,33 @@ function classifyFestival(poi, target) {
   return "past";
 }
 
+// venue group 포함 통합 분류 — venue 내 이벤트 중 하나라도 active/upcoming 면 그 레벨
+function classifyPoi(poi, target) {
+  if (poi && poi.isVenueGroup) {
+    let hasActive = false, hasUpcoming = false;
+    for (const e of poi.events || []) {
+      const k = classifyFestival(e, target);
+      if (k === "active") { hasActive = true; break; }
+      if (k === "upcoming") hasUpcoming = true;
+    }
+    if (hasActive) return "active";
+    if (hasUpcoming) return "upcoming";
+    return "unknown";
+  }
+  return classifyFestival(poi, target);
+}
+
 function applyDateFilter(target) {
   currentTargetDate = target;
 
   // 지도 마커 — festival/exhibition/performance 세 카테고리 모두 날짜 필터 적용
+  // exhibition/performance 는 venue 그룹이므로 classifyPoi 가 그룹 내 집계
   for (const cat of ["festival", "exhibition", "performance"]) {
     const clusterer = clusterers[cat];
     if (!clusterer) continue;
     const showMarkers = [];
     for (const { marker, poi } of allMarkers[cat] || []) {
-      const kind = classifyFestival(poi, target);
+      const kind = classifyPoi(poi, target);
       if (kind === "active")        { showMarkers.push(marker); marker.setOpacity(1.0); }
       else if (kind === "upcoming") { showMarkers.push(marker); marker.setOpacity(0.55); }
       else if (kind === "unknown")  { showMarkers.push(marker); marker.setOpacity(0.55); }
@@ -336,6 +353,18 @@ function showDetail(poi) {
     return;
   }
 
+  // 전시/공연 venue 그룹 — 그 venue 에서 현재 열리는 행사 목록으로 렌더
+  if (poi.isVenueGroup) {
+    $list.innerHTML = renderVenueDetail(poi);
+    const sheet = document.getElementById("sheet");
+    if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
+    if (poi.lat && poi.lon) {
+      pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
+      panToWithSheetOffset(poi.lat, poi.lon);
+    }
+    return;
+  }
+
   // 별표는 카테고리 색 유지하면서 골드 kicker 로 "내가 별표한 곳" 표시
   const favKicker = isFavorite
     ? `<div class="favorite-kicker">${icon("ph-star-fill")} 내가 별표한 곳${poi.subtype ? " · " + escape(poi.subtype) : ""}</div>`
@@ -400,6 +429,68 @@ function showDetail(poi) {
     pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
     panToWithSheetOffset(poi.lat, poi.lon);
   }
+}
+
+// ───────── 전시/공연 venue 그룹 상세 — 현재 열리는 행사 목록 ─────────
+function renderVenueDetail(poi) {
+  const target = currentTargetDate || new Date();
+  const active = [], upcoming = [], past = [];
+  for (const e of poi.events || []) {
+    const k = classifyFestival(e, target);
+    if (k === "active") active.push(e);
+    else if (k === "upcoming") upcoming.push(e);
+    else past.push(e);
+  }
+  active.sort((a, b) => (a.end || a.start || "").localeCompare(b.end || b.start || ""));
+  upcoming.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+  const catDef = CATEGORIES[poi.category] || {};
+  const catLabel = poi.category === "exhibition" ? "전시" : "공연";
+  const MS = 86400000;
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const venueEventRow = (e, kind) => {
+    const start = (e.start || "").slice(5);
+    const end = (e.end || "").slice(5);
+    const dateRange = start && end && end !== start ? `${start}~${end}` : (start || "");
+    let dBadge = "";
+    if (kind === "active") {
+      const endD = parseDate(e.end) || parseDate(e.start);
+      if (endD) {
+        const left = Math.max(0, Math.round((endD - t) / MS));
+        dBadge = left === 0 ? "오늘 종료" : `D-${left} 종료`;
+      } else dBadge = "진행중";
+    } else if (kind === "upcoming") {
+      const startD = parseDate(e.start);
+      const d = Math.max(0, Math.round((startD - t) / MS));
+      dBadge = d === 0 ? "오늘 시작" : `D-${d}`;
+    }
+    return `<div class="venue-event">
+      <div class="venue-event-title">${escape(e.title || "")}</div>
+      <div class="venue-event-meta">
+        ${dBadge ? `<span class="venue-event-d${kind === "active" ? " is-active" : ""}">${escape(dBadge)}</span>` : ""}
+        <span>${escape(dateRange)}</span>
+        ${e.url ? `<a href="${escape(e.url)}" target="_blank" rel="noopener">원문 →</a>` : ""}
+      </div>
+    </div>`;
+  };
+  const section = (title, items, kind) => items.length ? `
+    <div class="venue-section">
+      <div class="venue-section-title">${title}</div>
+      ${items.map(e => venueEventRow(e, kind)).join("")}
+    </div>` : "";
+  const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
+  return `
+    <div class="card" style="border-left:3px solid ${catDef.color}">
+      <div class="card-title">${icon(catDef.icon || "ph-map-pin")} ${escape(poi.title)}</div>
+      <div class="card-meta">${escape(catLabel)} 공간 · 진행 ${active.length} · 예정 ${upcoming.length}${past.length ? " · 지난 " + past.length : ""}</div>
+      ${poi.address ? `<div class="card-meta">${icon("ph-map-pin")} ${escape(poi.address)}</div>` : ""}
+      ${section(`🔴 지금 진행중 ${active.length}건`, active, "active")}
+      ${section(`📅 예정 ${upcoming.length}건`, upcoming, "upcoming")}
+      ${!active.length && !upcoming.length ? `<div class="card-meta" style="margin-top:12px">현재/예정 행사 없음 ${past.length ? `(지난 행사 ${past.length}건)` : ""}</div>` : ""}
+      <div style="margin-top:12px">
+        <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-map-pin")} 카카오맵 길찾기</a>
+      </div>
+    </div>
+  `;
 }
 
 // ───────── 블로그 상세 (출처·날짜 + 발췌 + 원문 링크 중심) ─────────
@@ -540,10 +631,38 @@ async function init() {
     loadableMonths.map(m => fetchJson(`./data/events-${m}.json`).catch(() => ({ events: [] })))
   );
   const allEvents = eventFiles.flatMap(f => f.events || []);
-  // Phase 3b: exhibition/performance 도 festival 마커로 통합 렌더 (지도 색 단일)
-  const allFestivalEvents = allEvents.filter(e =>
-    ["festival", "exhibition", "performance"].includes(e.category) && e.lat && e.lon
+  // festival 은 이벤트 단위 마커, exhibition/performance 는 venue 로 aggregate
+  // → 한 venue(F1963, 영화의전당 등) 에 여러 전시가 있을 때 마커 1개로 묶고
+  //   클릭 시 현재 열리는 전시/공연 목록을 보여주기 위함
+  const festivalOnly = allEvents.filter(e =>
+    e.category === "festival" && e.lat && e.lon
   );
+  const exhibPerfRaw = allEvents.filter(e =>
+    ["exhibition", "performance"].includes(e.category) && e.lat && e.lon
+  );
+  const venueGroupsMap = new Map();
+  for (const e of exhibPerfRaw) {
+    const latKey = e.lat.toFixed(4), lonKey = e.lon.toFixed(4);
+    const key = `${e.category}|${latKey}_${lonKey}|${e.venue || ""}`;
+    let g = venueGroupsMap.get(key);
+    if (!g) {
+      g = {
+        id: `venue:${key}`,
+        isVenueGroup: true,
+        category: e.category,
+        title: e.venue || e.title || "장소 미정",
+        venue: e.venue,
+        address: e.address,
+        lat: e.lat,
+        lon: e.lon,
+        events: [],
+      };
+      venueGroupsMap.set(key, g);
+    }
+    g.events.push(e);
+  }
+  const venueGroups = [...venueGroupsMap.values()];
+  const allFestivalEvents = [...festivalOnly, ...venueGroups];
   // 네이버 블로그 — category=blog_post/exhibition/performance 인 것만 (festival 은 위에 포함됨)
   const allBlogMarkers = allEvents
     .filter(e =>

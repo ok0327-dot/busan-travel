@@ -411,6 +411,59 @@ html, body {
   color: var(--busan-sunset);
 }
 
+/* ─── 전시/공연 venue 그룹 상세 ─── */
+.venue-section {
+  margin-top: 14px;
+}
+.venue-section-title {
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+.venue-event {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: var(--surface-hi);
+  border-radius: var(--r-sm);
+  border-left: 2px solid rgba(30,144,144,0.35);
+}
+.venue-event-title {
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+  margin-bottom: 3px;
+  line-height: 1.3;
+}
+.venue-event-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+.venue-event-d {
+  padding: 1px 6px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  border-radius: 8px;
+  font-weight: var(--fw-semibold);
+  line-height: 1.5;
+}
+.venue-event-d.is-active {
+  background: rgba(220,38,38,0.22);
+  color: #fca5a5;
+}
+.venue-event-meta a {
+  color: var(--busan-sea);
+  text-decoration: none;
+}
+.venue-event-meta a:hover {
+  text-decoration: underline;
+}
+
 /* ─── Phase 2.5: 향토음식 row 배지 ─── */
 .festival-row.foodie-row { border-left-color: #db2777; }
 .festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }
