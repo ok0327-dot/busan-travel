@@ -66,12 +66,12 @@ async function fetchJson(path) {
   return res.json();
 }
 
-// ───────── SVG 마커 생성 ─────────
+// ───────── SVG 마커 생성 (Phase 2: 32→40 확대로 탭 편의 개선) ─────────
 function svgMarker(color, emoji) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
-    <path d="M16 0C7.2 0 0 7.2 0 16c0 11.5 16 26 16 26s16-14.5 16-26C32 7.2 24.8 0 16 0z" fill="${color}" stroke="white" stroke-width="2"/>
-    <circle cx="16" cy="16" r="9" fill="white"/>
-    <text x="16" y="21" text-anchor="middle" font-size="14">${emoji}</text>
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
+    <path d="M20 0C9 0 0 9 0 20c0 14 20 32 20 32s20-18 20-32C40 9 31 0 20 0z" fill="${color}" stroke="white" stroke-width="2"/>
+    <circle cx="20" cy="20" r="11" fill="white"/>
+    <text x="20" y="25" text-anchor="middle" font-size="16">${emoji}</text>
   </svg>`;
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 }
@@ -80,8 +80,8 @@ function markerImageFor(category) {
   const cat = CATEGORIES[category] || CATEGORIES.attraction;
   return new kakao.maps.MarkerImage(
     svgMarker(cat.color, cat.emoji),
-    new kakao.maps.Size(32, 42),
-    { offset: new kakao.maps.Point(16, 42) }
+    new kakao.maps.Size(40, 52),
+    { offset: new kakao.maps.Point(20, 52) }
   );
 }
 
@@ -146,8 +146,9 @@ function buildMarkerSet(items, cat) {
   const clusterer = new kakao.maps.MarkerClusterer({
     map,
     averageCenter: true,
-    minLevel: 7,
-    gridSize: 80,
+    // Phase 2: 7→6 (더 빨리 개별 마커 표출) + 80→60 (겹친 마커 분리 쉬움)
+    minLevel: 6,
+    gridSize: 60,
     styles: [{
       width: "40px", height: "40px",
       background: catDef.color,
@@ -224,22 +225,28 @@ function classifyFestival(poi, target) {
 function applyDateFilter(target) {
   currentTargetDate = target;
   const clusterer = clusterers.festival;
-  if (!clusterer) return;
 
   let active = 0, upcoming = 0, unknown = 0;
-  const showMarkers = [];
-  for (const { marker, poi } of allMarkers.festival || []) {
-    const kind = classifyFestival(poi, target);
-    if (kind === "active")   { active++;   showMarkers.push(marker); marker.setOpacity(1.0); }
-    else if (kind === "upcoming") { upcoming++; showMarkers.push(marker); marker.setOpacity(0.55); }
-    else if (kind === "unknown")  { unknown++;  showMarkers.push(marker); marker.setOpacity(0.55); }
+  if (clusterer) {
+    const showMarkers = [];
+    for (const { marker, poi } of allMarkers.festival || []) {
+      const kind = classifyFestival(poi, target);
+      if (kind === "active")   { active++;   showMarkers.push(marker); marker.setOpacity(1.0); }
+      else if (kind === "upcoming") { upcoming++; showMarkers.push(marker); marker.setOpacity(0.55); }
+      else if (kind === "unknown")  { unknown++;  showMarkers.push(marker); marker.setOpacity(0.55); }
+      // past 는 showMarkers 에 미포함 → 지도에서 사라짐
+    }
+    clusterer.clear();
+    clusterer.addMarkers(showMarkers);
   }
-  clusterer.clear();
-  clusterer.addMarkers(showMarkers);
 
   const ymd = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
-  const total = (allMarkers.festival || []).length;
-  $status.textContent = `📅 ${ymd} · 진행 ${active} · 2개월내 ${upcoming} · 미상 ${unknown} · 전체 ${total}`;
+  $status.textContent = `📅 ${ymd} · 진행 ${active} · 2개월내 ${upcoming}`;
+
+  // Phase 2: 날짜 헤드라인 배지 + '오늘의 부산' 하이라이트 시트 동기화
+  renderDateBadge(target, active, upcoming);
+  const isMapView = !document.body.classList.contains("view-read") && !document.body.classList.contains("view-course");
+  if (isMapView) renderTodayHighlights(target);
 }
 
 // ───────── 날씨 배지 (지도 level <= 5 에서 festival/beach 에만) ─────────
@@ -348,14 +355,58 @@ function showDetail(poi) {
     </div>
   `;
 
-  // 시트 half 로 올려서 상세 보이게
+  // 시트 half 로 올려서 상세 보이게 (클릭 피드백 강화)
   const sheet = document.getElementById("sheet");
   if (sheet.classList.contains("sheet-peek")) {
     sheet.classList.replace("sheet-peek", "sheet-half");
   }
 
-  // 지도 중심 이동
-  map.panTo(new kakao.maps.LatLng(poi.lat, poi.lon));
+  // Phase 2: 펄스 오버레이로 클릭 시각 피드백 + 시트가 가리지 않도록 offset pan
+  if (poi.lat && poi.lon) {
+    pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
+    panToWithSheetOffset(poi.lat, poi.lon);
+  }
+}
+
+// ───────── Phase 2: 카테고리 가시성 토글 (cluster + 개별 marker 동시 제어) ─────────
+function toggleCategoryVisibility(cat, visible) {
+  const clusterer = clusterers[cat];
+  if (clusterer) {
+    clusterer.setMap(visible ? map : null);
+  }
+  // 개별 marker 도 명시 제어 — MarkerClusterer 가 minLevel 밖/직후에 놓치는 경우 즉시 숨김
+  for (const { marker } of allMarkers[cat] || []) {
+    marker.setMap(visible ? map : null);
+  }
+}
+
+// ───────── Phase 2: 클릭 피드백 펄스 ─────────
+function pulseMarker(latlng) {
+  const circle = new kakao.maps.Circle({
+    center: latlng,
+    radius: 120,
+    strokeWeight: 3,
+    strokeColor: "#60a5fa",
+    strokeOpacity: 0.9,
+    fillColor: "#60a5fa",
+    fillOpacity: 0.25,
+  });
+  circle.setMap(map);
+  setTimeout(() => circle.setMap(null), 650);
+}
+
+// ───────── Phase 2: 시트 가림 방지 offset pan ─────────
+function panToWithSheetOffset(lat, lon) {
+  try {
+    const proj = map.getProjection();
+    const pt = proj.pointFromCoords(new kakao.maps.LatLng(lat, lon));
+    const offsetY = Math.max(120, Math.floor(window.innerHeight * 0.2));
+    const newPt = new kakao.maps.Point(pt.x, pt.y + offsetY);
+    const newCoord = proj.coordsFromPoint(newPt);
+    map.panTo(newCoord);
+  } catch (e) {
+    map.panTo(new kakao.maps.LatLng(lat, lon));
+  }
 }
 
 // ───────── init ─────────
@@ -369,15 +420,17 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, lodging, courses] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, lodging, courses, seasonal] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
     fetchJson("./data/beaches.json"),
     fetchJson("./data/lodging.json").catch(() => ({ lodging: [] })),
     fetchJson("./data/courses.json").catch(() => ({ courses: [] })),
+    fetchJson("./data/seasonal.json").catch(() => ({ months: {} })),
   ]);
   coursesData = courses;
+  window.__seasonal = seasonal;
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -419,21 +472,17 @@ async function init() {
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
   $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
 
-  // 초기 카드: 카테고리 요약
-  renderCategorySummary();
+  // 초기: 오늘의 부산 하이라이트 (applyDateFilter 가 곧 다시 호출)
+  renderTodayHighlights(new Date());
 
-  // 카테고리 필터 토글
+  // 카테고리 필터 토글 — Phase 2: toggleCategoryVisibility 로 즉시 반응 보장
   document.querySelectorAll(".filter input[data-cat]").forEach(chk => {
     chk.addEventListener("change", () => {
-      const cat = chk.dataset.cat;
-      const clusterer = clusterers[cat];
-      if (!clusterer) return;
-      if (chk.checked) clusterer.setMap(map);
-      else clusterer.setMap(null);
+      toggleCategoryVisibility(chk.dataset.cat, chk.checked);
     });
-    // 초기: info_office 는 off (너무 많음 + 낮은 가치)
-    if (!chk.checked && clusterers[chk.dataset.cat]) {
-      clusterers[chk.dataset.cat].setMap(null);
+    // 초기: 체크 해제 카테고리는 명시적으로 숨김 (cluster + 개별 marker 동시 제어)
+    if (!chk.checked) {
+      toggleCategoryVisibility(chk.dataset.cat, false);
     }
   });
 
@@ -564,7 +613,7 @@ function setViewMode(mode) {
   } else {
     sheet.classList.remove("sheet-full");
     sheet.classList.add("sheet-peek");
-    renderCategorySummary();
+    renderTodayHighlights(currentTargetDate);
     clearCourseOverlay();
   }
 }
@@ -722,19 +771,84 @@ function renderNarrativeHero() {
   </article>`;
 }
 
-function renderCategorySummary() {
-  const counts = Object.fromEntries(
-    Object.keys(CATEGORIES).map(c => [c, (allMarkers[c] || []).length])
-  );
-  const summaryHTML = Object.entries(counts)
-    .filter(([, n]) => n > 0)
-    .map(([c, n]) => {
-      const cd = CATEGORIES[c];
-      return `<div class="card"><div class="card-title">${cd.emoji} ${cd.label}</div><div class="card-meta">${n}개 · 지도 마커를 탭하면 상세 보기</div></div>`;
-    }).join("");
-  $list.innerHTML = renderNarrativeHero() + summaryHTML;
+// ───────── Phase 2: "오늘의 부산" 하이라이트 (카테고리 요약 대체) ─────────
+// 선택 날짜 기반: 진행 중 축제 + 2개월 내 다가오는 행사 + 월 제철 + 월간 STORY
+function renderTodayHighlights(target) {
+  target = target || new Date();
+  const month = String(target.getMonth() + 1).padStart(2, "0");
 
-  // Narrative Hero 클릭 → 읽을거리 탭으로 전환
+  const active = [], upcoming = [];
+  for (const { poi } of allMarkers.festival || []) {
+    const kind = classifyFestival(poi, target);
+    if (kind === "active") active.push(poi);
+    else if (kind === "upcoming") upcoming.push(poi);
+  }
+  active.sort((a, b) => (a.end || a.start || "").localeCompare(b.end || b.start || ""));
+  upcoming.sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+
+  const season = (window.__seasonal?.months || {})[month];
+  const today = new Date();
+  const isToday = target.toDateString() === today.toDateString();
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const heroDate = isToday ? "오늘" : `${target.getMonth() + 1}월 ${target.getDate()}일 (${days[target.getDay()]})`;
+  const heroSub = season?.title || "부산 여행";
+
+  const heroHTML = `<div class="highlight-hero">
+    <div class="hh-date">${escape(heroDate)} · 부산</div>
+    <div class="hh-sub">${escape(heroSub)}</div>
+  </div>`;
+
+  let activeHTML;
+  if (active.length) {
+    activeHTML = `<div class="highlight-section">
+      <div class="hs-title">🎪 지금 진행 중 ${active.length}건</div>
+      ${active.slice(0, 8).map((p, i) => festivalRowHTML(p, "active", i)).join("")}
+    </div>`;
+  } else {
+    activeHTML = `<div class="highlight-section">
+      <div class="hs-title">🎪 이 날짜 진행 중 행사 없음</div>
+      <div class="hs-note">📅 다른 날을 선택하거나 '다가오는 행사' 를 참고하세요.</div>
+    </div>`;
+  }
+
+  let upcomingHTML = "";
+  if (upcoming.length) {
+    upcomingHTML = `<div class="highlight-section">
+      <div class="hs-title">📅 2개월 안에 열리는 행사 ${upcoming.length}건</div>
+      ${upcoming.slice(0, 6).map((p, i) => festivalRowHTML(p, "upcoming", i)).join("")}
+    </div>`;
+  }
+
+  let seasonHTML = "";
+  if (season) {
+    const foods = (season.foods || []).map(f =>
+      `<li>${escape(f.name)}${f.where ? ` <span class="sm-where">@ ${escape(f.where)}</span>` : ""}</li>`
+    ).join("");
+    const blooms = (season.blooms || []).map(b => `<li>${escape(b)}</li>`).join("");
+    const scenes = (season.scenes || []).map(s => `<li>${escape(s)}</li>`).join("");
+    seasonHTML = `<div class="highlight-section">
+      <div class="hs-title">🍽 ${target.getMonth() + 1}월 부산 제철</div>
+      ${foods ? `<ul class="sm-list"><li class="sm-sub">음식</li>${foods}</ul>` : ""}
+      ${blooms ? `<ul class="sm-list"><li class="sm-sub">꽃·봄빛</li>${blooms}</ul>` : ""}
+      ${scenes ? `<ul class="sm-list"><li class="sm-sub">계절 풍경</li>${scenes}</ul>` : ""}
+    </div>`;
+  }
+
+  const storyHero = renderNarrativeHero();
+
+  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + storyHero;
+
+  // 축제 row 클릭 → POI 상세 (showDetail 은 pulse+pan+시트 half 를 자동 처리)
+  $list.querySelectorAll(".festival-row").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const kind = btn.dataset.kind;
+      const idx = Number(btn.dataset.idx);
+      const poi = kind === "active" ? active[idx] : upcoming[idx];
+      if (poi) showDetail(poi);
+    });
+  });
+
+  // 월간 STORY 클릭 → 읽을거리 탭
   const hero = $list.querySelector(".narrative-hero");
   if (hero) {
     const goBlog = () => {
@@ -746,6 +860,61 @@ function renderCategorySummary() {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goBlog(); }
     });
   }
+}
+
+function festivalRowHTML(p, kind, idx) {
+  const start = (p.start || "").slice(5);
+  const end = (p.end || "").slice(5);
+  const dateRange = start && end && end !== start ? `${start}~${end}`
+                  : start ? start
+                  : "";
+  const venue = p.venue || p.address || "";
+  const upcomingClass = kind === "upcoming" ? " is-upcoming" : "";
+  return `<button class="festival-row${upcomingClass}" data-kind="${kind}" data-idx="${idx}">
+    <span class="fr-title">${escape(p.title || "(제목 없음)")}</span>
+    <span class="fr-meta">${escape(dateRange)}${venue ? " · " + escape(venue) : ""}</span>
+  </button>`;
+}
+
+// ───────── Phase 2: 선택 날짜 헤드라인 배지 (날씨 + 행사·제철 카운트) ─────────
+function renderDateBadge(target, active, upcoming) {
+  const $badge = document.getElementById("date-badge");
+  if (!$badge) return;
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const label = `${target.getMonth() + 1}/${target.getDate()} (${days[target.getDay()]})`;
+
+  // 부산 중심 격자 대표 날씨: 97_74 우선 (해운대권), 없으면 첫 셀
+  let f = null;
+  if (weatherIndex) {
+    const key = weatherIndex["97_74"] ? "97_74" : Object.keys(weatherIndex)[0];
+    if (key) {
+      const [nx, ny] = key.split("_").map(Number);
+      f = nearestForecast(nx, ny, target);
+    }
+  }
+  const parts = [`<span class="db-date">📅 ${escape(label)}</span>`];
+  if (f) {
+    const wxBits = [];
+    const skyEmo = (SKY_TXT[f.sky] || "").split(" ")[0];
+    const ptyEmo = (PTY_TXT[f.pty] || "").split(" ")[0];
+    if (skyEmo) wxBits.push(skyEmo);
+    if (ptyEmo) wxBits.push(ptyEmo);
+    if (f.tmp !== undefined && f.tmp !== null) wxBits.push(`${Math.round(f.tmp)}°`);
+    if (f.pop !== undefined && f.pop !== null && f.pop > 0) wxBits.push(`💧${f.pop}%`);
+    const wx = wxBits.join(" ");
+    if (wx) parts.push(`<span class="db-sep">·</span><span class="db-weather">${escape(wx)}</span>`);
+  }
+  const month = String(target.getMonth() + 1).padStart(2, "0");
+  const season = (window.__seasonal?.months || {})[month];
+  const seasonCount = season
+    ? ((season.foods?.length || 0) + (season.blooms?.length || 0) + (season.scenes?.length || 0))
+    : 0;
+  const activeN = active || 0, upcomingN = upcoming || 0;
+  const stats = `🎪 ${activeN}${upcomingN ? `+${upcomingN}` : ""} · 🍽 ${seasonCount}`;
+  parts.push(`<span class="db-sep">·</span><span class="db-stats">${stats}</span>`);
+
+  $badge.innerHTML = parts.join("");
+  $badge.hidden = false;
 }
 
 function openCustomDatePicker(chipBtn) {

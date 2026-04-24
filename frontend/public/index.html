@@ -37,6 +37,8 @@
       <button class="chip" data-preset="next-weekend">다음 주말</button>
       <button class="chip" data-preset="custom">날짜 선택</button>
     </div>
+    <!-- 선택 날짜 한눈에: 날씨 + 행사 수 + 제철 종 (applyDateFilter 가 렌더) -->
+    <div id="date-badge" class="date-badge" role="status" aria-live="polite" hidden></div>
   </header>
 
   <!-- Bottom sheet (category filters + card list) -->
@@ -49,14 +51,15 @@
         <button class="tab" data-view="read">📖 읽을거리</button>
       </div>
       <div class="filter-row" role="group" aria-label="카테고리 필터">
+        <!-- 기본 on: 이벤트·블로그(관광)만. 명소/맛집은 사용자가 필요 시 on (노이즈 최소) -->
         <label class="filter"><input type="checkbox" data-cat="festival" checked> 🎪 축제</label>
-        <label class="filter"><input type="checkbox" data-cat="attraction" checked> 🏛 명소</label>
-        <label class="filter"><input type="checkbox" data-cat="food" checked> 🍜 맛집</label>
-        <label class="filter"><input type="checkbox" data-cat="beach" checked> 🏖 해수욕장</label>
+        <label class="filter"><input type="checkbox" data-cat="blog" checked> 📝 블로그</label>
+        <label class="filter"><input type="checkbox" data-cat="attraction"> 🏛 명소</label>
+        <label class="filter"><input type="checkbox" data-cat="food"> 🍜 맛집</label>
+        <label class="filter"><input type="checkbox" data-cat="beach"> 🏖 해변</label>
         <label class="filter"><input type="checkbox" data-cat="shopping"> 🛍 쇼핑</label>
         <label class="filter"><input type="checkbox" data-cat="lodging"> 🏨 숙박</label>
         <label class="filter"><input type="checkbox" data-cat="theme"> 💡 테마</label>
-        <label class="filter"><input type="checkbox" data-cat="blog"> 📝 블로그</label>
         <label class="filter"><input type="checkbox" data-cat="info_office"> ℹ️ 안내소</label>
       </div>
       <div class="status-row">
