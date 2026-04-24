@@ -1,5 +1,4 @@
-// 부산 트래블 MVP — Kakao Maps 기반 지도 대시보드
-// Task #8 스캐폴드 + Task #9 마커/클러스터러/상세 드로어 + 날씨 배지.
+// 주말부산 — Kakao Maps 기반 지도 대시보드
 
 const cfg = window.APP_CONFIG;
 if (!cfg || !cfg.KAKAO_JS_KEY) {
@@ -8,24 +7,18 @@ if (!cfg || !cfg.KAKAO_JS_KEY) {
 }
 
 const CATEGORIES = {
-  festival:    { label: "축제",     emoji: "🎪", color: "#ef4444" },
-  attraction:  { label: "명소",     emoji: "🏛", color: "#3b82f6" },
-  food:        { label: "맛집",     emoji: "🍜", color: "#f97316" },
-  foodie:      { label: "향토",     emoji: "🥘", color: "#db2777" },
-  beach:       { label: "해수욕장", emoji: "🏖", color: "#06b6d4" },
-  shopping:    { label: "쇼핑",     emoji: "🛍", color: "#a855f7" },
-  lodging:     { label: "숙박",     emoji: "🏨", color: "#10b981" },
-  theme:       { label: "테마",     emoji: "💡", color: "#f59e0b" },
-  blog:        { label: "블로그",   emoji: "📝", color: "#ec4899" },
-  info_office: { label: "안내소",   emoji: "ℹ️", color: "#6b7280" },
+  festival:    { label: "축제",   emoji: "🎪", icon: "ph-confetti",      color: "#ef4444", letter: "축" },
+  attraction:  { label: "명소",   emoji: "🏛", icon: "ph-buildings",     color: "#3b82f6", letter: "명" },  // 해변 포함
+  food:        { label: "맛집",   emoji: "🍜", icon: "ph-bowl-food",     color: "#f97316", letter: "맛" },
+  cafe:        { label: "카페",   emoji: "☕", icon: "ph-coffee",        color: "#a16207", letter: "카" },
+  theme:       { label: "테마",   emoji: "💡", icon: "ph-compass-rose",  color: "#f59e0b", letter: "테" },
+  blog:        { label: "블로그", emoji: "📝", icon: "ph-notebook",      color: "#ec4899", letter: "블" },
 };
-const HOTEL_GRADE_BADGE = {
-  "관광호텔 5성": "⭐⭐⭐⭐⭐",
-  "관광호텔 4성": "⭐⭐⭐⭐",
-  "관광호텔 3성": "⭐⭐⭐",
-  "관광호텔 2성": "⭐⭐",
-  "관광호텔 1성": "⭐",
-};
+
+// Phosphor 아이콘 HTML helper — 카드/상세 렌더에서 이모지 대신 사용
+function icon(name) {
+  return `<i class="ph-bold ${name}" aria-hidden="true"></i>`;
+}
 
 const SKY_TXT = { 1: "☀️ 맑음", 3: "⛅ 구름많음", 4: "☁️ 흐림" };
 const PTY_TXT = { 0: "", 1: "🌧 비", 2: "🌨 비/눈", 3: "❄️ 눈", 4: "🌦 소나기" };
@@ -67,23 +60,33 @@ async function fetchJson(path) {
   return res.json();
 }
 
-// ───────── SVG 마커 생성 (Phase 2: 32→40 확대로 탭 편의 개선) ─────────
-function svgMarker(color, emoji) {
+// ───────── SVG 마커 생성 — 한글 단일문자 라벨 + 별표 배지 ─────────
+function svgMarker(color, letter, isFavorite = false) {
+  const starBadge = isFavorite
+    ? `<circle cx="33" cy="7" r="7" fill="#facc15" stroke="white" stroke-width="1.5"/><text x="33" y="10.5" text-anchor="middle" font-size="9" font-weight="700" fill="white">★</text>`
+    : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
     <path d="M20 0C9 0 0 9 0 20c0 14 20 32 20 32s20-18 20-32C40 9 31 0 20 0z" fill="${color}" stroke="white" stroke-width="2"/>
-    <circle cx="20" cy="20" r="11" fill="white"/>
-    <text x="20" y="25" text-anchor="middle" font-size="16">${emoji}</text>
+    <circle cx="20" cy="20" r="12" fill="white"/>
+    <text x="20" y="25.5" text-anchor="middle" font-size="15" font-weight="700" fill="${color}" font-family="Pretendard, -apple-system, system-ui, sans-serif">${letter}</text>
+    ${starBadge}
   </svg>`;
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 }
 
-function markerImageFor(category) {
-  const cat = CATEGORIES[category] || CATEGORIES.attraction;
-  return new kakao.maps.MarkerImage(
-    svgMarker(cat.color, cat.emoji),
-    new kakao.maps.Size(40, 52),
-    { offset: new kakao.maps.Point(20, 52) }
-  );
+// 이미지 캐시 — 카테고리 × 별표여부 조합별 1회만 생성
+const _markerImageCache = {};
+function markerImageFor(category, isFavorite = false) {
+  const key = `${category}:${isFavorite ? 1 : 0}`;
+  if (!_markerImageCache[key]) {
+    const cat = CATEGORIES[category] || CATEGORIES.attraction;
+    _markerImageCache[key] = new kakao.maps.MarkerImage(
+      svgMarker(cat.color, cat.letter || cat.emoji, isFavorite),
+      new kakao.maps.Size(40, 52),
+      { offset: new kakao.maps.Point(20, 52) }
+    );
+  }
+  return _markerImageCache[key];
 }
 
 // ───────── 날씨 인덱스 빌드 ─────────
@@ -133,11 +136,11 @@ function buildMarkerSet(items, cat) {
   const catDef = CATEGORIES[cat];
   if (!catDef) return { markers: [], clusterer: null };
 
-  const image = markerImageFor(cat);
+  // per-POI 이미지 — 별표인 것만 배지 추가. 캐시되므로 cost 작음.
   const markers = items.map(poi => {
     const marker = new kakao.maps.Marker({
       position: new kakao.maps.LatLng(poi.lat, poi.lon),
-      image,
+      image: markerImageFor(cat, !!poi.is_favorite),
       title: poi.title,
     });
     kakao.maps.event.addListener(marker, "click", () => showDetail(poi));
@@ -165,25 +168,25 @@ function buildMarkerSet(items, cat) {
   return { markers, clusterer };
 }
 
-function renderMarkers(places, beaches, festivalEvents, lodging, blogMarkers = [], foodie = { foodie: [] }) {
-  // beaches → POI 형태
+function renderMarkers(places, beaches, festivalEvents, blogMarkers = [], favorites = []) {
+  // beaches → 명소(attraction) 로 병합. 수질 정보는 latest_water 로 detail 카드에 유지.
   const beachRows = (beaches.beaches || []).map(b => ({
     id: "beach:" + b.name,
-    category: "beach",
+    category: "attraction",
+    subtype: "해변",
     title: b.name,
     lat: b.lat, lon: b.lon,
     address: "",
     latest_water: b.latest_water,
   }));
 
-  // places 는 food/attraction/info_office/shopping/theme 혼합
+  // places + favorites (각 favorite 는 자기 실제 category 유지, is_favorite 플래그로 ★ 배지만)
   const all = [
+    ...favorites,  // favorites 는 이미 category=cafe/food/attraction + is_favorite:true
     ...(places.places || []),
-    ...(lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
-    ...(foodie?.foodie || []).map(f => ({ ...f, category: "foodie" })),  // Phase 2.5
     ...beachRows,
     ...festivalEvents.map(e => ({ ...e, category: "festival" })),
-    ...blogMarkers,  // 네이버 블로그 72 → category='blog'
+    ...blogMarkers,  // 네이버 블로그 → category='blog'
   ];
 
   const byCategory = {};
@@ -266,7 +269,7 @@ function refreshWeatherBadges(targetDate) {
 
   if (map.getLevel() > 5) return; // 너무 멀면 생략
 
-  for (const cat of ["festival", "beach"]) {
+  for (const cat of ["festival"]) {
     if (!clusterers[cat]) continue;
     for (const { marker, poi } of allMarkers[cat] || []) {
       if (!poi.nx || !poi.ny) continue;
@@ -318,19 +321,35 @@ function imageTag(url, cls = "card-image") {
 
 function showDetail(poi) {
   const catDef = CATEGORIES[poi.category] || {};
+  const isBlog = poi.category === "blog" || poi.category === "blog_post";
+  const isFavorite = !!poi.is_favorite;
+
+  // 블로그는 별도 레이아웃 — 출처·날짜 + 발췌 + 원문 보기 중심으로 명확히
+  if (isBlog) {
+    $list.innerHTML = renderBlogDetail(poi);
+    const sheet = document.getElementById("sheet");
+    if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
+    return;
+  }
+
+  // 별표는 카테고리 색 유지하면서 골드 kicker 로 "내가 별표한 곳" 표시
+  const favKicker = isFavorite
+    ? `<div class="favorite-kicker">${icon("ph-star-fill")} 내가 별표한 곳${poi.subtype ? " · " + escape(poi.subtype) : ""}</div>`
+    : "";
+  const favNote = isFavorite && poi.note
+    ? `<div class="favorite-note">💬 ${escape(poi.note)}</div>`
+    : "";
+
   const now = new Date();
   const f = poi.nx && poi.ny ? nearestForecast(poi.nx, poi.ny, now) : null;
   const weatherLine = f
     ? `<div class="card-meta">${weatherBadge(f)} ${f.tmp ? f.tmp + "°C " : ""}${f.pop ? "POP " + f.pop + "%" : ""}</div>`
     : "";
   const dateLine = poi.start
-    ? `<div class="card-meta">📅 ${poi.start}${poi.end && poi.end !== poi.start ? " ~ " + poi.end : ""}</div>`
+    ? `<div class="card-meta">${icon("ph-calendar-blank")} ${poi.start}${poi.end && poi.end !== poi.start ? " ~ " + poi.end : ""}</div>`
     : "";
   const beachLine = poi.latest_water?.comment
-    ? `<div class="card-meta">🌊 ${escape(poi.latest_water.comment)}</div>`
-    : "";
-  const hotelGrade = poi.subtype && HOTEL_GRADE_BADGE[poi.subtype]
-    ? `<span style="margin-left:6px">${HOTEL_GRADE_BADGE[poi.subtype]}</span>`
+    ? `<div class="card-meta">${icon("ph-waves")} ${escape(poi.latest_water.comment)}</div>`
     : "";
   const ratingLine = poi.rating
     ? `<div class="card-meta" style="margin-top:4px">${renderStars(poi.rating)}${poi.views ? ` · 조회 ${poi.views.toLocaleString()}` : ""}${poi.reviews ? ` · 리뷰 ${poi.reviews}` : ""}</div>`
@@ -340,26 +359,28 @@ function showDetail(poi) {
   const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
 
   $list.innerHTML = `
-    <div class="card" style="border-left:3px solid ${catDef.color || "#888"}">
+    <div class="card${isFavorite ? " favorite-detail" : ""}" style="border-left:3px solid ${catDef.color || "#888"}">
+      ${favKicker}
       ${imageTag(poi.image)}
-      <div class="card-title">${catDef.emoji || ""} ${escape(poi.title)}${hotelGrade}</div>
-      <div class="card-meta">${catDef.label || poi.category}${poi.subtype && !HOTEL_GRADE_BADGE[poi.subtype] ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
+      <div class="card-title">${catDef.icon ? icon(catDef.icon) : (catDef.emoji || "")} ${escape(poi.title)}</div>
+      ${favNote}
+      <div class="card-meta">${catDef.label || poi.category}${poi.subtype ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
       ${ratingLine}
       ${dateLine}
       ${weatherLine}
       ${beachLine}
       ${excerpt ? `<div class="card-excerpt">${escape(excerpt.slice(0, 280))}</div>` : ""}
       ${renderTags(poi.tags)}
-      ${infoRow("🕐 영업", poi.hours)}
-      ${infoRow("🚫 휴무", poi.holiday)}
-      ${infoRow("💰 요금", poi.fee || poi.price)}
-      ${infoRow("🚌 교통", poi.transport)}
-      ${infoRow("💡 팁", poi.tip)}
-      ${infoRow("📞 전화", poi.phone)}
+      ${infoRow(icon("ph-clock") + " 영업", poi.hours)}
+      ${infoRow(icon("ph-prohibit") + " 휴무", poi.holiday)}
+      ${infoRow(icon("ph-currency-krw") + " 요금", poi.fee || poi.price)}
+      ${infoRow(icon("ph-bus") + " 교통", poi.transport)}
+      ${infoRow(icon("ph-lightbulb") + " 팁", poi.tip)}
+      ${infoRow(icon("ph-phone") + " 전화", poi.phone)}
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">🗺️ 카카오맵 길찾기</a>
-        ${poi.story_url ? `<a href="${escape(poi.story_url)}" target="_blank" style="padding:6px 10px;background:#0ea5e9;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">📖 비짓부산</a>` : ""}
-        ${poi.url && poi.url !== poi.story_url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">🔗 홈페이지</a>` : ""}
+        <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-map-pin")} 카카오맵 길찾기</a>
+        ${poi.story_url ? `<a href="${escape(poi.story_url)}" target="_blank" style="padding:6px 10px;background:#0ea5e9;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-book-open")} 비짓부산</a>` : ""}
+        ${poi.url && poi.url !== poi.story_url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-globe")} 홈페이지</a>` : ""}
       </div>
     </div>
   `;
@@ -375,6 +396,58 @@ function showDetail(poi) {
     pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
     panToWithSheetOffset(poi.lat, poi.lon);
   }
+}
+
+// ───────── 블로그 상세 (출처·날짜 + 발췌 + 원문 링크 중심) ─────────
+function renderBlogDetail(poi) {
+  const sourceLabel = formatBlogSource(poi.source);
+  const dateText = poi.start || poi.end || "";
+  const excerpt = poi.excerpt || poi.description || "";
+  const tags = renderTags(poi.tags);
+  const fullUrl = poi.url || poi.story_url;
+  const blogColor = CATEGORIES.blog?.color || "#ec4899";
+
+  const metaLine = [
+    sourceLabel ? `<span>${icon("ph-notebook")} ${escape(sourceLabel)}</span>` : "",
+    dateText ? `<span>${icon("ph-calendar-blank")} ${escape(dateText)}</span>` : "",
+    poi.venue && !isBoilerplateVenue(poi.venue) ? `<span>${icon("ph-map-pin")} ${escape(poi.venue)}</span>` : "",
+  ].filter(Boolean).join(" · ");
+
+  return `
+    <div class="card blog-detail" style="border-left:3px solid ${blogColor}">
+      <div class="blog-kicker">블로그 포스트</div>
+      <div class="card-title">${escape(poi.title || "(제목 없음)")}</div>
+      ${metaLine ? `<div class="card-meta blog-meta">${metaLine}</div>` : ""}
+      ${imageTag(poi.image)}
+      ${excerpt ? `<div class="card-excerpt blog-excerpt">${escape(excerpt.slice(0, 600))}${excerpt.length > 600 ? "…" : ""}</div>` : ""}
+      ${tags}
+      <div class="blog-note">※ 발췌문은 네이버 블로그 원문에서 일부만 가져온 것입니다.</div>
+      ${fullUrl ? `
+        <div style="margin-top:12px">
+          <a href="${escape(fullUrl)}" target="_blank" rel="noopener"
+             style="display:inline-block;padding:10px 16px;background:${blogColor};color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+            ${icon("ph-arrow-square-out")} 네이버 블로그 원문 보기 →
+          </a>
+        </div>` : ""}
+    </div>
+  `;
+}
+
+function formatBlogSource(source) {
+  if (!source) return "";
+  const map = {
+    "naver_blog:cooolbusan": "네이버 블로그 · 부산시청",
+    "naver_blog:bscf2009": "네이버 블로그 · 부산문화재단",
+    "naver_blog:hudpr": "네이버 블로그 · 부산관광공사",
+    "naver_search:blog": "네이버 블로그 검색",
+    "naver_search:news": "네이버 뉴스",
+  };
+  return map[source] || (source.startsWith("naver_") ? "네이버 콘텐츠" : source);
+}
+
+function isBoilerplateVenue(v) {
+  const bp = new Set(["Busan City", "Busan Culture Fdn", "hudpr", "부산시", "부산광역시", "부산관광공사"]);
+  return bp.has(v);
 }
 
 // ───────── Phase 2: 카테고리 가시성 토글 (cluster + 개별 marker 동시 제어) ─────────
@@ -428,22 +501,23 @@ async function init() {
   map = new kakao.maps.Map(mapEl, { center, level: cfg.DEFAULT_LEVEL });
   // Phase 3: 부산 전체가 딱 보이는 수준에서 더 축소 방지 (동아시아까지 넓어지는 것 차단)
   map.setMaxLevel(9);
+  // 모바일 핀치 줌 / 더블탭 줌 / 마우스 휠 확대·축소 보장
+  map.setZoomable(true);
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, lodging, courses, seasonal, foodie] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
     fetchJson("./data/beaches.json"),
-    fetchJson("./data/lodging.json").catch(() => ({ lodging: [] })),
     fetchJson("./data/courses.json").catch(() => ({ courses: [] })),
     fetchJson("./data/seasonal.json").catch(() => ({ months: {} })),
-    fetchJson("./data/foodie.json").catch(() => ({ foodie: [] })),  // Phase 2.5: 부산푸디투어
+    fetchJson("./data/my-favorites.json").catch(() => ({ favorites: [] })),  // 구글 별표 import (파일 없으면 빈 배열)
   ]);
   coursesData = courses;
   window.__seasonal = seasonal;
-  window.__foodie = foodie;
+  window.__favorites = favorites;
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -486,9 +560,10 @@ async function init() {
   );
 
   weatherIndex = buildWeatherIndex(weatherShort);
-  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, foodie, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers, allEventPoi };
+  const favArr = favorites?.favorites || [];
+  window.__data = { manifest, places, weatherShort, beaches, courses, favorites: favArr, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers, allEventPoi };
 
-  renderMarkers(places, beaches, allFestivalEvents, lodging, allBlogMarkers, foodie);
+  renderMarkers(places, beaches, allFestivalEvents, allBlogMarkers, favArr);
 
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
   $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
@@ -577,42 +652,6 @@ async function init() {
     if (btn) btn.click();
   }
 
-  // 언어 토글: URL ?lang=en/ja/zh 면 모든 비짓부산 deep-link 를 해당 언어 경로로 다시 씀
-  const urlLang = new URLSearchParams(location.search).get("lang") || "ko";
-  window.__lang = urlLang;
-  document.querySelectorAll(".lang-toggle a").forEach(a => {
-    const isActive = a.dataset.lang === urlLang;
-    a.classList.toggle("active", isActive);
-  });
-  if (urlLang !== "ko") {
-    rewriteStoryUrls(urlLang);
-  }
-
-}
-
-// 비짓부산 URL 의 lang_cd 파라미터 교체 (en/ja/zhs/zht 지원)
-function rewriteStoryUrls(lang) {
-  const map = { en: "en", ja: "ja", zh: "zhs" };
-  const target = map[lang] || "ko";
-  const rewrite = (url) => {
-    if (!url || !url.includes("visitbusan.net")) return url;
-    return url
-      .replace(/\/kr\//, `/${target}/`)
-      .replace(/lang_cd=ko/, `lang_cd=${target}`);
-  };
-  // places + lodging + courses 의 URL 들 일괄 재작성
-  const d = window.__data;
-  for (const p of (d.places?.places || [])) {
-    p.story_url = rewrite(p.story_url);
-    p.url = rewrite(p.url);
-  }
-  for (const l of (d.lodging?.lodging || [])) {
-    l.story_url = rewrite(l.story_url);
-    l.url = rewrite(l.url);
-  }
-  for (const c of (d.courses?.courses || [])) {
-    c.story_url = rewrite(c.story_url);
-  }
 }
 
 function setViewMode(mode) {
@@ -691,10 +730,7 @@ function activateCourse(uc_seq) {
   activeCourseId = uc_seq;
 
   // POI 이름 기반으로 places 에서 매칭 시도 (loose: 앞 6글자 일치)
-  const allPlaces = [
-    ...(window.__data.places.places || []),
-    ...(window.__data.lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
-  ];
+  const allPlaces = [...(window.__data.places.places || [])];
   const path = [];
   for (const p of course.pois || []) {
     const name = (p.name || "").trim();
@@ -854,43 +890,17 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // Phase 2.5: 부산푸디투어 기반 향토음식 TOP 8 (좌표 없는 에세이형 데이터)
-  let foodieHTML = "";
-  const foodieList = (window.__foodie?.foodie || []).slice(0, 8);
-  if (foodieList.length) {
-    const rows = foodieList.map((p, i) => {
-      const sub = p.subtype ? `<span class="fr-badge">🍲 ${escape(p.subtype)}</span>` : "";
-      const venue = p.venue || p.address || "";
-      return `<button class="festival-row foodie-row" data-foodie-idx="${i}">
-        <span class="fr-title">${escape(p.title || "")}</span>
-        <span class="fr-meta">${sub}${venue ? " · " + escape(venue) : ""}</span>
-      </button>`;
-    }).join("");
-    foodieHTML = `<div class="highlight-section">
-      <div class="hs-title">🥘 부산 대표 향토음식 ${foodieList.length}곳</div>
-      ${rows}
-    </div>`;
-  }
-
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + foodieHTML + storyHero;
+  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + storyHero;
 
   // 축제 row 클릭 → POI 상세 (showDetail 은 pulse+pan+시트 half 를 자동 처리)
-  $list.querySelectorAll(".festival-row:not(.foodie-row)").forEach(btn => {
+  $list.querySelectorAll(".festival-row").forEach(btn => {
     btn.addEventListener("click", () => {
       const kind = btn.dataset.kind;
       const idx = Number(btn.dataset.idx);
       const poi = kind === "active" ? active[idx] : upcoming[idx];
       if (poi) showDetail(poi);
-    });
-  });
-  // 향토음식 row 클릭
-  $list.querySelectorAll(".foodie-row").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.dataset.foodieIdx);
-      const poi = foodieList[idx];
-      if (poi) showDetail({ ...poi, category: "foodie" });
     });
   });
 

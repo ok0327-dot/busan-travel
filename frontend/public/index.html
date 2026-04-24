@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#0b1220" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="부산" />
-  <title>부산 트래블</title>
+  <meta name="apple-mobile-web-app-title" content="주말부산" />
+  <title>주말부산</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="apple-touch-icon" href="./icon.svg" />
@@ -35,22 +35,18 @@
     <div class="sheet-handle" aria-hidden="true"></div>
     <div class="sheet-header">
       <div class="tab-row" role="tablist">
-        <button class="tab active" data-view="map">🗺 지도</button>
-        <button class="tab" data-view="course">📋 코스</button>
-        <button class="tab" data-view="read">📖 읽을거리</button>
+        <button class="tab active" data-view="map"><i class="ph-bold ph-map-trifold"></i> 지도</button>
+        <button class="tab" data-view="course"><i class="ph-bold ph-path"></i> 코스</button>
+        <button class="tab" data-view="read"><i class="ph-bold ph-book-open-text"></i> 읽을거리</button>
       </div>
       <div class="filter-row" role="group" aria-label="카테고리 필터">
-        <!-- 기본 on: 이벤트·블로그(관광)만. 명소/맛집은 사용자가 필요 시 on (노이즈 최소) -->
-        <label class="filter"><input type="checkbox" data-cat="festival" checked> 🎪 축제</label>
-        <label class="filter"><input type="checkbox" data-cat="blog" checked> 📝 블로그</label>
-        <label class="filter"><input type="checkbox" data-cat="attraction"> 🏛 명소</label>
-        <label class="filter"><input type="checkbox" data-cat="food"> 🍜 맛집</label>
-        <label class="filter"><input type="checkbox" data-cat="foodie"> 🥘 향토</label>
-        <label class="filter"><input type="checkbox" data-cat="beach"> 🏖 해변</label>
-        <label class="filter"><input type="checkbox" data-cat="shopping"> 🛍 쇼핑</label>
-        <label class="filter"><input type="checkbox" data-cat="lodging"> 🏨 숙박</label>
-        <label class="filter"><input type="checkbox" data-cat="theme"> 💡 테마</label>
-        <label class="filter"><input type="checkbox" data-cat="info_office"> ℹ️ 안내소</label>
+        <!-- 별표는 각 카테고리 내 ★ 배지로 표시. 기본 on: 축제·블로그. 명소/맛집/카페 는 사용자가 필요 시 on -->
+        <label class="filter"><input type="checkbox" data-cat="festival" checked> <i class="ph-bold ph-confetti"></i> 축제</label>
+        <label class="filter"><input type="checkbox" data-cat="blog" checked> <i class="ph-bold ph-notebook"></i> 블로그</label>
+        <label class="filter"><input type="checkbox" data-cat="attraction"> <i class="ph-bold ph-buildings"></i> 명소</label>
+        <label class="filter"><input type="checkbox" data-cat="food"> <i class="ph-bold ph-bowl-food"></i> 맛집</label>
+        <label class="filter"><input type="checkbox" data-cat="cafe"> <i class="ph-bold ph-coffee"></i> 카페</label>
+        <label class="filter"><input type="checkbox" data-cat="theme"> <i class="ph-bold ph-compass-rose"></i> 테마</label>
       </div>
       <div class="status-row">
         <span id="status">로딩 중…</span>
@@ -61,16 +57,8 @@
     </div>
   </aside>
 
-  <!-- Language toggle -->
-  <nav class="lang-toggle" aria-label="Language">
-    <a href="?lang=ko" data-lang="ko" class="active">KO</a>
-    <a href="?lang=en" data-lang="en">EN</a>
-    <a href="?lang=ja" data-lang="ja">JA</a>
-    <a href="?lang=zh" data-lang="zh">中</a>
-  </nav>
-
   <!-- Floating action button: 내 위치 -->
-  <button id="fab-locate" class="fab" aria-label="내 위치로 이동">📍</button>
+  <button id="fab-locate" class="fab" aria-label="내 위치로 이동"><i class="ph-bold ph-navigation-arrow"></i></button>
 
   <!-- Config + main -->
   <script src="./config.js"></script>

@@ -1,5 +1,6 @@
-/* ═══ P1 — Fonts (Pretendard body + GmarketSans display) ═══ */
+/* ═══ P1 — Fonts (Pretendard body + GmarketSans display) + Icons (Phosphor Bold) ═══ */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+@import url("https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css");
 
 @font-face {
   font-family: "GmarketSans";
@@ -88,6 +89,8 @@ html, body {
   position: fixed; inset: 0;
   width: 100vw; height: 100dvh;
   background: #1e293b;
+  /* 핀치 줌 / 팬 손가락 제스처 허용 — Kakao Maps 가 자체 처리 */
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 /* Top chip bar */
@@ -272,20 +275,30 @@ html, body {
 #sheet.sheet-half    { transform: translateY(50%); }
 #sheet.sheet-full    { transform: translateY(0); }
 
+/* 드래그 핸들 — 시각은 작게 유지하되 탭 영역 크게 확보 (::after 로 히트존 확장) */
 .sheet-handle {
   width: 44px; height: 5px;
-  background: var(--muted); opacity: 0.4;
+  background: var(--muted); opacity: 0.5;
   border-radius: 3px;
-  margin: 8px auto;
+  margin: 14px auto 6px;
   cursor: grab;
+  position: relative;
+  /* 손가락 탭 영역: 상하 14px, 좌우 40px 투명 확장 */
+  touch-action: none;
+}
+.sheet-handle::after {
+  content: "";
+  position: absolute;
+  top: -14px; bottom: -14px;
+  left: -40px; right: -40px;
 }
 .sheet-header {
-  padding: 0 16px 10px;
+  padding: 6px 16px 10px;  /* 핸들과 탭 사이 공간 증가 */
   border-bottom: 1px solid var(--border);
 }
 .tab-row {
-  display: flex; gap: 6px;
-  padding: 2px 0 6px;
+  display: flex; gap: 8px;
+  padding: 6px 0 8px;  /* 탭 상하 여백 증가 — 핸들·필터와 안 부딪히게 */
 }
 .tab {
   flex: 0 0 auto;
@@ -320,6 +333,83 @@ body.view-read .filter-row { display: none; }
 .filter input { accent-color: var(--accent); }
 
 .status-row { color: var(--muted); font-size: 11px; padding: 4px 0 0; }
+
+/* ═══ Phosphor 아이콘 — 인라인 정렬 + 사이즈 톤 통일 ═══ */
+.tab i[class^="ph-"],
+.filter i[class^="ph-"] {
+  font-size: 15px;
+  vertical-align: -2px;
+  margin-right: 2px;
+}
+.fab i[class^="ph-"] { font-size: 22px; vertical-align: -3px; }
+.card-title i[class^="ph-"] { font-size: 17px; vertical-align: -2px; margin-right: 4px; color: var(--busan-sunset); }
+.card-meta i[class^="ph-"],
+.info-row i[class^="ph-"] { font-size: 13px; vertical-align: -2px; margin-right: 3px; color: var(--muted); }
+a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
+
+/* ═══ 별표(favorite) 필터칩 — 골드 강조 ═══ */
+.filter-favorite {
+  background: linear-gradient(135deg, rgba(250,204,21,0.18), rgba(250,204,21,0.08));
+  border-color: rgba(250,204,21,0.45);
+}
+.filter-favorite i[class^="ph-"] { color: #facc15; }
+.filter-favorite:has(input:checked) {
+  background: linear-gradient(135deg, rgba(250,204,21,0.35), rgba(250,204,21,0.18));
+  border-color: #facc15;
+}
+
+/* ═══ 별표 상세 카드 — 골드 킥커 + 노트 강조 ═══ */
+.favorite-detail .favorite-kicker {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: var(--fw-bold);
+  letter-spacing: 0.06em;
+  color: #facc15;
+  background: rgba(250,204,21,0.14);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+.favorite-detail .favorite-note {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: rgba(250,204,21,0.08);
+  border-left: 3px solid #facc15;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-meta);
+  color: var(--fg);
+  line-height: 1.55;
+}
+
+/* ═══ 블로그 상세 카드 — 출처/발췌/원문 버튼 스타일 ═══ */
+.blog-detail .blog-kicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ec4899;
+  background: rgba(236, 72, 153, 0.12);
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+.blog-detail .blog-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  color: var(--muted); font-size: var(--fs-meta);
+}
+.blog-detail .blog-excerpt {
+  line-height: 1.62;
+  color: var(--fg);
+  margin-top: 10px;
+}
+.blog-detail .blog-note {
+  font-size: var(--fs-small);
+  color: var(--muted);
+  opacity: 0.75;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
 
 .sheet-body {
   flex: 1 1 auto;
@@ -566,27 +656,6 @@ body.view-read .filter-row { display: none; }
   margin-right: 6px;
 }
 
-/* Language toggle */
-.lang-toggle {
-  position: fixed;
-  top: max(env(safe-area-inset-top, 0), 14px);
-  right: 12px;
-  z-index: 11;
-  display: flex;
-  gap: 4px;
-}
-.lang-toggle a {
-  padding: 4px 8px;
-  background: var(--chip-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 10px;
-  color: var(--muted);
-  text-decoration: none;
-  backdrop-filter: blur(8px);
-}
-.lang-toggle a.active { background: var(--chip-active); color: white; border-color: var(--chip-active); }
-
 /* FAB: 내 위치 */
 .fab {
   position: fixed;
@@ -627,9 +696,8 @@ body.view-read .filter-row { display: none; }
   .sheet-handle { display: none; }
   .sheet-header { padding-top: 12px; }
 
-  /* 상단 칩바·언어 토글·FAB: 사이드 패널 공간 비우기 */
+  /* 상단 칩바·FAB: 사이드 패널 공간 비우기 */
   #topbar { right: 420px; }
-  .lang-toggle { right: 436px; }
   .fab { right: 436px; bottom: 24px; }
 
   /* 읽을거리(블로그) 뷰에서 2컬럼 매거진 그리드 — 에디토리얼 매거진 룩 */
@@ -656,6 +724,5 @@ body.view-read .filter-row { display: none; }
 @media (min-width: 1280px) {
   #sheet { width: 480px; }
   #topbar { right: 480px; }
-  .lang-toggle { right: 496px; }
   .fab { right: 496px; }
 }

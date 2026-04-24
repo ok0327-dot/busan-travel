@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 from config import DB_PATH
 from sources import (
     busan_festival,
-    busan_foodie,
-    gov_info_office,
     gov_tour,
     naver_blogs,
     naver_search,
@@ -26,16 +24,12 @@ from storage.db import Event, connect, upsert_events
 # busan_attraction/busan_food (KTO) 는 visitbusan 이 같은 데이터 + 스토리/태그/평점으로 대체
 SOURCES = [
     ("busan_festival",         busan_festival.fetch),
-    ("busan_foodie",           busan_foodie.fetch),  # 향토음식 — API_ID 확정 후 활성
-    ("busan_info_office",      gov_info_office.fetch),
     ("tour_api",               gov_tour.fetch),
     ("naver_blogs",            naver_blogs.fetch),
     ("naver_search",           naver_search.fetch),  # Phase 3: 검색 API (블로그+뉴스)
     # VisitBusan.net 큐레이션 (Phase 5)
     ("vb_attraction",          visitbusan.fetch_attractions),
     ("vb_food_curated",        visitbusan.fetch_food_curated),
-    ("vb_lodging",             visitbusan.fetch_lodging),
-    ("vb_shopping",            visitbusan.fetch_shopping),
     ("vb_festival_curated",    visitbusan.fetch_festival_curated),
     ("vb_theme",               visitbusan.fetch_themes),
     ("vb_schedule_board",      visitbusan.fetch_schedule_board),

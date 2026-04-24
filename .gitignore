@@ -20,3 +20,5 @@ vendor/gov-api-kr/*.db
 vendor/gov-api-kr/data/
 # Wrangler 로컬 캐시/임시 빌드 산출물 — 커밋 대상 아님
 .wrangler/
+# Google Takeout 원본 압축 해제 임시폴더 (parser 실행용, 결과는 my-favorites.json 에 반영됨)
+.tmp-google-takeout/

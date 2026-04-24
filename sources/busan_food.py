@@ -1,7 +1,7 @@
 """Busan city restaurant API (data.go.kr 15063472) — via gov-api-kr.
 
 부산 맛집 정보. POI 성격(start_date=None).
-Schema identical to busan_festival/attraction/info_office (6260000 통합키).
+Schema identical to busan_festival/attraction (6260000 통합키).
 """
 from __future__ import annotations
 

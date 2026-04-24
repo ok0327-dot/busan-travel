@@ -1,7 +1,7 @@
 {
-  "name": "부산 트래블",
-  "short_name": "부산",
-  "description": "부산 축제·명소·맛집·날씨를 날짜별로 한눈에",
+  "name": "주말부산",
+  "short_name": "주말부산",
+  "description": "이번 주 부산, 오늘 뭐 할지 1분 안에",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

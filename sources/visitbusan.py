@@ -1,10 +1,8 @@
-"""VisitBusan.net 어댑터 — 8개 카테고리 통합.
+"""VisitBusan.net 어댑터 — 큐레이션 카테고리 통합.
 
 카테고리 / Category mapping:
 - 명소 (attractions):      201001 list → 201001001 detail, Event.category='attraction', source='vb_attraction'
 - 음식 (food curated):     201002 list → 201002001 detail, Event.category='food',       source='vb_food'
-- 숙박 (lodging):          201004 list → 201004001 detail, Event.category='lodging',    source='vb_lodging' ⭐신규
-- 쇼핑 (shopping):         201003 list → 201003001 detail, Event.category='shopping',   source='vb_shopping' ⭐신규
 - 축제 (festivals cur.):   201005 list → 201005001 detail, Event.category='festival',   source='vb_festival_curated'
 - 테마여행 (themes):       202002 list → 202002001 detail, Event.category='theme',      source='vb_theme'
 - 일정여행 (courses):      202012 list → 202012001 detail, vb_courses table,            source='vb_course'
@@ -141,15 +139,6 @@ def fetch_food_curated() -> list[Event]:
     )
 
 
-def fetch_shopping() -> list[Event]:
-    return _fetch_curated(
-        source="vb_shopping",
-        category="shopping",
-        list_menu="DOM_000000201003000000",
-        detail_menu="DOM_000000201003001000",
-    )
-
-
 def fetch_festival_curated() -> list[Event]:
     return _fetch_curated(
         source="vb_festival_curated",
@@ -166,107 +155,6 @@ def fetch_themes() -> list[Event]:
         list_menu="DOM_000000202002000000",
         detail_menu="DOM_000000202002001000",
     )
-
-
-# ─────────── 숙박 (다른 리스트 레이아웃: 표 형식 + 등급) ───────────
-
-
-_HOTEL_CLASS_RE = re.compile(r"(관광호텔|휴양콘도|가족호텔|소형호텔|호스텔)\s*(\d성)?")
-
-
-def _lodging_enrich(detail: dict, ev: Event) -> None:
-    """숙박은 리스트 페이지에 등급(5성 등) 정보가 있어 item.raw 에 들어감 → subtype 으로."""
-    # 리스트 HTML 의 '관광호텔 5성' 텍스트는 list 에서 별도 파싱 필요 — 여기선 detail text 에서 재추출 시도
-    text = (detail.get("subtitle") or "") + " " + (detail.get("title") or "")
-    m = _HOTEL_CLASS_RE.search(text)
-    if m:
-        ev.subtype = (m.group(1) + " " + (m.group(2) or "")).strip()
-
-
-def fetch_lodging() -> list[Event]:
-    """숙박 362건. 리스트 페이지 구조가 달라 별도 파싱 필요."""
-    client = VisitBusanClient()
-    list_menu = "DOM_000000201004000000"
-    detail_menu = "DOM_000000201004001000"
-
-    all_items: list[dict] = []
-    seen: set[int] = set()
-    for page in range(1, 40):
-        soup = client.get_soup(
-            "/index.do",
-            {"menuCd": list_menu, "page_no": page, "listCntPerPage2": 16},
-        )
-        items = parse_list_page(soup)
-        # .acm_item 래퍼 기반으로 subtype/loc 재추출
-        for it in items:
-            if it["uc_seq"] in seen:
-                continue
-            seen.add(it["uc_seq"])
-            a = soup.find("a", href=lambda h: h and f"uc_seq={it['uc_seq']}" in h)
-            card_text = ""
-            if a:
-                # .acm_item 래퍼 찾기 (일반 list는 .acm_item 없음 → fallback 상위 li/div)
-                card = a.find_parent(class_="acm_item") or a.find_parent(["li", "div"])
-                if card:
-                    card_text = card.get_text(" | ", strip=True)[:400]
-            it["_card_text"] = card_text
-            m = _HOTEL_CLASS_RE.search(card_text.replace(" | ", " "))
-            it["_subtype"] = (m.group(1) + " " + (m.group(2) or "")).strip() if m else None
-            # 지역 추출
-            loc_m = re.search(r"부산시\s*[>&gt;]*\s*(\w+구|\w+군)", card_text)
-            it["_gugun"] = loc_m.group(1) if loc_m else None
-            all_items.append(it)
-        total = total_count(soup.get_text(" ", strip=True))
-        if total and len(all_items) >= total:
-            break
-        if len(items) < 5:
-            break
-    print(f"[vb_lodging] list: {len(all_items)} items", file=sys.stderr)
-
-    events: list[Event] = []
-    for i, item in enumerate(all_items):
-        uc = item["uc_seq"]
-        try:
-            soup = client.get_soup(
-                "/kr/index.do",
-                {"menuCd": detail_menu, "uc_seq": uc, "lang_cd": "ko"},
-            )
-            d = parse_detail_page(soup, uc, detail_menu)
-        except Exception as exc:
-            print(f"[vb_lodging] detail #{uc} failed: {exc}", file=sys.stderr)
-            continue
-        lat, lon = busan_latlon(d["lat"], d["lon"])
-        title = d["title"] or item.get("title")
-        if not title:
-            continue
-        ev = Event(
-            source="vb_lodging",
-            source_id=str(uc),
-            category="lodging",
-            title=title,
-            venue=d.get("address"),
-            address=d.get("address"),
-            url=d.get("homepage") or d.get("story_url"),
-            image_url=item.get("image_url"),
-            description=d.get("story_excerpt"),
-            lat=lat,
-            lon=lon,
-            rating=d.get("rating"),
-            view_count=d.get("view_count"),
-            review_count=d.get("review_count"),
-            tags_json=json.dumps(d.get("tags", []), ensure_ascii=False) if d.get("tags") else None,
-            story_url=d.get("story_url"),
-            story_excerpt=d.get("story_excerpt"),
-            phone=d.get("phone"),
-            hours=d.get("hours"),
-            subtype=item.get("_subtype"),
-            raw={"list_item": {k: v for k, v in item.items() if k != "_card_text"}},
-        )
-        events.append(ev)
-        if (i + 1) % 50 == 0:
-            print(f"[vb_lodging] progress {i+1}/{len(all_items)}", file=sys.stderr)
-    print(f"[vb_lodging] parsed: {len(events)}", file=sys.stderr)
-    return events
 
 
 # ─────────── 일정여행 코스 (별도 테이블 vb_courses) ───────────

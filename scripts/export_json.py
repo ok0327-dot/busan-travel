@@ -1,7 +1,8 @@
 """SQLite events.db → frontend/public/data/ JSON export.
 
 출력:
-  places.json          고정 POI (맛집/명소/안내소/해수욕장)
+  places.json          고정 POI (맛집/명소/테마)
+  beaches.json         해수욕장 (수질 정보 포함, 명소로 병합 렌더)
   events-YYYY-MM.json  월별 이벤트 (축제/공연, start_date 기준)
   weather-short.json   단기예보 (모든 격자 × 3시간 간격)
   weather-mid.json     중기예보 (부산 단일, D+3~D+10)
@@ -20,8 +21,7 @@ ROOT = Path(__file__).parent.parent
 DB_PATH = ROOT / "data" / "events.db"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 
-PLACE_CATEGORIES = {"food", "attraction", "info_office", "beach", "shopping", "theme"}
-LODGING_CATEGORIES = {"lodging"}
+PLACE_CATEGORIES = {"food", "cafe", "attraction", "theme"}
 EVENT_CATEGORIES = {"festival", "blog_post"}
 
 # blog_post 필터 — 부산 공식 블로그(cooolbusan/bscf2009/hudpr) 피드에는 관광과 무관한
@@ -152,13 +152,13 @@ def _jsonable(row: sqlite3.Row) -> dict:
 
 
 def export_places(conn: sqlite3.Connection) -> int:
-    """Places: food + attraction + info_office + beach + shopping + theme.
+    """Places: food + cafe + attraction + theme. (해변은 beaches.json 으로 별도 export)
 
     중복 제거 (dedup): 같은 POI 를 여러 source (KTO + VisitBusan) 에서 수집할 수 있음.
     → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
     """
     rows_raw = list(conn.execute(
-        "SELECT * FROM events WHERE category IN ('food','attraction','info_office','beach','shopping','theme') "
+        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','theme') "
         "AND lat IS NOT NULL "
         # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
@@ -174,41 +174,6 @@ def export_places(conn: sqlite3.Connection) -> int:
     rows = list(seen.values())
     (OUT_DIR / "places.json").write_text(
         json.dumps({"count": len(rows), "places": rows}, ensure_ascii=False, separators=(",", ":")),
-        encoding="utf-8",
-    )
-    return len(rows)
-
-
-def export_lodging(conn: sqlite3.Connection) -> int:
-    """숙박 전용 파일 — 별 등급 + 지역. 기본 off, 토글 on 시 로드."""
-    rows = [
-        _jsonable(r)
-        for r in conn.execute(
-            "SELECT * FROM events WHERE category='lodging' AND lat IS NOT NULL "
-            "ORDER BY subtype DESC, title"
-        )
-    ]
-    (OUT_DIR / "lodging.json").write_text(
-        json.dumps({"count": len(rows), "lodging": rows}, ensure_ascii=False, separators=(",", ":")),
-        encoding="utf-8",
-    )
-    return len(rows)
-
-
-def export_foodie(conn: sqlite3.Connection) -> int:
-    """향토음식 전용 파일 — 부산푸디투어 API 기반. food(일반 맛집) 과 분리된 레이어.
-
-    NOTE: 이 API 는 좌표가 없어 지도 마커가 아닌 시트 하이라이트 리스트에만 노출.
-    따라서 lat IS NOT NULL 조건 없이 전체 수집.
-    """
-    rows = [
-        _jsonable(r)
-        for r in conn.execute(
-            "SELECT * FROM events WHERE category='foodie' ORDER BY title"
-        )
-    ]
-    (OUT_DIR / "foodie.json").write_text(
-        json.dumps({"count": len(rows), "foodie": rows}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     return len(rows)
@@ -367,8 +332,6 @@ def main():
 
     places = export_places(conn)
     events = export_events(conn)
-    lodging = export_lodging(conn)
-    foodie = export_foodie(conn)
     courses = export_courses(conn)
     w_short = export_weather_short(conn)
     w_mid = export_weather_mid(conn)
@@ -380,8 +343,6 @@ def main():
         "version": now.replace(":", "").replace("-", "")[:15],
         "counts": {
             "places": places,
-            "lodging": lodging,
-            "foodie": foodie,
             "courses": courses,
             "events_by_month": events,
             "weather_short_rows": w_short,
