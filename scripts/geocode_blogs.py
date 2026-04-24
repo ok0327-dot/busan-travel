@@ -197,7 +197,7 @@ def main(limit: int = 0, dry_run: bool = False):
         rows = rows[:limit]
     print(f"대상: {len(rows)} 포스트", file=sys.stderr)
 
-    stats = {"extracted": 0, "skipped_low_conf": 0, "skipped_no_place": 0, "geocoded": 0, "oob": 0}
+    stats = {"extracted": 0, "skipped_low_conf": 0, "skipped_no_place": 0, "geocoded": 0, "oob": 0, "awaiting_kakao": 0}
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     for i, r in enumerate(rows):
@@ -239,6 +239,7 @@ def main(limit: int = 0, dry_run: bool = False):
             continue
 
         if not kakao_available:
+            stats["awaiting_kakao"] += 1
             print(f"  [{i+1:3d}/{len(rows)}] {place} (Kakao 스킵)", file=sys.stderr)
             continue
 
