@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from config import DB_PATH
 from sources import (
     busan_festival,
+    busan_foodie,
     gov_info_office,
     gov_tour,
     naver_blogs,
@@ -24,6 +25,7 @@ from storage.db import Event, connect, upsert_events
 # busan_attraction/busan_food (KTO) 는 visitbusan 이 같은 데이터 + 스토리/태그/평점으로 대체
 SOURCES = [
     ("busan_festival",         busan_festival.fetch),
+    ("busan_foodie",           busan_foodie.fetch),  # 향토음식 — API_ID 확정 후 활성
     ("busan_info_office",      gov_info_office.fetch),
     ("tour_api",               gov_tour.fetch),
     ("naver_blogs",            naver_blogs.fetch),

@@ -195,6 +195,22 @@ def export_lodging(conn: sqlite3.Connection) -> int:
     return len(rows)
 
 
+def export_foodie(conn: sqlite3.Connection) -> int:
+    """향토음식 전용 파일 — 부산푸디투어 API 기반. food(일반 맛집) 과 분리된 레이어."""
+    rows = [
+        _jsonable(r)
+        for r in conn.execute(
+            "SELECT * FROM events WHERE category='foodie' AND lat IS NOT NULL "
+            "ORDER BY title"
+        )
+    ]
+    (OUT_DIR / "foodie.json").write_text(
+        json.dumps({"count": len(rows), "foodie": rows}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    return len(rows)
+
+
 def export_courses(conn: sqlite3.Connection) -> int:
     """vb_courses → courses.json. 일정여행 코스 + 포함 POI 리스트."""
     import json as _json
@@ -349,6 +365,7 @@ def main():
     places = export_places(conn)
     events = export_events(conn)
     lodging = export_lodging(conn)
+    foodie = export_foodie(conn)
     courses = export_courses(conn)
     w_short = export_weather_short(conn)
     w_mid = export_weather_mid(conn)
@@ -361,6 +378,7 @@ def main():
         "counts": {
             "places": places,
             "lodging": lodging,
+            "foodie": foodie,
             "courses": courses,
             "events_by_month": events,
             "weather_short_rows": w_short,

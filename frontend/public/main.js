@@ -11,6 +11,7 @@ const CATEGORIES = {
   festival:    { label: "축제",     emoji: "🎪", color: "#ef4444" },
   attraction:  { label: "명소",     emoji: "🏛", color: "#3b82f6" },
   food:        { label: "맛집",     emoji: "🍜", color: "#f97316" },
+  foodie:      { label: "향토",     emoji: "🥘", color: "#db2777" },
   beach:       { label: "해수욕장", emoji: "🏖", color: "#06b6d4" },
   shopping:    { label: "쇼핑",     emoji: "🛍", color: "#a855f7" },
   lodging:     { label: "숙박",     emoji: "🏨", color: "#10b981" },
@@ -164,7 +165,7 @@ function buildMarkerSet(items, cat) {
   return { markers, clusterer };
 }
 
-function renderMarkers(places, beaches, festivalEvents, lodging, blogMarkers = []) {
+function renderMarkers(places, beaches, festivalEvents, lodging, blogMarkers = [], foodie = { foodie: [] }) {
   // beaches → POI 형태
   const beachRows = (beaches.beaches || []).map(b => ({
     id: "beach:" + b.name,
@@ -179,6 +180,7 @@ function renderMarkers(places, beaches, festivalEvents, lodging, blogMarkers = [
   const all = [
     ...(places.places || []),
     ...(lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
+    ...(foodie?.foodie || []).map(f => ({ ...f, category: "foodie" })),  // Phase 2.5
     ...beachRows,
     ...festivalEvents.map(e => ({ ...e, category: "festival" })),
     ...blogMarkers,  // 네이버 블로그 72 → category='blog'
@@ -420,7 +422,7 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, lodging, courses, seasonal] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, lodging, courses, seasonal, foodie] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
@@ -428,9 +430,11 @@ async function init() {
     fetchJson("./data/lodging.json").catch(() => ({ lodging: [] })),
     fetchJson("./data/courses.json").catch(() => ({ courses: [] })),
     fetchJson("./data/seasonal.json").catch(() => ({ months: {} })),
+    fetchJson("./data/foodie.json").catch(() => ({ foodie: [] })),  // Phase 2.5: 부산푸디투어
   ]);
   coursesData = courses;
   window.__seasonal = seasonal;
+  window.__foodie = foodie;
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -465,9 +469,9 @@ async function init() {
   window.__blogPosts = allBlogPosts;
 
   weatherIndex = buildWeatherIndex(weatherShort);
-  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers };
+  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, foodie, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers };
 
-  renderMarkers(places, beaches, allFestivalEvents, lodging, allBlogMarkers);
+  renderMarkers(places, beaches, allFestivalEvents, lodging, allBlogMarkers, foodie);
 
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
   $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
@@ -834,17 +838,43 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
+  // Phase 2.5: 부산푸디투어 기반 향토음식 TOP 8 (데이터 있을 때만)
+  let foodieHTML = "";
+  const foodieList = (window.__foodie?.foodie || []).filter(f => f && f.lat && f.lon).slice(0, 8);
+  if (foodieList.length) {
+    const rows = foodieList.map((p, i) => {
+      const sub = p.subtype ? `<span class="fr-badge">🍲 ${escape(p.subtype)}</span>` : "";
+      const venue = p.venue || p.address || "";
+      return `<button class="festival-row foodie-row" data-foodie-idx="${i}">
+        <span class="fr-title">${escape(p.title || "")}</span>
+        <span class="fr-meta">${sub}${venue ? " · " + escape(venue) : ""}</span>
+      </button>`;
+    }).join("");
+    foodieHTML = `<div class="highlight-section">
+      <div class="hs-title">🥘 부산 대표 향토음식 ${foodieList.length}곳</div>
+      ${rows}
+    </div>`;
+  }
+
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + storyHero;
+  $list.innerHTML = heroHTML + activeHTML + upcomingHTML + seasonHTML + foodieHTML + storyHero;
 
   // 축제 row 클릭 → POI 상세 (showDetail 은 pulse+pan+시트 half 를 자동 처리)
-  $list.querySelectorAll(".festival-row").forEach(btn => {
+  $list.querySelectorAll(".festival-row:not(.foodie-row)").forEach(btn => {
     btn.addEventListener("click", () => {
       const kind = btn.dataset.kind;
       const idx = Number(btn.dataset.idx);
       const poi = kind === "active" ? active[idx] : upcoming[idx];
       if (poi) showDetail(poi);
+    });
+  });
+  // 향토음식 row 클릭
+  $list.querySelectorAll(".foodie-row").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.foodieIdx);
+      const poi = foodieList[idx];
+      if (poi) showDetail({ ...poi, category: "foodie" });
     });
   });
 
@@ -1010,6 +1040,7 @@ function _searchPool() {
   const pool = [];
   for (const p of (d.places?.places || [])) if (p && p.lat && p.lon) pool.push(p);
   for (const p of (d.lodging?.lodging || [])) if (p && p.lat && p.lon) pool.push(p);
+  for (const p of (d.foodie?.foodie || [])) if (p && p.lat && p.lon) pool.push({ ...p, category: "foodie" });
   for (const p of (d.festivalEvents || [])) if (p && p.lat && p.lon) pool.push(p);
   for (const p of (d.blogMarkers || [])) if (p && p.lat && p.lon) pool.push(p);
   return pool;

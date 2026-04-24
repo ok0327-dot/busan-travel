@@ -307,6 +307,20 @@ html, body {
   0%   { opacity: 1;   transform: scale(0.6); }
   100% { opacity: 0;   transform: scale(1.6); }
 }
+
+/* ─── Phase 2.5: 향토음식 row 배지 ─── */
+.festival-row.foodie-row { border-left-color: #db2777; }
+.festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }
+.fr-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-right: 4px;
+  background: rgba(219,39,119,0.18);
+  color: #f9a8d4;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
 .chip {
   flex: 0 0 auto;
   padding: 8px 14px;
