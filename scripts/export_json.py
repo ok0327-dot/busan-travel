@@ -25,6 +25,22 @@ OUT_DIR = ROOT / "frontend" / "public" / "data"
 sys.path.insert(0, str(ROOT))
 from sources._tour_filter import importance_score, SCALE_POSITIVE_KEYWORDS  # noqa: E402
 
+# 읽을거리 탭 전용 소스 가중치 — 공식 블로그 강가점, 일반 보도 감점
+# 공식 블로그는 depth/trust 높고, 일반 뉴스는 단순 홍보 반복이 많음.
+BLOG_SOURCE_WEIGHTS = {
+    # 공식 네이버 블로그 (신뢰 + 큐레이션)
+    "naver_blog:bscf2009":     +3,   # 부산문화재단
+    "naver_blog:hudpr":        +3,   # 해운대구청
+    "naver_blog:moca_busan":   +3,   # 부산현대미술관
+    "naver_blog:bsbukgusns":   +2,   # 북구청 (행정 혼재)
+    "naver_blog:bsjunggu":     +2,   # 중구청
+    "naver_blog:yeonjegu":     +2,   # 연제구청
+    "naver_blog:bsdonggublog": +2,   # 동구청
+    # 일반 수집 채널
+    "naver_search:news":       -2,   # 보도 단발성 + 중복 도배
+    "naver_search:blog":       -1,   # 개인 블로그 편차
+}
+
 
 def _duration_days(start: str | None, end: str | None) -> int | None:
     """YYYY-MM-DD 문자열 페어 → 기간 일수 (포함). 미정 값은 None."""
@@ -155,6 +171,7 @@ def _jsonable(row: sqlite3.Row) -> dict:
 
     # 이벤트 우선순위 스코어링 (festival/exhibition/performance/blog_post 에만 의미)
     priority = None
+    blog_priority = None
     hero_tags: list[str] = []
     cat = row["category"]
     if cat in ("festival", "exhibition", "performance", "blog_post"):
@@ -171,6 +188,8 @@ def _jsonable(row: sqlite3.Row) -> dict:
             duration_days=dur,
         )
         hero_tags = _hero_tags(row["title"], row["description"])
+        # 읽을거리 전용 priority — 소스 가중치 반영
+        blog_priority = priority + BLOG_SOURCE_WEIGHTS.get(row["source"], 0)
 
     return {
         "id": row["id"],
@@ -205,6 +224,7 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "phone": _col(row, "phone"),
         # Hero Top 3 재설계용 (이벤트에만 값, places 는 None)
         "priority": priority,
+        "blog_priority": blog_priority,
         "hero_tags": hero_tags or None,
     }
 

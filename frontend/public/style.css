@@ -390,6 +390,27 @@ html, body {
 }
 .chip-more:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
 
+/* ─── 읽을거리 Top 3 규모 태그 ─── */
+.blog-card-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0 6px;
+}
+.blog-card-tag {
+  padding: 2px 8px;
+  background: rgba(30,144,144,0.18);
+  color: var(--busan-sea);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+}
+.blog-card-featured .blog-card-tag {
+  background: rgba(244,162,97,0.22);
+  color: var(--busan-sunset);
+}
+
 /* ─── Phase 2.5: 향토음식 row 배지 ─── */
 .festival-row.foodie-row { border-left-color: #db2777; }
 .festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }

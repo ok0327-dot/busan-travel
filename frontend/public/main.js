@@ -548,10 +548,34 @@ async function init() {
       e.lat && e.lon
     )
     .map(e => ({ ...e, category: "blog" }));
-  // 읽을거리 탭용 — 좌표 여부 무관 전체 naver_blog
-  const allBlogPosts = allEvents
-    .filter(e => (e.source && e.source.startsWith("naver_blog")))
-    .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
+  // 읽을거리 탭 — 소스 신뢰도 반영된 blog_priority 기반 정렬 + 동일 제목군 디덕스
+  // naver_search:news/blog 까지 후보에 포함해 뒤로 밀어내되, 공식 블로그가 상위 점유하게.
+  const rawBlog = allEvents.filter(e =>
+    (e.source && (e.source.startsWith("naver_blog") || e.source.startsWith("naver_search")))
+  );
+  // dedup: 제목 prefix 18자 normalize(공백/기호 제거) 같으면 blog_priority 최대 1건만
+  const titleKey = (t) => (t || "")
+    .replace(/[\[\]\(\)\{\}<>…·!?,.\-_~`'"'"#|:;/\\]/g, "")
+    .replace(/\s+/g, "")
+    .toLowerCase()
+    .slice(0, 18);
+  const bestByKey = new Map();
+  for (const p of rawBlog) {
+    const k = titleKey(p.title);
+    if (!k) { bestByKey.set(Symbol(), p); continue; }
+    const cur = bestByKey.get(k);
+    const curBp = cur?.blog_priority ?? -99;
+    const newBp = p.blog_priority ?? -99;
+    if (!cur || newBp > curBp) bestByKey.set(k, p);
+  }
+  const allBlogPosts = [...bestByKey.values()].sort((a, b) => {
+    const pa = a.blog_priority ?? a.priority ?? 0;
+    const pb = b.blog_priority ?? b.priority ?? 0;
+    if (pa !== pb) return pb - pa;
+    const ia = a.image ? 1 : 0, ib = b.image ? 1 : 0;
+    if (ia !== ib) return ib - ia;
+    return (b.start || "").localeCompare(a.start || "");
+  });
   window.__blogPosts = allBlogPosts;
 
   // Phase 3: 좌표 없는 naver_search 행사도 시트에 노출하기 위해 카테고리 기반 전체 수집
@@ -779,7 +803,7 @@ function renderBlogFeed() {
     return;
   }
 
-  // P3 — Culture Trip 에디토리얼 스타일: 첫 카드 featured, 나머지 매거진 카드
+  // P3 — 중요도 정렬(priority → 이미지 → 날짜). Top 3 은 hero_tags 칩으로 규모 강조
   $list.innerHTML = posts.slice(0, 100).map((p, i) => {
     const src = (p.source || "").replace("naver_blog:", "");
     const date = (p.start || "").slice(0, 10);
@@ -792,8 +816,13 @@ function renderBlogFeed() {
       ? escape(p.description.slice(0, leadLen)) + (p.description.length > leadLen ? "…" : "")
       : "";
     const featured = i === 0 ? " blog-card-featured" : "";
+    const tags = (p.hero_tags || []).slice(0, 2);
+    const tagHTML = (i < 3 && tags.length)
+      ? `<div class="blog-card-tags">${tags.map(t => `<span class="blog-card-tag">${escape(t)}</span>`).join("")}</div>`
+      : "";
     return `<article class="blog-card${featured}">
       <div class="blog-card-category">${escape(label)}</div>
+      ${tagHTML}
       <h3 class="blog-card-title">${escape(p.title)}</h3>
       ${lead ? `<p class="blog-card-lead">${lead}</p>` : ""}
       <div class="blog-card-meta">
