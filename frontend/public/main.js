@@ -15,6 +15,7 @@ const CATEGORIES = {
   shopping:    { label: "쇼핑",     emoji: "🛍", color: "#a855f7" },
   lodging:     { label: "숙박",     emoji: "🏨", color: "#10b981" },
   theme:       { label: "테마",     emoji: "💡", color: "#f59e0b" },
+  blog:        { label: "블로그",   emoji: "📝", color: "#ec4899" },
   info_office: { label: "안내소",   emoji: "ℹ️", color: "#6b7280" },
 };
 const HOTEL_GRADE_BADGE = {
@@ -162,7 +163,7 @@ function buildMarkerSet(items, cat) {
   return { markers, clusterer };
 }
 
-function renderMarkers(places, beaches, festivalEvents, lodging) {
+function renderMarkers(places, beaches, festivalEvents, lodging, blogMarkers = []) {
   // beaches → POI 형태
   const beachRows = (beaches.beaches || []).map(b => ({
     id: "beach:" + b.name,
@@ -179,6 +180,7 @@ function renderMarkers(places, beaches, festivalEvents, lodging) {
     ...(lodging?.lodging || []).map(l => ({ ...l, category: "lodging" })),
     ...beachRows,
     ...festivalEvents.map(e => ({ ...e, category: "festival" })),
+    ...blogMarkers,  // 네이버 블로그 72 → category='blog'
   ];
 
   const byCategory = {};
@@ -380,15 +382,24 @@ async function init() {
   );
   const allEvents = eventFiles.flatMap(f => f.events || []);
   const allFestivalEvents = allEvents.filter(e => e.category === "festival" && e.lat && e.lon);
+  // 네이버 블로그 — category=blog_post/exhibition/performance 인 것만 (festival 은 위에 포함됨)
+  const allBlogMarkers = allEvents
+    .filter(e =>
+      (e.source || "").startsWith("naver_blog") &&
+      e.category !== "festival" &&
+      e.lat && e.lon
+    )
+    .map(e => ({ ...e, category: "blog" }));
+  // 읽을거리 탭용 — 좌표 여부 무관 전체 naver_blog
   const allBlogPosts = allEvents
-    .filter(e => e.category === "blog_post" || (e.source && e.source.startsWith("naver_blog")))
+    .filter(e => (e.source && e.source.startsWith("naver_blog")))
     .sort((a, b) => (b.start || "").localeCompare(a.start || ""));
   window.__blogPosts = allBlogPosts;
 
   weatherIndex = buildWeatherIndex(weatherShort);
-  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, festivalEvents: allFestivalEvents };
+  window.__data = { manifest, places, weatherShort, beaches, lodging, courses, festivalEvents: allFestivalEvents, blogMarkers: allBlogMarkers };
 
-  renderMarkers(places, beaches, allFestivalEvents, lodging);
+  renderMarkers(places, beaches, allFestivalEvents, lodging, allBlogMarkers);
 
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
   $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
