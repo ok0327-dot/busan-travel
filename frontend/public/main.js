@@ -437,6 +437,9 @@ async function init() {
     }
   });
 
+  // 빈 카테고리 비활성화 (data=0 필터는 헛클릭 방지 위해 disabled + '준비 중' 툴팁)
+  lockEmptyFilters();
+
   // Chip 토글 (날짜 preset → 축제 필터 + 날씨 배지)
   document.querySelectorAll(".chip").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -514,6 +517,10 @@ async function init() {
   if (urlLang !== "ko") {
     rewriteStoryUrls(urlLang);
   }
+
+  // Phase 1 개선: 검색창 + 다국어 honest 배너
+  setupSearch();
+  setupLangBanner(urlLang);
 }
 
 // 비짓부산 URL 의 lang_cd 파라미터 교체 (en/ja/zhs/zht 지원)
@@ -824,6 +831,137 @@ function escape(s) {
   return String(s || "").replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
+}
+
+// ───────── Phase 1: 상단 검색창 ─────────
+let searchMatches = [];
+
+function _searchPool() {
+  const d = window.__data || {};
+  const pool = [];
+  for (const p of (d.places?.places || [])) if (p && p.lat && p.lon) pool.push(p);
+  for (const p of (d.lodging?.lodging || [])) if (p && p.lat && p.lon) pool.push(p);
+  for (const p of (d.festivalEvents || [])) if (p && p.lat && p.lon) pool.push(p);
+  for (const p of (d.blogMarkers || [])) if (p && p.lat && p.lon) pool.push(p);
+  return pool;
+}
+
+function setupSearch() {
+  const $search = document.getElementById("search");
+  const $clear = document.getElementById("search-clear");
+  const $results = document.getElementById("search-results");
+  if (!$search || !$results) return;
+
+  let timer = null;
+  const runSearch = (q) => {
+    if (!q || q.length < 1) {
+      $results.hidden = true;
+      $results.innerHTML = "";
+      $clear.hidden = true;
+      return;
+    }
+    $clear.hidden = false;
+    const ql = q.toLowerCase();
+    const pool = _searchPool();
+    const matches = [];
+    for (const p of pool) {
+      const hay = `${p.title || ""} ${p.address || ""} ${p.venue || ""}`.toLowerCase();
+      if (hay.includes(ql)) {
+        matches.push(p);
+        if (matches.length >= 30) break;
+      }
+    }
+    searchMatches = matches;
+    if (!matches.length) {
+      $results.innerHTML = `<div class="sr-empty">'${escape(q)}' 결과 없음</div>`;
+      $results.hidden = false;
+      return;
+    }
+    $results.innerHTML = matches.slice(0, 8).map((p, i) => {
+      const cat = CATEGORIES[p.category] || {};
+      const meta = (p.address || p.venue || "").slice(0, 60);
+      return `<button class="sr-item" role="option" data-idx="${i}">
+        <span class="sr-ic">${cat.emoji || "📍"}</span>
+        <span class="sr-text">
+          <span class="sr-title">${escape(p.title || "(제목 없음)")}</span>
+          <span class="sr-meta">${escape(cat.label || p.category || "")}${meta ? " · " + escape(meta) : ""}</span>
+        </span>
+      </button>`;
+    }).join("");
+    $results.hidden = false;
+    $results.querySelectorAll(".sr-item").forEach(b => {
+      b.addEventListener("click", () => {
+        const idx = Number(b.dataset.idx);
+        const hit = searchMatches[idx];
+        if (!hit) return;
+        if (map && hit.lat && hit.lon) {
+          map.setLevel(4);
+          map.panTo(new kakao.maps.LatLng(hit.lat, hit.lon));
+        }
+        showDetail(hit);
+        $search.value = "";
+        $results.hidden = true;
+        $clear.hidden = true;
+      });
+    });
+  };
+
+  $search.addEventListener("input", (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => runSearch(e.target.value.trim()), 180);
+  });
+  $search.addEventListener("focus", () => {
+    if ($search.value.trim()) runSearch($search.value.trim());
+  });
+  $clear.addEventListener("click", () => {
+    $search.value = "";
+    $results.hidden = true;
+    $clear.hidden = true;
+    $search.focus();
+  });
+  document.addEventListener("click", (e) => {
+    if (!$search.contains(e.target) && !$results.contains(e.target) && !$clear.contains(e.target)) {
+      $results.hidden = true;
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { $results.hidden = true; $search.blur(); }
+  });
+}
+
+// ───────── Phase 1: 다국어 honest banner ─────────
+function setupLangBanner(lang) {
+  const banner = document.getElementById("lang-banner");
+  if (!banner || lang === "ko") return;
+  const MESSAGES = {
+    en: "🌐 English UI is limited for now. Tap any pin → 'Visit Busan (English)' for full details (hours, directions, etc).",
+    ja: "🌐 日本語UIはまだ限定的です。ピンをタップすると Visit Busan 日本語版で詳細が開きます。",
+    zh: "🌐 中文界面仍在完善中。点击地图图钉即可跳转 Visit Busan 中文版查看详细信息。",
+  };
+  const $txt = banner.querySelector(".lang-banner-text");
+  const $close = banner.querySelector(".lang-banner-close");
+  if ($txt) $txt.textContent = MESSAGES[lang] || MESSAGES.en;
+  banner.hidden = false;
+  if ($close) $close.addEventListener("click", () => { banner.hidden = true; });
+}
+
+// ───────── Phase 1: 빈 카테고리 필터 비활성 ─────────
+function lockEmptyFilters() {
+  document.querySelectorAll(".filter input[data-cat]").forEach(chk => {
+    const cat = chk.dataset.cat;
+    const arr = allMarkers[cat];
+    const n = arr ? arr.length : 0;
+    if (n === 0) {
+      const label = chk.closest(".filter");
+      if (label) {
+        label.classList.add("is-empty");
+        label.title = "데이터 준비 중";
+      }
+      chk.checked = false;
+      chk.disabled = true;
+      if (clusterers[cat]) clusterers[cat].setMap(null);
+    }
+  });
 }
 
 init().catch(err => {

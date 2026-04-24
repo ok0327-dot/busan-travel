@@ -24,6 +24,80 @@ PLACE_CATEGORIES = {"food", "attraction", "info_office", "beach", "shopping", "t
 LODGING_CATEGORIES = {"lodging"}
 EVENT_CATEGORIES = {"festival", "blog_post"}
 
+# blog_post 필터 — 부산 공식 블로그(cooolbusan/bscf2009/hudpr) 피드에는 관광과 무관한
+# 시정·정책·보도자료·공모·지원금·산업박람회가 섞임. "읽을거리" 탭이 여행 맥락이므로
+# 아래 키워드 중 하나라도 title/description 에 포함되면 제외.
+# 원칙: 보수적 블랙리스트 — 애매하면 포함. festival/exhibition/performance 는 필터 대상 아님.
+TOUR_NEGATIVE_KEYWORDS = (
+    # 행정·정책·홍보
+    "정책 종합계획", "정책 종합", "마스터 플랜", "마스터플랜",
+    "종합계획 발표", "시정보고", "의정보고", "중점 추진",
+    "인증 확산", "가족친화인증", "미래유산 시민제안",
+    # 공모·모집 (여행 무관)
+    "참가업체 모집", "참가 기업·기관 모집", "명문향토기업 모집",
+    "입주작가 공모", "서포터즈 모집", "작가 양성", "작가 모집",
+    "예술가 모집", "조사요원 모집", "합창단 단원 모집",
+    "인증 모집", "UNDER 39", "창작클래스",
+    "대관 일정", "정기대관", "포럼",
+    "청년 아트페어 참여 작가",
+    # 신청·지원금·혜택
+    "피해지원금", "지원금 신청", "청년수당", "기초연금",
+    "월세 지원", "월세지원", "고용인센티브", "장학금", "장학생",
+    "진료비·장례비", "진료비 지원", "교육지원포인트",
+    "희망두배통장", "두배통장",
+    # 보건·의료·돌봄
+    "예방접종", "방사선 촬영", "일시중단",
+    "보건지소", "거점병원", "건강생활지원센터", "심폐소생술",
+    "돌봄 서비스", "통합돌봄", "돌봄사업", "소아 야간 휴일 진료",
+    "소아 야간", "달빛어린이병원",
+    # 산업·경제·사업 홍보
+    "앵커기업", "스마트밸리", "경제의 뿌리", "인턴사업", "인턴지원금",
+    "원자력산업전", "K-ICT WEEK", "ICT WEEK", "도시지원센터",
+    "일자리정책", "잡(JOB)매칭", "잡(JOB)카페", "일자리정보망",
+    "일자리 창출", "소상공인 해결사", "기업가형 소상공인",
+    "해결사 지원사업", "B-스타", "Beyond B-Star",
+    # 안전·점검·공사·교통 행정
+    "중대시민재해", "중대산업재해", "의무이행 집중 점검",
+    "안전보강", "전면 통제", "5부제 시행", "승용차 5부제",
+    "불법행위 사전예방", "유니버설디자인 개선 공사", "공사 착수",
+    "태그리스", "교통카드 안 찍",
+    # 조사·위원회·법령
+    "조사요원", "총조사", "실태조사", "위원회 구성",
+    "조례", "선거",
+    # 교육·평생학습 (시정)
+    "평생학습", "더배움학교", "고전의 창",
+    # 행정 인프라·공지
+    "봉투 가격", "종량제", "터미널 유니버설",
+    "플랫폼 구축", "앱 하나로", "앱으로",
+    "스마트 안전 산단", "스마트 관문", "행정 마스터",
+    # 환경·기후 행정
+    "기후대응 도시숲", "자녀안심 그린숲", "탄소중립 실천",
+    # 기타 행정·이벤트
+    "당첨자 안내", "당첨자 발표", "댓글 요정",
+    "댓글만 달면", "예산", "결산", "납세",
+    "자원안보위기", "에너지 캐시백",
+    "반려견 순찰대", "반려동물 진료비",
+    "반려문화공원 건립", "건립 안내",
+    "전자아카이브 개편", "전자아카이브",
+    "교육사업 공모", "교육 지원사업",
+    "컨설팅 지원", "거점시설",
+    "시범 운영 시작", "확대 안내",
+    "인공지능 맞춤 추천", "1인 가구 돌봄",
+    "빅데이터 기반",
+    "정책간담회", "사업설명회", "의견청취", "주민설명회",
+    "포용적인 부산", "외국인 유학생",
+    "자매결연", "자매도시",
+)
+
+
+def _is_tour_friendly_blog(title: str | None, description: str | None) -> bool:
+    """blog_post 가 여행 맥락에 적합한지 판정. 제외 키워드 매칭 시 False."""
+    blob = f"{title or ''} {description or ''}"
+    for kw in TOUR_NEGATIVE_KEYWORDS:
+        if kw in blob:
+            return False
+    return True
+
 
 def _col(row: sqlite3.Row, key: str, default=None):
     try:
@@ -151,17 +225,29 @@ def export_courses(conn: sqlite3.Connection) -> int:
 
 
 def export_events(conn: sqlite3.Connection) -> dict[str, int]:
-    """월별 분할 + 날짜 없는 것은 events-undated.json."""
+    """월별 분할 + 날짜 없는 것은 events-undated.json.
+
+    blog_post 는 TOUR_NEGATIVE_KEYWORDS 로 1차 필터링해 관광 무관 시정 공지 제거.
+    festival/exhibition/performance 는 필터 대상 아님 (행사 성격이라 관광 가치 있음).
+    """
     by_month: dict[str, list] = defaultdict(list)
+    blog_kept = blog_dropped = 0
     for r in conn.execute(
-        "SELECT * FROM events WHERE category IN ('festival','blog_post') ORDER BY start_date"
+        "SELECT * FROM events WHERE category IN ('festival','blog_post','exhibition','performance') "
+        "ORDER BY start_date"
     ):
         row = _jsonable(r)
+        if row["category"] == "blog_post" and not _is_tour_friendly_blog(row["title"], row.get("description")):
+            blog_dropped += 1
+            continue
+        if row["category"] == "blog_post":
+            blog_kept += 1
         if row["start"] and len(row["start"]) >= 7:
             key = row["start"][:7]  # YYYY-MM
         else:
             key = "undated"
         by_month[key].append(row)
+    print(f"[blog filter] kept={blog_kept} dropped={blog_dropped}")
     result = {}
     for key, rows in by_month.items():
         fname = f"events-{key}.json"

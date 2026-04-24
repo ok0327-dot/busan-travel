@@ -17,8 +17,19 @@
   <!-- Map container (full viewport) -->
   <div id="map" aria-label="부산 지도"></div>
 
-  <!-- Top chip bar (date presets) -->
+  <!-- Top chip bar (search + date presets) -->
   <header id="topbar">
+    <div class="search-row">
+      <input id="search" type="search" inputmode="search" autocomplete="off"
+             placeholder="🔍 장소·주소 검색 (예: 해운대, 감천문화마을)"
+             aria-label="장소 검색" />
+      <button id="search-clear" class="search-clear" aria-label="검색어 지우기" hidden>✕</button>
+    </div>
+    <div id="search-results" class="search-results" role="listbox" aria-label="검색 결과" hidden></div>
+    <div id="lang-banner" class="lang-banner" hidden>
+      <span class="lang-banner-text"></span>
+      <button class="lang-banner-close" aria-label="닫기">✕</button>
+    </div>
     <div class="chip-row" role="tablist" aria-label="날짜 선택">
       <button class="chip active" data-preset="today">오늘</button>
       <button class="chip" data-preset="tomorrow">내일</button>

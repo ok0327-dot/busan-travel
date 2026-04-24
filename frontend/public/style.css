@@ -29,10 +29,15 @@
   --busan-magenta: #e76f51;  /* 해운대 선셋 마젠타 (hero gradient용) */
 
   /* ─── Typography tokens ─── */
+  /* 이모지 fallback: Pretendard/GmarketSans 는 컬러 이모지 글리프가 없어
+     Windows Chrome 등에서 필터/탭/배지 이모지가 □ 박스로 깨짐.
+     OS 별 컬러 이모지 폰트를 스택 끝에 넣어 fallback 되게 함. */
   --font-body: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
-               "Apple SD Gothic Neo", "Noto Sans KR", "Helvetica Neue", Arial, sans-serif;
+               "Apple SD Gothic Neo", "Noto Sans KR", "Helvetica Neue", Arial,
+               "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   --font-display: "GmarketSans", "Pretendard Variable", Pretendard, -apple-system,
-                  "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+                  "Apple SD Gothic Neo", "Noto Sans KR",
+                  "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
   --fs-display: 28px;
   --fs-h1: 20px;
   --fs-h2: 16px;
@@ -100,6 +105,93 @@ html, body {
   scrollbar-width: none;
 }
 .chip-row::-webkit-scrollbar { display: none; }
+
+/* ─── Search bar (topbar 내 1줄) ─── */
+.search-row {
+  position: relative;
+  display: flex; align-items: center;
+  pointer-events: auto;
+  margin: 4px 4px 6px;
+}
+#search {
+  flex: 1;
+  height: 40px;
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: var(--fs-body);
+  font-family: var(--font-body);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  outline: none;
+}
+#search::placeholder { color: var(--muted); }
+#search:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(96,165,250,0.25), var(--shadow-sm); }
+.search-clear {
+  position: absolute; right: 10px;
+  width: 28px; height: 28px;
+  border: 0; border-radius: 50%;
+  background: var(--chip-bg); color: var(--fg);
+  cursor: pointer; font-size: 13px; line-height: 1;
+}
+.search-clear:hover { background: var(--surface-hi); }
+
+.search-results {
+  pointer-events: auto;
+  margin: 0 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+  max-height: 60dvh; overflow-y: auto;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.sr-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 14px;
+  background: transparent; border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg); text-align: left; cursor: pointer;
+  font-family: var(--font-body); font-size: var(--fs-body);
+}
+.sr-item:last-child { border-bottom: 0; }
+.sr-item:hover, .sr-item:focus-visible { background: var(--surface-hi); outline: none; }
+.sr-ic { font-size: 18px; min-width: 24px; text-align: center; }
+.sr-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.sr-title { font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-meta { font-size: var(--fs-meta); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-empty { padding: 14px; color: var(--muted); text-align: center; font-size: var(--fs-meta); }
+
+/* ─── Honest language banner (EN/JA/ZH 진입 시) ─── */
+.lang-banner {
+  display: flex; align-items: center; gap: 10px;
+  pointer-events: auto;
+  margin: 0 4px 6px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, var(--busan-sunset), var(--busan-magenta));
+  color: #fff;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--fs-meta);
+  line-height: 1.4;
+}
+.lang-banner-text { flex: 1; }
+.lang-banner-close {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border: 0; border-radius: 50%;
+  background: rgba(255,255,255,0.25); color: #fff;
+  cursor: pointer; font-size: 12px; line-height: 1;
+}
+.lang-banner-close:hover { background: rgba(255,255,255,0.4); }
+
+/* 빈 카테고리 필터(데이터 0) 비활성 — 헛클릭 방지 */
+.filter.is-empty { opacity: 0.4; cursor: not-allowed; }
+.filter.is-empty input { pointer-events: none; }
 .chip {
   flex: 0 0 auto;
   padding: 8px 14px;
