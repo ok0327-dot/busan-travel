@@ -462,7 +462,10 @@ async function init() {
     loadableMonths.map(m => fetchJson(`./data/events-${m}.json`).catch(() => ({ events: [] })))
   );
   const allEvents = eventFiles.flatMap(f => f.events || []);
-  const allFestivalEvents = allEvents.filter(e => e.category === "festival" && e.lat && e.lon);
+  // Phase 3b: exhibition/performance 도 festival 마커로 통합 렌더 (지도 색 단일)
+  const allFestivalEvents = allEvents.filter(e =>
+    ["festival", "exhibition", "performance"].includes(e.category) && e.lat && e.lon
+  );
   // 네이버 블로그 — category=blog_post/exhibition/performance 인 것만 (festival 은 위에 포함됨)
   const allBlogMarkers = allEvents
     .filter(e =>

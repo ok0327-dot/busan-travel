@@ -30,6 +30,7 @@ from pathlib import Path
 
 import requests
 
+from sources._venues import guess_venue_coords
 from storage.db import Event
 
 SOURCE_PREFIX = "naver_search"
@@ -211,6 +212,9 @@ def _parse_item(item: dict, kind: str, query: str) -> Event | None:
 
     source_id = hashlib.md5(link.encode("utf-8")).hexdigest()[:16] if link else hashlib.md5(title.encode("utf-8")).hexdigest()[:16]
 
+    # Phase 3b: 제목/설명에서 부산 주요 공연·전시장 매칭 → 좌표 부여
+    venue_name, lat, lon = guess_venue_coords(title, desc)
+
     return Event(
         source=f"{SOURCE_PREFIX}:{kind}",
         source_id=source_id,
@@ -218,11 +222,13 @@ def _parse_item(item: dict, kind: str, query: str) -> Event | None:
         title=title[:200],
         start_date=start_iso,
         end_date=end_iso,
-        venue=None,
+        venue=venue_name,
         address=None,
         url=link,
         description=desc[:300] if desc else None,
         image_url=None,
+        lat=lat,
+        lon=lon,
         raw={"kind": kind, "query": query, "postdate": postdate},
     )
 
