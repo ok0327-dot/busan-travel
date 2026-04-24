@@ -7,12 +7,14 @@ if (!cfg || !cfg.KAKAO_JS_KEY) {
 }
 
 const CATEGORIES = {
-  festival:    { label: "축제",   emoji: "🎪", icon: "ph-confetti",      color: "#ef4444", letter: "축" },
-  attraction:  { label: "명소",   emoji: "🏛", icon: "ph-buildings",     color: "#3b82f6", letter: "명" },  // 해변 포함
-  food:        { label: "맛집",   emoji: "🍜", icon: "ph-bowl-food",     color: "#f97316", letter: "맛" },
-  cafe:        { label: "카페",   emoji: "☕", icon: "ph-coffee",        color: "#a16207", letter: "카" },
-  theme:       { label: "테마",   emoji: "💡", icon: "ph-compass-rose",  color: "#f59e0b", letter: "테" },
-  blog:        { label: "블로그", emoji: "📝", icon: "ph-notebook",      color: "#ec4899", letter: "블" },
+  festival:    { label: "축제",   emoji: "🎪", icon: "ph-confetti",       color: "#ef4444", letter: "축" },
+  exhibition:  { label: "전시",   emoji: "🎨", icon: "ph-palette",        color: "#8b5cf6", letter: "전" },
+  performance: { label: "공연",   emoji: "🎭", icon: "ph-music-notes",    color: "#db2777", letter: "공" },
+  attraction:  { label: "명소",   emoji: "🏛", icon: "ph-buildings",      color: "#3b82f6", letter: "명" },
+  food:        { label: "맛집",   emoji: "🍜", icon: "ph-bowl-food",      color: "#f97316", letter: "맛" },
+  cafe:        { label: "카페",   emoji: "☕", icon: "ph-coffee",         color: "#a16207", letter: "카" },
+  theme:       { label: "테마",   emoji: "💡", icon: "ph-compass-rose",   color: "#f59e0b", letter: "테" },
+  blog:        { label: "블로그", emoji: "📝", icon: "ph-notebook",       color: "#ec4899", letter: "블" },
 };
 
 // Phosphor 아이콘 HTML helper — 카드/상세 렌더에서 이모지 대신 사용
@@ -185,7 +187,8 @@ function renderMarkers(places, beaches, festivalEvents, blogMarkers = [], favori
     ...favorites,  // favorites 는 이미 category=cafe/food/attraction + is_favorite:true
     ...(places.places || []),
     ...beachRows,
-    ...festivalEvents.map(e => ({ ...e, category: "festival" })),
+    // festivalEvents 는 festival/exhibition/performance 섞여 있음 — 각자 자신의 category 유지
+    ...festivalEvents,
     ...blogMarkers,  // 네이버 블로그 → category='blog'
   ];
 
@@ -229,14 +232,15 @@ function classifyFestival(poi, target) {
 
 function applyDateFilter(target) {
   currentTargetDate = target;
-  const clusterer = clusterers.festival;
 
-  // 지도 마커 (좌표 있는 festival 만) — opacity 조정 + past 제거
-  if (clusterer) {
+  // 지도 마커 — festival/exhibition/performance 세 카테고리 모두 날짜 필터 적용
+  for (const cat of ["festival", "exhibition", "performance"]) {
+    const clusterer = clusterers[cat];
+    if (!clusterer) continue;
     const showMarkers = [];
-    for (const { marker, poi } of allMarkers.festival || []) {
+    for (const { marker, poi } of allMarkers[cat] || []) {
       const kind = classifyFestival(poi, target);
-      if (kind === "active")   { showMarkers.push(marker); marker.setOpacity(1.0); }
+      if (kind === "active")        { showMarkers.push(marker); marker.setOpacity(1.0); }
       else if (kind === "upcoming") { showMarkers.push(marker); marker.setOpacity(0.55); }
       else if (kind === "unknown")  { showMarkers.push(marker); marker.setOpacity(0.55); }
     }

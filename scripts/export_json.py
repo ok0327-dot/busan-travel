@@ -23,7 +23,7 @@ DB_PATH = ROOT / "data" / "events.db"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 
 sys.path.insert(0, str(ROOT))
-from sources._tour_filter import importance_score, SCALE_POSITIVE_KEYWORDS  # noqa: E402
+from sources._tour_filter import importance_score, is_major_venue, SCALE_POSITIVE_KEYWORDS  # noqa: E402
 
 # 읽을거리 탭 전용 소스 가중치 — 공식 블로그 강가점, 일반 보도 감점
 # 공식 블로그는 depth/trust 높고, 일반 뉴스는 단순 홍보 반복이 많음.
@@ -290,19 +290,27 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
     """월별 분할 + 날짜 없는 것은 events-undated.json.
 
     blog_post 는 TOUR_NEGATIVE_KEYWORDS 로 1차 필터링해 관광 무관 시정 공지 제거.
-    festival/exhibition/performance 는 필터 대상 아님 (행사 성격이라 관광 가치 있음).
+    exhibition/performance 는 MAJOR_VENUES 화이트리스트 통과 건만 keep
+    (동네 갤러리·카페 전시·지역명만 있는 소규모 건 drop).
+    festival 은 전부 keep (축제 성격이라 규모 무관 관광 가치).
     """
     by_month: dict[str, list] = defaultdict(list)
     blog_kept = blog_dropped = 0
+    minor_dropped = 0
     for r in conn.execute(
         "SELECT * FROM events WHERE category IN ('festival','blog_post','exhibition','performance') "
         "ORDER BY start_date"
     ):
         row = _jsonable(r)
-        if row["category"] == "blog_post" and not _is_tour_friendly_blog(row["title"], row.get("description")):
+        cat = row["category"]
+        if cat == "blog_post" and not _is_tour_friendly_blog(row["title"], row.get("description")):
             blog_dropped += 1
             continue
-        if row["category"] == "blog_post":
+        # 규모 필터 — 전시/공연만 MAJOR_VENUES 화이트리스트 통과분만
+        if cat in ("exhibition", "performance") and not is_major_venue(row.get("venue")):
+            minor_dropped += 1
+            continue
+        if cat == "blog_post":
             blog_kept += 1
         if row["start"] and len(row["start"]) >= 7:
             key = row["start"][:7]  # YYYY-MM
@@ -310,6 +318,7 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
             key = "undated"
         by_month[key].append(row)
     print(f"[blog filter] kept={blog_kept} dropped={blog_dropped}")
+    print(f"[venue filter] exhibition/performance minor dropped={minor_dropped}")
     result = {}
     for key, rows in by_month.items():
         fname = f"events-{key}.json"
