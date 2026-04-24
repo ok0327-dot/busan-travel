@@ -1,8 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0b1220"/>
-  <circle cx="256" cy="256" r="200" fill="#1e293b" stroke="#60a5fa" stroke-width="8"/>
-  <path d="M256 100c-55 0-100 45-100 100 0 80 100 180 100 180s100-100 100-180c0-55-45-100-100-100z" fill="#ef4444"/>
-  <circle cx="256" cy="200" r="45" fill="white"/>
-  <text x="256" y="215" text-anchor="middle" font-size="60" font-family="Apple SD Gothic Neo, sans-serif">🌊</text>
-  <text x="256" y="440" text-anchor="middle" font-size="48" fill="white" font-family="Apple SD Gothic Neo, sans-serif" font-weight="bold">부산</text>
+  <defs>
+    <linearGradient id="bg" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#fb923c"/>
+      <stop offset="0.52" stop-color="#ec4899"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0.55" stop-color="#fef3c7" stop-opacity="1"/>
+      <stop offset="1" stop-color="#fef3c7" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <!-- Rounded square background (iOS/Android both honor) -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Sun with soft glow -->
+  <circle cx="256" cy="208" r="112" fill="url(#sunGlow)" opacity="0.55"/>
+  <circle cx="256" cy="208" r="74" fill="#fef3c7"/>
+  <!-- Horizon waves (safe zone 안쪽 112~400 범위) -->
+  <g stroke="#ffffff" stroke-linecap="round" stroke-width="16" fill="none">
+    <path d="M112 332 Q184 292 256 332 T400 332" opacity="0.95"/>
+    <path d="M112 380 Q184 340 256 380 T400 380" opacity="0.72"/>
+    <path d="M112 428 Q184 388 256 428 T400 428" opacity="0.48"/>
+  </g>
 </svg>
