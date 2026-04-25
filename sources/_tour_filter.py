@@ -152,47 +152,8 @@ BOILERPLATE_VENUES: frozenset[str] = frozenset({
     "Busan MoCA",         # moca_busan 블로그 라벨 (실 venue 는 아님)
 })
 
-# 주요 규모 venue 화이트리스트 — exhibition/performance 가 이 중 한 곳에서 열려야 keep.
-# substring 매칭(정규화 후) 이므로 "신세계갤러리 센텀시티" 는 "신세계" 로도 매칭.
-# 애매 판정: 동네 갤러리·카페 전시·지역명만 있는 건(해운대/서면/광안리/센텀시티 등) 제외.
-MAJOR_VENUES: tuple[str, ...] = (
-    # 국공립 미술관·박물관
-    "부산시립미술관", "부산현대미술관", "부산박물관", "국립해양박물관",
-    "이우환공간", "아세안문화원", "부산근현대역사관", "국립부산국악원",
-    # 민간 주요 복합 문화공간
-    "F1963", "신세계갤러리", "신세계 갤러리", "신세계 문화홀",
-    # 대형 공연장·컨벤션
-    "영화의전당", "BEXCO", "벡스코",
-    "부산문화회관", "부산시민회관", "소향시어터", "소향씨어터",
-    "KBS부산홀", "KBS홀",
-    "부산콘서트홀", "낙동아트센터", "센텀아트홀",
-    "드림씨어터", "뮤지엄원", "뮤지엄 원",
-    "BNK부산은행 조은극장", "BNK 부산은행", "가온아트홀",
-    "KT&G 상상마당", "어댑터씨어터", "동서대학교 민석",
-    # 구군 문화회관
-    "해운대문화회관", "금정문화회관", "을숙도문화회관",
-    "북구문화회관", "남구문화예술회관", "사하문화회관", "동래문화회관",
-    "영도문화예술회관", "기장군청 (차성", "차성아트홀",
-    # 대형 야외 공공 공간 (정기 공연 장소)
-    "부산시민공원", "APEC나루공원", "송상현광장", "북항친수공원",
-    # 국제/대형 축제 상설 venue
-    "부산국제영화제", "해운대해수욕장",
-)
-
-
-def is_major_venue(venue: str | None) -> bool:
-    """venue 가 주요 규모 화이트리스트와 substring 매칭되는지.
-
-    정규화: 공백/점/괄호 제거 후 소문자. 영문 venue (BEXCO) 도 정상 매칭.
-    """
-    if not venue:
-        return False
-    norm = "".join(venue.split()).replace(".", "").lower()
-    for v in MAJOR_VENUES:
-        vn = "".join(v.split()).replace(".", "").lower()
-        if vn and vn in norm:
-            return True
-    return False
+# 주요 규모 venue 화이트리스트는 sources/_venues.py 의 VENUE_MAP 으로 단일화됨.
+# is_major_venue() 도 거기서 직접 import (P3 단일 진실 소스 통합, 2026-04-25).
 
 # minor 분기 임계값 (합산 스코어 < 이 값 이면 minor)
 MINOR_THRESHOLD: int = 2

@@ -22,7 +22,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
 SOURCE = "dureraum"
 
 LAT, LON = 35.1717, 129.1286
-VENUE_NAME = "영화의전당"  # MAJOR_VENUES 매칭용
+VENUE_NAME = "영화의전당"  # _venues.is_major_venue 매칭용
 ADDRESS = "부산광역시 해운대구 수영강변대로 120"
 
 CODE_RE = re.compile(r"contentsCode=([\w]+)")

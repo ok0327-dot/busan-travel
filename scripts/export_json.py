@@ -24,7 +24,8 @@ DB_PATH = ROOT / "data" / "events.db"
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 
 sys.path.insert(0, str(ROOT))
-from sources._tour_filter import importance_score, is_major_venue, SCALE_POSITIVE_KEYWORDS  # noqa: E402
+from sources._tour_filter import importance_score, SCALE_POSITIVE_KEYWORDS  # noqa: E402
+from sources._venues import is_major_venue  # noqa: E402
 
 # 읽을거리 탭 전용 소스 가중치 — 공식 블로그만 채택 (Phase A 정비, 2026-04-25)
 BLOG_SOURCE_WEIGHTS = {
@@ -385,7 +386,7 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
     """월별 분할 + 날짜 없는 것은 events-undated.json.
 
     blog_post 는 TOUR_NEGATIVE_KEYWORDS 로 1차 필터링해 관광 무관 시정 공지 제거.
-    exhibition/performance 는 MAJOR_VENUES 화이트리스트 통과 건만 keep
+    exhibition/performance 는 sources/_venues.py 의 is_major venue 통과 건만 keep
     (동네 갤러리·카페 전시·지역명만 있는 소규모 건 drop).
     festival 은 전부 keep (축제 성격이라 규모 무관 관광 가치).
 
@@ -412,7 +413,7 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
         if cat == "blog_post" and not _is_tour_friendly_blog(row["title"], row.get("description")):
             blog_dropped += 1
             continue
-        # 규모 필터 — 전시/공연만 MAJOR_VENUES 화이트리스트 통과분만
+        # 규모 필터 — 전시/공연만 is_major venue 화이트리스트 통과분만
         if cat in ("exhibition", "performance") and not is_major_venue(row.get("venue")):
             minor_dropped += 1
             continue
