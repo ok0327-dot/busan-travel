@@ -276,8 +276,9 @@ def main() -> int:
     load_dotenv(ROOT / ".env")
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("[ai_summary] SKIP: GEMINI_API_KEY 미설정")
-        return 0
+        # silent skip 금지 — workflow 가 통과한 채 ai-summary.json 이 stale 로 남는 위험 차단.
+        print("[ai_summary] FAIL: GEMINI_API_KEY 미설정", file=sys.stderr)
+        return 1
 
     today = date.today()
     tomorrow = today + timedelta(days=1)

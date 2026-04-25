@@ -60,9 +60,9 @@ jobs:
         run: mkdir -p data frontend/public/data
 
       # R2 download — 우선순위 cache 보다 높음 (R2 에 있으면 cache 덮어씀).
-      # secrets 미설정 시 db_sync 가 즉시 exit 0 (graceful degrade).
+      # credentials 미설정 시 db_sync.py 가 exit 0 (graceful degrade — 첫 실행 보호).
+      # 그 외 다운로드 실패는 step fail 로 전파 → workflow fail → Issue 생성.
       - name: Restore events.db from R2
-        continue-on-error: true
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -118,12 +118,26 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.air_korea
 
+      # mode → scope 매핑:
+      #   all          → all      (places + weather + manifest)
+      #   events-only  → events   (places 만, weather 안건드림)
+      #   weather-only → weather  (weather-short/mid/air-quality 만, places 보존)
+      # weather-only 빌드가 옛 events.db 로 places.json 을 덮어쓰던 silent overwrite 차단.
       - name: Export JSON
-        run: python scripts/export_json.py
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          case "$MODE" in
+            weather-only) SCOPE=weather ;;
+            events-only)  SCOPE=events ;;
+            *)            SCOPE=all ;;
+          esac
+          echo "-> scope=$SCOPE"
+          python scripts/export_json.py --scope "$SCOPE"
 
+      # GEMINI_API_KEY 누락 시 ai_summary.py 가 exit 1 → step fail → workflow fail.
+      # silent skip 으로 어제 picks 가 stale 노출되던 위험 차단.
       - name: AI summary (Gemini 2.5 Flash, 매일만)
         if: steps.mode.outputs.mode == 'all'
-        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/ai_summary.py
@@ -142,9 +156,10 @@ jobs:
           fi
 
       # R2 backup — 어댑터들이 새로 fetch 한 db 영속화. cache 보다 안정.
+      # if: always() 제거 — 앞 step (어댑터/export/ai-summary) 이 실패하면 R2 갱신 안 함.
+      # 어제 정상 db 가 R2 에 그대로 남아 있어야 다음 빌드가 fresh start 위험 없이 재시도 가능.
+      # 부분 실패한 db 를 R2 에 올리면 다음 빌드의 silent overwrite 원인이 됨.
       - name: Backup events.db to R2
-        if: always()  # 부분 실패해도 부분 성공한 db 만큼은 보존
-        continue-on-error: true
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

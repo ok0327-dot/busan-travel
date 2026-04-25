@@ -7,12 +7,22 @@
 """
 from __future__ import annotations
 
+import os
 import sys
 from datetime import date
 
 from dotenv import load_dotenv
 
 from config import DB_PATH
+
+# critical = 누락 시 silent skip 으로 데이터 결손 일으키는 키.
+# DATA_GO_KR_KEY 누락 시 정부 API 어댑터 전부 fail.
+# NAVER_CLIENT_ID/SECRET 누락 시 naver_local 신상 식당이 통째로 [] return.
+REQUIRED_SECRETS = (
+    "DATA_GO_KR_KEY",
+    "NAVER_CLIENT_ID",
+    "NAVER_CLIENT_SECRET",
+)
 from sources import (
     art_busan,
     busan_festival,
@@ -56,6 +66,13 @@ SOURCES = [
 
 def run() -> int:
     load_dotenv()
+    missing = [k for k in REQUIRED_SECRETS if not os.environ.get(k)]
+    if missing:
+        print(
+            f"[main] FAIL: required secrets missing: {missing} — silent skip 차단을 위해 즉시 종료",
+            file=sys.stderr,
+        )
+        return 1
     conn = connect(DB_PATH)
     total_new = total_upd = 0
     for name, fetch_fn in SOURCES:

@@ -542,37 +542,61 @@ def export_adapter_health(conn: sqlite3.Connection) -> dict:
 
 
 def main():
+    """--scope all|events|weather (default all).
+
+    weather scope 는 cron 3시간마다 weather-only 빌드 전용:
+    weather-short / weather-mid / air-quality / manifest 의 weather 카운트만 갱신.
+    places.json / events-*.json 은 절대 건드리지 않음 → silent overwrite 차단.
+    events scope 는 weather 측정 데이터를 만지지 않음 (수동 백필 시나리오).
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--scope",
+        choices=["all", "events", "weather"],
+        default="all",
+        help="all=전체 / events=POI/이벤트만 / weather=날씨·대기만",
+    )
+    args = parser.parse_args()
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    places = export_places(conn)
-    events = export_events(conn)
-    courses = export_courses(conn)
-    guides = export_guides(conn)
-    w_short = export_weather_short(conn)
-    w_mid = export_weather_mid(conn)
-    air = export_air_quality(conn)
-    beaches = export_beaches(conn)
-    adapters = export_adapter_health(conn)
+    # 기존 manifest 읽기 (부분 빌드 시 머지용)
+    manifest_path = OUT_DIR / "manifest.json"
+    prev = {}
+    if manifest_path.exists():
+        try:
+            prev = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            prev = {}
+    counts = dict(prev.get("counts") or {})
+    adapters = prev.get("adapters") or {}
+
+    if args.scope in ("all", "events"):
+        counts["places"] = export_places(conn)
+        counts["events_by_month"] = export_events(conn)
+        counts["courses"] = export_courses(conn)
+        counts["guides"] = export_guides(conn)
+        counts["beaches"] = export_beaches(conn)
+        adapters = export_adapter_health(conn)
+
+    if args.scope in ("all", "weather"):
+        counts["weather_short_rows"] = export_weather_short(conn)
+        counts["weather_mid_rows"] = export_weather_mid(conn)
+        counts["air_quality_rows"] = export_air_quality(conn)
 
     manifest = {
         "generated_at": now,
         "version": now.replace(":", "").replace("-", "")[:15],
-        "counts": {
-            "places": places,
-            "courses": courses,
-            "guides": guides,
-            "events_by_month": events,
-            "weather_short_rows": w_short,
-            "weather_mid_rows": w_mid,
-            "air_quality_rows": air,
-            "beaches": beaches,
-        },
+        "scope": args.scope,
+        "counts": counts,
         "adapters": adapters,
     }
-    (OUT_DIR / "manifest.json").write_text(
+    manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
