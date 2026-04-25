@@ -336,6 +336,14 @@ function renderStars(rating) {
   return `<span class="rating-stars">${"★".repeat(n)}${"☆".repeat(5 - n)}</span> <span class="card-meta">${rating.toFixed(1)}</span>`;
 }
 
+// Naver 블로그 언급 수 (food/cafe 에만 enrich 됨) — 정확 일치 검색 기반
+function renderExternalRatings(poi) {
+  if (!poi.naver_reviews) return "";
+  const n = poi.naver_reviews;
+  const pretty = n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toLocaleString();
+  return `<div class="card-meta ext-rating-row"><span class="ext-rating ext-naver"><b>N</b> 블로그 언급 ${pretty}건</span></div>`;
+}
+
 function renderTags(tags) {
   if (!tags || !tags.length) return "";
   return `<div class="tag-chips">${tags.slice(0, 8).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>`;
@@ -426,6 +434,7 @@ function showDetail(poi) {
   const ratingLine = poi.rating
     ? `<div class="card-meta" style="margin-top:4px">${renderStars(poi.rating)}${poi.views ? ` · 조회 ${poi.views.toLocaleString()}` : ""}${poi.reviews ? ` · 리뷰 ${poi.reviews}` : ""}</div>`
     : "";
+  const externalRatingLine = renderExternalRatings(poi);
   const excerpt = poi.excerpt || poi.description;
 
   const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
@@ -438,6 +447,7 @@ function showDetail(poi) {
       ${favNote}
       <div class="card-meta">${catDef.label || poi.category}${poi.subtype ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
       ${ratingLine}
+      ${externalRatingLine}
       ${dateLine}
       ${weatherLine}
       ${beachLine}

@@ -216,6 +216,8 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "rating": _col(row, "rating"),
         "views": _col(row, "view_count"),
         "reviews": _col(row, "review_count"),
+        # Naver 블로그 리뷰 수 (food/cafe POI enrich)
+        "naver_reviews": _col(row, "naver_review_count"),
         "tags": tags,
         "first_seen": _col(row, "first_seen"),
         "story_url": _col(row, "story_url"),

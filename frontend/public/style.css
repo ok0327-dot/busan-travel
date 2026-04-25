@@ -886,6 +886,17 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   white-space: nowrap;
 }
 .rating-stars { color: #fbbf24; font-size: var(--fs-meta); }
+.ext-rating-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ext-rating {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: var(--fs-meta); font-weight: var(--fw-medium);
+  background: rgba(31, 197, 84, 0.12); color: #6ee7a3;
+  border: 1px solid rgba(31, 197, 84, 0.3);
+}
+.ext-rating b { font-weight: 800; opacity: 0.9; margin-right: 2px; }
+.ext-naver { background: rgba(31, 197, 84, 0.12); color: #6ee7a3; border-color: rgba(31, 197, 84, 0.3); }
+.ext-google { background: rgba(66, 133, 244, 0.12); color: #93c5fd; border-color: rgba(66, 133, 244, 0.3); }
 .info-row { margin-top: 6px; color: var(--muted); font-size: var(--fs-small); line-height: 1.45; }
 .info-row strong { color: var(--fg); font-weight: var(--fw-medium); margin-right: 4px; }
 .card-excerpt { margin-top: 8px; font-size: var(--fs-meta); line-height: 1.5; color: #d1d5db; }

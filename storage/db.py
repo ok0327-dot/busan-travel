@@ -84,6 +84,12 @@ _MIGRATIONS = {
     # Phase B — 부산푸디(15063472) enrichment: 대표메뉴, 구군
     "menu":                 "TEXT",
     "gugun":                "TEXT",
+    # v3.7 — 외부 평점 enrichment (food/cafe POI 대상)
+    "google_rating":        "REAL",     # Google Places rating 1.0~5.0
+    "google_user_ratings":  "INTEGER",  # Google user_ratings_total
+    "google_place_id":      "TEXT",     # Places place_id (재호출용)
+    "naver_review_count":   "INTEGER",  # 네이버 블로그 검색 결과 수
+    "ratings_enriched_at":  "TEXT",     # 마지막 enrich 일시 (ISO)
 }
 
 EXTRA_TABLES_SQL = """
