@@ -285,21 +285,30 @@ def export_places(conn: sqlite3.Connection) -> int:
         # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
     ))
+    # 카테고리 specificity (낮을수록 specific). 같은 좌표·제목 충돌 시
+    # 더 specific 한 카테고리(cafe/bar)가 generic(food/attraction)을 덮어쓴다.
+    # v3.9 override 이후 새 데이터가 들어와도 silent bug 재발 방지.
+    SPEC_RANK = {"cafe": 0, "bar": 0, "food": 1, "attraction": 2}
+
     seen: dict[tuple, dict] = {}
     for r in rows_raw:
         if r["lat"] is None or r["lon"] is None:
             continue
         key = (round(r["lat"], 3), round(r["lon"], 3), (r["title"] or "")[:4])
         if key in seen:
+            existing = seen[key]
             # Phase B — 부산푸디(busan_food) 의 menu/gugun 을 vb_food 레코드에 머지
             # vb_food_curated 가 우선 채택돼도 부산푸디 고유 메타(대표메뉴/구군)는 보존
-            existing = seen[key]
             menu = _col(r, "menu")
             gugun = _col(r, "gugun")
             if menu and not existing.get("menu"):
                 existing["menu"] = menu
             if gugun and not existing.get("gugun"):
                 existing["gugun"] = gugun
+            # 카테고리 promotion (specific > generic)
+            new_cat = r["category"]
+            if SPEC_RANK.get(new_cat, 9) < SPEC_RANK.get(existing.get("category"), 9):
+                existing["category"] = new_cat
             continue
         seen[key] = _jsonable(r)
     rows = list(seen.values())
