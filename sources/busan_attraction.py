@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import sys
 
+from sources._classification_overrides import apply_override
 from sources._gov_api import call_api
 from sources._parsers import busan_latlon
 from storage.db import Event
@@ -19,10 +20,12 @@ MAX_PAGES = 20
 
 def _parse_item(raw: dict) -> Event:
     lat, lon = busan_latlon(raw.get("LAT"), raw.get("LNG"))
+    source_id = str(raw.get("UC_SEQ") or raw.get("TITLE") or "")
+    category = apply_override(SOURCE, source_id, "attraction")
     return Event(
         source=SOURCE,
-        source_id=str(raw.get("UC_SEQ") or raw.get("TITLE") or ""),
-        category="attraction",
+        source_id=source_id,
+        category=category,
         title=(raw.get("TITLE") or raw.get("MAIN_TITLE") or "").strip(),
         start_date=None,
         venue=raw.get("PLACE") or raw.get("GUGUN_NM"),

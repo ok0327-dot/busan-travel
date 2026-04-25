@@ -13,6 +13,7 @@ const CATEGORIES = {
   attraction:  { label: "명소",   emoji: "🏛", icon: "ph-buildings",      color: "#3b82f6", letter: "명" },
   food:        { label: "맛집",   emoji: "🍜", icon: "ph-bowl-food",      color: "#f97316", letter: "맛" },
   cafe:        { label: "카페",   emoji: "☕", icon: "ph-coffee",         color: "#a16207", letter: "카" },
+  bar:         { label: "술집",   emoji: "🍻", icon: "ph-beer-stein",     color: "#7c3aed", letter: "바" },
   blog:        { label: "블로그", emoji: "📝", icon: "ph-notebook",       color: "#ec4899", letter: "블" },
   // guide 는 visitbusan 매거진 가이드 글. 지도 마커 X, 읽을거리 탭 카드용 (CATEGORIES 에 두면 라벨/색 재사용 가능)
   guide:       { label: "가이드", emoji: "📖", icon: "ph-book-open-text", color: "#94a3b8", letter: "가" },
@@ -1246,18 +1247,34 @@ function _newItemsPool() {
     seen.add(x.id);
     unique.push(x);
   }
-  // 정렬: ① 공연/전시/축제 우선 → ② 신상 source → ③ first_seen DESC
-  const CAT_RANK = { performance: 0, exhibition: 0, festival: 1, attraction: 2, food: 3, cafe: 4 };
-  unique.sort((a, b) => {
-    const ra = CAT_RANK[a.category] ?? 5;
-    const rb = CAT_RANK[b.category] ?? 5;
-    if (ra !== rb) return ra - rb;
+  // 라운드로빈 다양화: 카테고리당 한 사이클 1개 → head 6 가 카페/식당으로 쏠리지 않음.
+  // 사이클 우선순위: 공연 → 전시 → 축제 → 명소 → 식당 → 카페 → 술집
+  const ORDER = ["performance", "exhibition", "festival", "attraction", "food", "cafe", "bar"];
+  const buckets = Object.fromEntries(ORDER.map(k => [k, []]));
+  for (const x of unique) {
+    if (buckets[x.category]) buckets[x.category].push(x);
+  }
+  // 버킷 내 정렬: 신상 우선 → first_seen DESC
+  const internalSort = (a, b) => {
     const sa = a._newKind === "신상" ? 1 : 0;
     const sb = b._newKind === "신상" ? 1 : 0;
     if (sa !== sb) return sb - sa;
     return (b.first_seen || "").localeCompare(a.first_seen || "");
-  });
-  return unique;
+  };
+  for (const arr of Object.values(buckets)) arr.sort(internalSort);
+
+  const result = [];
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const k of ORDER) {
+      if (buckets[k].length) {
+        result.push(buckets[k].shift());
+        progress = true;
+      }
+    }
+  }
+  return result;
 }
 
 function _newItemHTML(p, idx) {
@@ -1439,7 +1456,7 @@ function renderTodayHighlights(target) {
       : "";
     newHTML = `<div class="highlight-section new-section">
       <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 공연·전시·식당·카페</div>
-      <div class="hs-note">최근 2주 신규 등록 행사 + 네이버 동네 신상 (공연/전시 우선)</div>
+      <div class="hs-note">최근 2주 신규 등록 행사 + 네이버 동네 신상 (카테고리별 라운드로빈 다양화)</div>
       <div class="new-grid">${head.map((p, i) => _newItemHTML(p, i)).join("")}</div>
       ${extraHTML}
     </div>`;

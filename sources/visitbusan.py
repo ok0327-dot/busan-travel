@@ -121,15 +121,31 @@ def _fetch_curated(
 # ─────────── 개별 어댑터 ───────────
 
 
-# 명소 어댑터 후처리: 명백한 술집/음악바 패턴은 'food' 로 보정 (외식 카테고리 통합).
-# 보수적 키워드 — false positive 최소화 (데모 검증: "광안리 골방" 이 유일하게 매칭됨)
+# Naver Local 검증으로 확정된 카테고리 정정 / Verified category overrides
+from sources._classification_overrides import apply_override
+
+# 명소 어댑터 키워드 fallback — 검증 안 된 신규 attraction 후속 보정용.
+# (확정된 정정은 _classification_overrides 가 우선 처리)
 _BAR_PAT = re.compile(r"혼술 맛집|혼술에 특화|뮤직 ?바|음악 ?바|위스키 ?바|와인 ?바|라이브 ?바|이자카야|선술집")
 
 
 def _attraction_postprocess(_raw: dict, ev: Event) -> None:
+    # 1) override 우선 (Naver 검증으로 cafe/food/bar 결정된 케이스)
+    new_cat = apply_override(ev.source, ev.source_id, None)
+    if new_cat:
+        ev.category = new_cat
+        return
+    # 2) 키워드 fallback — 신규 attraction 중 명백한 외식업소 패턴
     blob = f"{ev.title or ''} {ev.description or ''}"
     if _BAR_PAT.search(blob):
-        ev.category = "food"
+        ev.category = "bar"
+
+
+def _food_postprocess(_raw: dict, ev: Event) -> None:
+    # vb_food 안의 카페·바 정정 (Naver 검증 기반)
+    new_cat = apply_override(ev.source, ev.source_id, None)
+    if new_cat:
+        ev.category = new_cat
 
 
 def fetch_attractions() -> list[Event]:
@@ -148,6 +164,7 @@ def fetch_food_curated() -> list[Event]:
         category="food",
         list_menu="DOM_000000201002000000",
         detail_menu="DOM_000000201002001000",
+        enrichment=_food_postprocess,
     )
 
 

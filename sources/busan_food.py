@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import sys
 
+from sources._classification_overrides import apply_override
 from sources._gov_api import call_api
 from sources._parsers import busan_latlon
 from storage.db import Event
@@ -31,10 +32,12 @@ def _parse_item(raw: dict) -> Event:
         head_bits.append(f"📍 {gugun}")
     head = " · ".join(head_bits)
     description = f"{head}\n{base_desc}" if head and base_desc else (head or base_desc or None)
+    source_id = str(raw.get("UC_SEQ") or raw.get("TITLE") or "")
+    category = apply_override(SOURCE, source_id, "food")
     return Event(
         source=SOURCE,
-        source_id=str(raw.get("UC_SEQ") or raw.get("TITLE") or ""),
-        category="food",
+        source_id=source_id,
+        category=category,
         title=(raw.get("TITLE") or raw.get("MAIN_TITLE") or "").strip(),
         start_date=None,
         venue=raw.get("PLACE") or gugun,

@@ -280,7 +280,7 @@ def export_places(conn: sqlite3.Connection) -> int:
     → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
     """
     rows_raw = list(conn.execute(
-        "SELECT * FROM events WHERE category IN ('food','cafe','attraction') "
+        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','bar') "
         "AND lat IS NOT NULL "
         # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
