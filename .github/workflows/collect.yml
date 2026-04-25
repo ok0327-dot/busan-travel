@@ -49,7 +49,7 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
-      - name: Restore SQLite cache
+      - name: Restore SQLite cache (fallback)
         uses: actions/cache@v4
         with:
           path: data/events.db
@@ -58,6 +58,16 @@ jobs:
 
       - name: Ensure data dirs
         run: mkdir -p data frontend/public/data
+
+      # R2 download — 우선순위 cache 보다 높음 (R2 에 있으면 cache 덮어씀).
+      # secrets 미설정 시 db_sync 가 즉시 exit 0 (graceful degrade).
+      - name: Restore events.db from R2
+        continue-on-error: true
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python scripts/db_sync.py download
 
       - name: Determine mode
         id: mode
@@ -130,6 +140,16 @@ jobs:
             git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }}) [skip ci]"
             git push
           fi
+
+      # R2 backup — 어댑터들이 새로 fetch 한 db 영속화. cache 보다 안정.
+      - name: Backup events.db to R2
+        if: always()  # 부분 실패해도 부분 성공한 db 만큼은 보존
+        continue-on-error: true
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python scripts/db_sync.py upload
 
       # P1 — cron 실패 시 GitHub Issue 자동 생성 (사용자 알림용)
       # 같은 날 동일 모드 실패가 이미 열려있으면 새 issue 생성 안 함 (중복 방지)

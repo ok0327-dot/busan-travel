@@ -18,7 +18,7 @@ from bs4 import BeautifulSoup
 from storage.db import Event
 
 LIST_URL = "https://www.dureraum.org/bcc/ccontents/cCaleList.do?rbsIdx=39"
-HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
+from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "dureraum"
 
 LAT, LON = 35.1717, 129.1286

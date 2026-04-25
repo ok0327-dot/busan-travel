@@ -18,7 +18,7 @@ from storage.db import Event
 
 LIST_URL = "https://www.busan.go.kr/moca/exhibition01"
 BASE = "https://www.busan.go.kr"
-HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
+from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "moca_busan"
 
 LAT, LON = 35.1021, 128.9991

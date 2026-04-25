@@ -1,0 +1,94 @@
+"""R2 에서 events.db 다운로드 / 업로드 (cron 영속화).
+
+배경:
+- data/events.db 가 .gitignore — repo 영속 X
+- GitHub Actions cache 만으론 eviction 위험 (한국 사이트 차단 + 빈 db 시작 = 빈 export)
+- R2 S3-API 로 매 cron 시작/끝 sync → 어제 데이터 보존
+
+Usage (워크플로 호출):
+    python scripts/db_sync.py download   # cron 시작 — 없으면 fresh start (warn only)
+    python scripts/db_sync.py upload     # cron 끝 — overwrite
+
+환경 변수 (GitHub Secrets):
+    R2_ACCOUNT_ID
+    R2_ACCESS_KEY_ID
+    R2_SECRET_ACCESS_KEY
+    R2_BUCKET            (옵션, 기본 'busan-travel-images')
+    R2_DB_KEY            (옵션, 기본 'db/events.db')
+
+설정 미존재 시 즉시 종료 (exit 0) — workflow 가 graceful degrade 하도록.
+"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+DB_PATH = Path(__file__).resolve().parent.parent / "data" / "events.db"
+BUCKET = os.environ.get("R2_BUCKET", "busan-travel-images")
+KEY = os.environ.get("R2_DB_KEY", "db/events.db")
+
+
+def _client():
+    """boto3 S3 client to Cloudflare R2."""
+    try:
+        import boto3
+        from botocore.client import Config
+    except ImportError:
+        print("[db_sync] boto3 미설치 — R2 sync 건너뜀", file=sys.stderr)
+        sys.exit(0)
+
+    account_id = os.environ.get("R2_ACCOUNT_ID")
+    access_key = os.environ.get("R2_ACCESS_KEY_ID")
+    secret_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+    if not (account_id and access_key and secret_key):
+        print("[db_sync] R2 credentials 미설정 — sync 건너뜀 (정상)", file=sys.stderr)
+        sys.exit(0)
+
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        config=Config(signature_version="s3v4"),
+        region_name="auto",
+    )
+
+
+def download() -> None:
+    client = _client()
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        client.download_file(BUCKET, KEY, str(DB_PATH))
+        size = DB_PATH.stat().st_size
+        print(f"[db_sync] downloaded {KEY} → {DB_PATH} ({size:,} bytes)")
+    except Exception as e:
+        msg = str(e)
+        # 첫 실행은 R2 에 db 없어서 404 — 정상
+        if any(x in msg for x in ("404", "Not Found", "NoSuchKey", "does not exist")):
+            print(f"[db_sync] R2 에 {KEY} 없음 — fresh start", file=sys.stderr)
+            return
+        # 그 외 에러는 fail 시켜서 cron 에 문제 알림 (단 workflow 의 continue-on-error 가 흡수)
+        print(f"[db_sync] download FAILED: {msg}", file=sys.stderr)
+        sys.exit(1)
+
+
+def upload() -> None:
+    if not DB_PATH.exists():
+        print(f"[db_sync] {DB_PATH} 없음 — 업로드 스킵", file=sys.stderr)
+        return
+    client = _client()
+    size = DB_PATH.stat().st_size
+    try:
+        client.upload_file(str(DB_PATH), BUCKET, KEY)
+        print(f"[db_sync] uploaded {DB_PATH} → {KEY} ({size:,} bytes)")
+    except Exception as e:
+        print(f"[db_sync] upload FAILED: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2 or sys.argv[1] not in ("download", "upload"):
+        print("Usage: python scripts/db_sync.py {download|upload}", file=sys.stderr)
+        sys.exit(2)
+    (download if sys.argv[1] == "download" else upload)()

@@ -22,7 +22,7 @@ LIST_URLS = [
     (BASE + "/tblTsite07Display/listNowClient.nm",    "viewNowClient"),
     (BASE + "/tblTsite07Display/listFutureClient.nm", "viewFutureClient"),
 ]
-HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
+from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "art_busan"
 
 LAT, LON = 35.1699, 129.1385

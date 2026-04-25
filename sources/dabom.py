@@ -18,7 +18,7 @@ from storage.db import Event
 
 LIST_URL = "https://busandabom.net/play/list.nm"
 BASE = "https://busandabom.net"
-HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
+from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "dabom"
 MAX_PAGES = 30  # 총 16페이지(159건) 전후, 여유 있게
 

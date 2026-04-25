@@ -15,7 +15,7 @@ from bs4 import BeautifulSoup
 
 from storage.db import Event
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (busan-travel-bot)"}
+from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE_PREFIX = "festivalbusan"
 
 # (key, url, title_default, venue, lat, lon)
