@@ -23,7 +23,6 @@ DROP_SOURCES: frozenset[str] = frozenset({
 })
 
 # blog_post 카테고리를 쓸 수 있는 공식(신뢰) 블로그 — 외 소스의 blog_post 는 drop
-# 개인 블로그(naver_search:blog) 는 품질 편차 크고, 뉴스는 블로그 아님.
 OFFICIAL_BLOG_SOURCES: frozenset[str] = frozenset({
     "naver_blog:bscf2009",      # 부산문화재단
     "naver_blog:hudpr",         # 해운대구청
@@ -32,6 +31,13 @@ OFFICIAL_BLOG_SOURCES: frozenset[str] = frozenset({
     "naver_blog:bsjunggu",      # 부산 중구청
     "naver_blog:yeonjegu",      # 부산 연제구청
     "naver_blog:bsdonggublog",  # 부산 동구청
+})
+
+# naver_blog:* 전체에서 허용되는 ID — 카테고리 무관 화이트리스트.
+# DROP_SOURCES 의 cooolbusan(시청)도 festival/exhibition 등은 keep 가능하므로 포함.
+# 이 셋에 없는 naver_blog:* prefix 는 ingestion 단계에서 drop (개인 블로그 차단).
+ALLOWED_NAVER_BLOG_SOURCES: frozenset[str] = OFFICIAL_BLOG_SOURCES | frozenset({
+    "naver_blog:cooolbusan",    # 부산광역시 공식 (blog_post 만 DROP_SOURCES, 그 외 카테고리 허용)
 })
 
 # 공식 관광 데이터 — 필터 건너뛰고 항상 keep (품질 신뢰)
@@ -274,6 +280,10 @@ def classify_event(event: Any) -> Decision:
 
     # A) 소스 차단
     if source in DROP_SOURCES:
+        return "drop"
+
+    # A-1) naver_blog:* 는 화이트리스트(공식 8개) 외 전부 drop — 개인 블로그 차단
+    if source.startswith("naver_blog:") and source not in ALLOWED_NAVER_BLOG_SOURCES:
         return "drop"
 
     # A-2) 공식 블로그만 — blog_post 카테고리는 OFFICIAL_BLOG_SOURCES 만 허용

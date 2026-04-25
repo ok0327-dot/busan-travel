@@ -2,8 +2,6 @@
 
 소스 수집 전략 (Phase A 정비, 2026-04-25):
 - 공식만 채택: 정부 API + 부산관광공사(visitbusan) + 부산시 직속 공식 블로그 8개.
-- naver_search(블로그/뉴스 키워드 검색)는 비공식 노이즈 비중이 높아 SOURCES 에서 제외.
-  파일은 sources/naver_search.py 로 보존(추후 공식 큐레이션 재활용 여지).
 - 부산푸디(15063472) = '부산광역시_부산맛집정보' API 재활성화: visitbusan 큐레이션엔
   없는 대표메뉴(RPRSNTV_MENU)·구군(GUGUN_NM) 메타를 enrich 보강.
 """

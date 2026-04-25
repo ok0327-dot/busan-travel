@@ -285,7 +285,7 @@ function applyDateFilter(target) {
     clusterer.addMarkers(showMarkers);
   }
 
-  // Phase 3: 시트·배지 카운트는 좌표 無 이벤트 포함 전체 기준 (naver_search 포함)
+  // Phase 3: 시트·배지 카운트는 좌표 無 이벤트 포함 전체 기준
   const all = window.__data?.allEventPoi || [];
   let active = 0, upcoming = 0;
   for (const poi of all) {
@@ -572,7 +572,6 @@ function renderBlogDetail(poi) {
 
 function formatBlogSource(source) {
   if (!source) return "";
-  // Phase A 정비: naver_search(개인블로그/뉴스 검색) 제거. 공식 지자체/문화기관 블로그만.
   const map = {
     "naver_blog:cooolbusan": "네이버 블로그 · 부산광역시",
     "naver_blog:bscf2009":   "네이버 블로그 · 부산문화재단",
@@ -582,7 +581,6 @@ function formatBlogSource(source) {
     "naver_blog:bsjunggu":   "네이버 블로그 · 중구청",
     "naver_blog:yeonjegu":   "네이버 블로그 · 연제구청",
     "naver_blog:bsdonggublog": "네이버 블로그 · 동구청",
-    "naver_search:news":     "뉴스",
   };
   return map[source] || (source.startsWith("naver_") ? "네이버 공식 콘텐츠" : source);
 }
@@ -721,9 +719,8 @@ async function init() {
     )
     .map(e => ({ ...e, category: "blog" }));
   // 읽을거리 탭 — 소스 신뢰도 반영된 blog_priority 기반 정렬 + 동일 제목군 디덕스
-  // naver_search:news/blog 까지 후보에 포함해 뒤로 밀어내되, 공식 블로그가 상위 점유하게.
   const rawBlog = allEvents.filter(e =>
-    (e.source && (e.source.startsWith("naver_blog") || e.source.startsWith("naver_search")))
+    (e.source && e.source.startsWith("naver_blog"))
   );
   // dedup: 제목 prefix 18자 normalize(공백/기호 제거) 같으면 blog_priority 최대 1건만
   const titleKey = (t) => (t || "")
@@ -750,7 +747,7 @@ async function init() {
   });
   window.__blogPosts = allBlogPosts;
 
-  // Phase 3: 좌표 없는 naver_search 행사도 시트에 노출하기 위해 카테고리 기반 전체 수집
+  // Phase 3: 좌표 없는 행사도 시트에 노출하기 위해 카테고리 기반 전체 수집
   const allEventPoi = allEvents.filter(e =>
     ["festival", "exhibition", "performance"].includes(e.category)
   );
@@ -1176,8 +1173,12 @@ function _newItemsPool() {
     seen.add(x.id);
     unique.push(x);
   }
-  // 정렬: 신상 source 우선, 그 다음 first_seen DESC
+  // 정렬: ① 공연/전시/축제 우선 → ② 신상 source → ③ first_seen DESC
+  const CAT_RANK = { performance: 0, exhibition: 0, festival: 1, attraction: 2, food: 3, cafe: 4 };
   unique.sort((a, b) => {
+    const ra = CAT_RANK[a.category] ?? 5;
+    const rb = CAT_RANK[b.category] ?? 5;
+    if (ra !== rb) return ra - rb;
     const sa = a._newKind === "신상" ? 1 : 0;
     const sb = b._newKind === "신상" ? 1 : 0;
     if (sa !== sb) return sb - sa;
@@ -1279,8 +1280,8 @@ function renderTodayHighlights(target) {
          <button class="new-more chip-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
     newHTML = `<div class="highlight-section new-section">
-      <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 식당·카페·공연·전시</div>
-      <div class="hs-note">네이버 동네 신상 + 최근 2주 신규 등록 행사·POI 통합</div>
+      <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 공연·전시·식당·카페</div>
+      <div class="hs-note">최근 2주 신규 등록 행사 + 네이버 동네 신상 (공연/전시 우선)</div>
       <div class="new-grid">${head.map((p, i) => _newItemHTML(p, i)).join("")}</div>
       ${extraHTML}
     </div>`;

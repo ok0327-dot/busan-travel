@@ -26,7 +26,6 @@ sys.path.insert(0, str(ROOT))
 from sources._tour_filter import importance_score, is_major_venue, SCALE_POSITIVE_KEYWORDS  # noqa: E402
 
 # 읽을거리 탭 전용 소스 가중치 — 공식 블로그만 채택 (Phase A 정비, 2026-04-25)
-# naver_search(개인블로그/뉴스 검색)는 SOURCES 에서 제외돼 더 이상 유입되지 않음.
 BLOG_SOURCE_WEIGHTS = {
     "naver_blog:bscf2009":     +3,   # 부산문화재단
     "naver_blog:hudpr":        +3,   # 해운대구청
@@ -350,16 +349,27 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
     exhibition/performance 는 MAJOR_VENUES 화이트리스트 통과 건만 keep
     (동네 갤러리·카페 전시·지역명만 있는 소규모 건 drop).
     festival 은 전부 keep (축제 성격이라 규모 무관 관광 가치).
+
+    P3 노이즈 정리: end_date 가 today-14일 이전인 종료 행사는 export 에서 제외.
     """
+    from datetime import timedelta
+    expired_cutoff = (date.today() - timedelta(days=14)).isoformat()
     by_month: dict[str, list] = defaultdict(list)
     blog_kept = blog_dropped = 0
     minor_dropped = 0
+    expired_dropped = 0
     for r in conn.execute(
         "SELECT * FROM events WHERE category IN ('festival','blog_post','exhibition','performance') "
         "ORDER BY start_date"
     ):
         row = _jsonable(r)
         cat = row["category"]
+        # P3: 종료된 행사 drop (end_date 명시 + 14일 지난 것만. blog_post 는 게시일이라 제외)
+        if cat != "blog_post":
+            end = row.get("end") or ""
+            if end and end < expired_cutoff:
+                expired_dropped += 1
+                continue
         if cat == "blog_post" and not _is_tour_friendly_blog(row["title"], row.get("description")):
             blog_dropped += 1
             continue
@@ -376,6 +386,7 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
         by_month[key].append(row)
     print(f"[blog filter] kept={blog_kept} dropped={blog_dropped}")
     print(f"[venue filter] exhibition/performance minor dropped={minor_dropped}")
+    print(f"[expired filter] end_date<{expired_cutoff} dropped={expired_dropped}")
     result = {}
     for key, rows in by_month.items():
         fname = f"events-{key}.json"
