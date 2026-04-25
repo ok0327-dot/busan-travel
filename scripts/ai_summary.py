@@ -89,10 +89,15 @@ SCHEMA = {
 
 
 def fetch_events_for_window(conn: sqlite3.Connection, start_d: date, days: int, limit: int = 12):
-    """start_d ~ start_d+days 범위에 active 또는 upcoming 인 행사."""
+    """start_d ~ start_d+days 범위에 active 또는 upcoming 인 행사.
+
+    필터:
+    - 공식 출처(trust_tier S/A)만
+    - duration > 60일 = 상설/정기 행사 (광안리 드론쇼 등 365일짜리) 제외
+    - title 에 '정기/매주/매달/월 공연/월 프로그램/상설/운영 안내' 패턴 = 정기 행사 제외
+    """
     end = start_d + timedelta(days=days)
     s_iso, e_iso = start_d.isoformat(), end.isoformat()
-    # AI Pick 후보는 공식 출처(S=정부 API, A=공식 지자체 블로그)만 — naver_search:news 같은 단발 보도 제외
     rows = conn.execute(
         """SELECT title, category, start_date, end_date, venue, address, description
            FROM events
@@ -104,6 +109,18 @@ def fetch_events_for_window(conn: sqlite3.Connection, start_d: date, days: int, 
                   OR (start_date BETWEEN ? AND ?)
                  )
              AND lat IS NOT NULL
+             -- duration > 60일 = 상설/정기 행사 제외
+             AND (julianday(COALESCE(end_date, start_date)) - julianday(start_date)) <= 60
+             -- 정기 패턴 제외
+             AND title NOT LIKE '%정기%'
+             AND title NOT LIKE '%매주%'
+             AND title NOT LIKE '%매달%'
+             AND title NOT LIKE '%월 공연%'
+             AND title NOT LIKE '%월 프로그램%'
+             AND title NOT LIKE '%월별 프로그램%'
+             AND title NOT LIKE '%상설%'
+             AND title NOT LIKE '%운영 안내%'
+             AND title NOT LIKE '%운영안내%'
            ORDER BY
              CASE WHEN start_date <= ? AND COALESCE(end_date, start_date) >= ? THEN 0 ELSE 1 END,
              start_date""",
@@ -113,8 +130,12 @@ def fetch_events_for_window(conn: sqlite3.Connection, start_d: date, days: int, 
 
 
 def fetch_weather(conn: sqlite3.Connection, target_date: date) -> str | None:
-    """부산 중심(nx=97, ny=74) 격자에서 target_date 정오 직후 첫 예보."""
-    target_ts = f"{target_date.isoformat()}T1200"
+    """부산 중심(nx=97, ny=74) 격자에서 target_date 정오 직후 첫 예보.
+
+    fcst_ts 형식은 'YYYYMMDDThh:00' (KMA 단기예보 raw). isoformat 과 다름 — 형식 일치 필수.
+    """
+    ymd = target_date.strftime("%Y%m%d")
+    target_ts = f"{ymd}T12:00"
     row = conn.execute(
         "SELECT tmp, pty, sky, pop FROM weather_fcst "
         "WHERE source='short' AND nx=97 AND ny=74 AND fcst_ts >= ? "

@@ -66,7 +66,7 @@ def _hero_tags(title: str | None, description: str | None) -> list[str]:
             break
     return out
 
-PLACE_CATEGORIES = {"food", "cafe", "attraction", "bar"}  # theme→guide 분리, bar 신규
+PLACE_CATEGORIES = {"food", "cafe", "attraction"}  # bar 는 food 에 흡수 (사용자 결정)
 EVENT_CATEGORIES = {"festival", "blog_post"}
 # guide = visitbusan 매거진 가이드 글. 지도 마커 X, 읽을거리 탭에 매거진 카드로 노출
 
@@ -240,7 +240,7 @@ def export_places(conn: sqlite3.Connection) -> int:
     → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
     """
     rows_raw = list(conn.execute(
-        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','bar') "
+        "SELECT * FROM events WHERE category IN ('food','cafe','attraction') "
         "AND lat IS NOT NULL "
         # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"

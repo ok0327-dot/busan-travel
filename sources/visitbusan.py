@@ -121,7 +121,7 @@ def _fetch_curated(
 # ─────────── 개별 어댑터 ───────────
 
 
-# 명소 어댑터 후처리: 명백한 술집/음악바 패턴은 'bar' 로 자동 보정.
+# 명소 어댑터 후처리: 명백한 술집/음악바 패턴은 'food' 로 보정 (외식 카테고리 통합).
 # 보수적 키워드 — false positive 최소화 (데모 검증: "광안리 골방" 이 유일하게 매칭됨)
 _BAR_PAT = re.compile(r"혼술 맛집|혼술에 특화|뮤직 ?바|음악 ?바|위스키 ?바|와인 ?바|라이브 ?바|이자카야|선술집")
 
@@ -129,7 +129,7 @@ _BAR_PAT = re.compile(r"혼술 맛집|혼술에 특화|뮤직 ?바|음악 ?바|�
 def _attraction_postprocess(_raw: dict, ev: Event) -> None:
     blob = f"{ev.title or ''} {ev.description or ''}"
     if _BAR_PAT.search(blob):
-        ev.category = "bar"
+        ev.category = "food"
 
 
 def fetch_attractions() -> list[Event]:
