@@ -1272,7 +1272,7 @@ function _formatK(n) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toLocaleString();
 }
 
-function _popularFoodPool(limit = 5) {
+function _popularFoodPool(limit = 10) {
   const places = window.__data?.places?.places || [];
   return places
     .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0)
@@ -1280,7 +1280,7 @@ function _popularFoodPool(limit = 5) {
     .slice(0, limit);
 }
 
-function _popularEventsPool(target, limit = 5) {
+function _popularEventsPool(target, limit = 10) {
   const events = window.__data?.allEventPoi || [];
   const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
   const weekEnd = new Date(t);
@@ -1400,8 +1400,8 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ③ 🔥 인기 맛집 TOP 5 (popularity_score 기반)
-  const popularFood = _popularFoodPool(5);
+  // ③ 🔥 인기 맛집 TOP 10 (popularity_score 기반)
+  const popularFood = _popularFoodPool(10);
   const popularFoodHTML = popularFood.length >= 3
     ? `<div class="highlight-section popular-section">
         <div class="hs-title">🔥 인기 맛집·카페 TOP ${popularFood.length}</div>
@@ -1410,8 +1410,8 @@ function renderTodayHighlights(target) {
       </div>`
     : "";
 
-  // ④ 🎭 이번주 공연/전시 TOP 5
-  const popularEvents = _popularEventsPool(target, 5);
+  // ④ 🎭 이번주 공연/전시 TOP 10
+  const popularEvents = _popularEventsPool(target, 10);
   const popularEventsHTML = popularEvents.length >= 2
     ? `<div class="highlight-section popular-section popular-events">
         <div class="hs-title">🎭 이번주 공연·전시 TOP ${popularEvents.length}</div>
