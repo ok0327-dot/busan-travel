@@ -858,21 +858,32 @@ async function init() {
     });
   });
 
-  // URL 해시 기반 초기 뷰 (#read / #course / #map) — 공유용 링크 + 테스트
+  // 초기 뷰: URL 해시 우선, 없으면 'today' (default)
   const hashView = (location.hash || "").replace("#", "");
-  if (hashView === "read" || hashView === "course") {
-    const btn = document.querySelector(`.tab[data-view="${hashView}"]`);
-    if (btn) btn.click();
+  const initView = (["today", "map", "course", "read"].includes(hashView)) ? hashView : "today";
+  const initBtn = document.querySelector(`.tab[data-view="${initView}"]`);
+  if (initBtn) {
+    document.querySelectorAll(".tab[data-view]").forEach(b => b.classList.remove("active"));
+    initBtn.classList.add("active");
+    setViewMode(initView);
   }
-
 }
 
 function setViewMode(mode) {
+  // body.dataset.view 가 "today/map/course/read" — CSS 가 #map hidden 등 자동 처리
+  document.body.dataset.view = mode;
   document.body.classList.toggle("view-read", mode === "read" || mode === "course");
   document.body.classList.toggle("view-blog", mode === "read");
   document.body.classList.toggle("view-course", mode === "course");
+  document.body.classList.toggle("view-today", mode === "today");
   const sheet = document.getElementById("sheet");
-  if (mode === "read") {
+  if (mode === "today") {
+    // 핵심 정보 풀 — sheet 가 화면 전체 차지하도록 full 스냅
+    ["sheet-peek", "sheet-half"].forEach(c => sheet.classList.remove(c));
+    sheet.classList.add("sheet-full");
+    renderTodayHighlights(currentTargetDate);
+    clearCourseOverlay();
+  } else if (mode === "read") {
     ["sheet-peek", "sheet-half"].forEach(c => sheet.classList.remove(c));
     sheet.classList.add("sheet-full");
     renderBlogFeed();
@@ -881,10 +892,14 @@ function setViewMode(mode) {
     sheet.classList.add("sheet-full");
     renderCourseList();
   } else {
+    // map 뷰 — 마커 보기 위주, sheet 는 peek 으로
     sheet.classList.remove("sheet-full");
     sheet.classList.add("sheet-peek");
-    renderTodayHighlights(currentTargetDate);
+    // 마커 상호작용 위해 카드는 비워둠 (마커 클릭 시 detail 노출)
+    $list.innerHTML = `<div class="map-hint card"><div class="card-meta">${icon("ph-cursor-click")} 지도 마커를 눌러 상세를 확인하세요.</div></div>`;
     clearCourseOverlay();
+    // Kakao Map relayout — 숨겼다가 보이면 paint 갱신
+    if (window.kakao?.maps?.Map && map) setTimeout(() => map.relayout(), 50);
   }
 }
 

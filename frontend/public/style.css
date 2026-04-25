@@ -1102,6 +1102,61 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   font-weight: 500;
 }
 
+/* ═══ 4탭 분리 (today / map / course / read) — 핵심 정보 vs 지도 분리 ═══ */
+/* view-today: AI Pick + 오늘의 부산 등 카드를 풀화면. 지도/필터/FAB 숨김 */
+body.view-today #map { display: none; }
+body.view-today .sheet-handle { display: none; }
+body.view-today #fab-locate { display: none; }
+body.view-today .filter-toggle,
+body.view-today #filter-row { display: none !important; }
+
+/* 모바일 — sheet 를 화면 풀로 */
+body.view-today #sheet {
+  top: 92px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  transform: none !important;
+  max-height: none;
+}
+
+/* 데스크톱 ≥ 900px — sunset 일러스트 백드롭 + 사이드 패널 콘텐츠 */
+@media (min-width: 900px) {
+  body.view-today #map {
+    display: block;
+    background: linear-gradient(135deg, #F4A261 0%, #E76F51 50%, #1D3557 100%);
+    pointer-events: none;
+  }
+  body.view-today #sheet {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 420px;
+  }
+}
+
+/* map 뷰의 hint 카드 (지도 탭에서 마커 클릭 안내) */
+.map-hint {
+  text-align: center;
+  padding: 24px 16px !important;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+.map-hint .card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* view-course / view-read 에선 카테고리 필터 숨김 (의미 없음) */
+body.view-read .filter-toggle,
+body.view-read #filter-row,
+body.view-course .filter-toggle,
+body.view-course #filter-row { display: none !important; }
+
 /* ───────── 마커 클릭 detail 에서 카드 리스트 복귀 버튼 ───────── */
 .detail-back {
   display: inline-flex;
