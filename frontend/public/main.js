@@ -803,14 +803,20 @@ async function init() {
     const newBp = p.blog_priority ?? -99;
     if (!cur || newBp > curBp) bestByKey.set(k, p);
   }
-  // 정렬: 게시일(start) DESC = 최신순. 같은 날짜는 blog_priority 보조키.
-  const allBlogPosts = [...bestByKey.values()].sort((a, b) => {
-    const cmp = (b.start || "").localeCompare(a.start || "");
-    if (cmp !== 0) return cmp;
-    const pa = a.blog_priority ?? a.priority ?? 0;
-    const pb = b.blog_priority ?? b.priority ?? 0;
-    return pb - pa;
-  });
+  // 정렬: 하이브리드 점수 = blog_priority * 10 + recency_bonus(최근 14일 내).
+  // 의미·중요도가 1차 키, 최신성은 같은 bp 안에서만 영향.
+  // bp = -2 (의도적 차단 신호) 는 노이즈로 hide.
+  const _todayMs = Date.now();
+  const blogScore = (e) => {
+    const bp = e.blog_priority ?? e.priority ?? 0;
+    const startMs = Date.parse(e.start || "");
+    const daysOld = isNaN(startMs) ? 999 : Math.max(0, (_todayMs - startMs) / 86400000);
+    const recency = Math.max(0, 14 - daysOld);  // 14일 cap
+    return bp * 10 + recency;
+  };
+  const allBlogPosts = [...bestByKey.values()]
+    .filter(e => (e.blog_priority ?? 0) >= 0)  // bp = -2 등 negative 컷
+    .sort((a, b) => blogScore(b) - blogScore(a));
   window.__blogPosts = allBlogPosts;
 
   // Phase 3: 좌표 없는 행사도 시트에 노출하기 위해 카테고리 기반 전체 수집
@@ -1351,8 +1357,8 @@ function renderTodayHighlights(target) {
     if (pa !== pb) return pb - pa;
     return (a.start || "").localeCompare(b.start || "");
   });
-  const hero = combined.slice(0, 3);
-  const tail = combined.slice(3);
+  const hero = combined.slice(0, 5);
+  const tail = combined.slice(5);
 
   // D-30 사전 예약 — combined 인덱스 보존(클릭 시 detail 매핑)
   const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
