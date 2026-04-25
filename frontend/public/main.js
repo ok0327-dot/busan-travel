@@ -360,6 +360,23 @@ function imageTag(url, cls = "card-image") {
   return `<img class="${cls}" src="${escape(src)}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`;
 }
 
+// 마커 클릭 → detail → "← 목록으로" 버튼으로 카드 리스트 즉시 복귀
+function _detailHeader() {
+  return `<button class="detail-back" type="button" aria-label="목록으로 돌아가기">← 목록으로</button>`;
+}
+function _bindDetailBack() {
+  const btn = $list.querySelector(".detail-back");
+  if (btn) btn.addEventListener("click", () => {
+    const view = document.body.dataset.view || "map";
+    if (view === "course") renderCourseList();
+    else if (view === "read") renderBlogFeed();
+    else renderTodayHighlights(currentTargetDate);
+    // sheet peek 복귀
+    const sheet = document.getElementById("sheet");
+    if (sheet?.classList.contains("sheet-full")) sheet.classList.replace("sheet-full", "sheet-half");
+  });
+}
+
 function showDetail(poi) {
   const catDef = CATEGORIES[poi.category] || {};
   const isBlog = poi.category === "blog" || poi.category === "blog_post";
@@ -367,7 +384,8 @@ function showDetail(poi) {
 
   // 블로그는 별도 레이아웃 — 출처·날짜 + 발췌 + 원문 보기 중심으로 명확히
   if (isBlog) {
-    $list.innerHTML = renderBlogDetail(poi);
+    $list.innerHTML = _detailHeader() + renderBlogDetail(poi);
+    _bindDetailBack();
     const sheet = document.getElementById("sheet");
     if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
     return;
@@ -375,7 +393,8 @@ function showDetail(poi) {
 
   // 전시/공연 venue 그룹 — 그 venue 에서 현재 열리는 행사 목록으로 렌더
   if (poi.isVenueGroup) {
-    $list.innerHTML = renderVenueDetail(poi);
+    $list.innerHTML = _detailHeader() + renderVenueDetail(poi);
+    _bindDetailBack();
     const sheet = document.getElementById("sheet");
     if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
     if (poi.lat && poi.lon) {
@@ -411,7 +430,7 @@ function showDetail(poi) {
 
   const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
 
-  $list.innerHTML = `
+  $list.innerHTML = _detailHeader() + `
     <div class="card${isFavorite ? " favorite-detail" : ""}" style="border-left:3px solid ${catDef.color || "#888"}">
       ${favKicker}
       ${imageTag(poi.image)}
@@ -439,6 +458,7 @@ function showDetail(poi) {
       </div>
     </div>
   `;
+  _bindDetailBack();
 
   // 시트 half 로 올려서 상세 보이게 (클릭 피드백 강화)
   const sheet = document.getElementById("sheet");

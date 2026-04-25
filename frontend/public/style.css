@@ -1102,6 +1102,25 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   font-weight: 500;
 }
 
+/* ───────── 마커 클릭 detail 에서 카드 리스트 복귀 버튼 ───────── */
+.detail-back {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 10px;
+  padding: 8px 14px;
+  background: rgba(244, 162, 97, 0.12);
+  color: #f4a261;
+  border: 1px solid rgba(244, 162, 97, 0.4);
+  border-radius: 999px;
+  font: 600 13px/1 Pretendard, sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.detail-back:hover {
+  background: rgba(244, 162, 97, 0.22);
+  transform: translateX(-2px);
+}
+
 /* ───────── 코스 카드 → visitbusan deep-link 버튼 ───────── */
 .course-link {
   display: inline-flex;
