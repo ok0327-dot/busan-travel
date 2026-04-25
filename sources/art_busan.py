@@ -10,11 +10,8 @@ from __future__ import annotations
 
 import re
 import sys
-import time
 
-import requests
-from bs4 import BeautifulSoup
-
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
 BASE = "https://art.busan.go.kr"
@@ -22,7 +19,6 @@ LIST_URLS = [
     (BASE + "/tblTsite07Display/listNowClient.nm",    "viewNowClient"),
     (BASE + "/tblTsite07Display/listFutureClient.nm", "viewFutureClient"),
 ]
-from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "art_busan"
 
 LAT, LON = 35.1699, 129.1385
@@ -32,15 +28,13 @@ ADDRESS = "부산광역시 해운대구 APEC로 58"
 # 날짜 범위 형식: "2025-04-15 – 2025-06-29" (em-dash) 또는 "2025-04-15 ~ 2025-06-29"
 RANGE_RE = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})\s*[–~\-]\s*(\d{4})-(\d{1,2})-(\d{1,2})")
 
+session = HTTPSession(SOURCE, rate_limit_s=0.3)
+
 
 def _parse_detail(detail_url: str) -> dict:
-    try:
-        r = requests.get(detail_url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] detail fail {detail_url}: {exc}", file=sys.stderr)
+    soup = session.soup(detail_url)
+    if not soup:
         return {}
-    soup = BeautifulSoup(r.text, "html.parser")
     text = soup.get_text("\n", strip=True)
 
     # 날짜 범위 — detail 본문 첫 발견 기준
@@ -66,13 +60,9 @@ def _parse_detail(detail_url: str) -> dict:
 
 
 def _fetch_list(list_url: str, view_keyword: str) -> list[Event]:
-    try:
-        r = requests.get(list_url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] list fail {list_url}: {exc}", file=sys.stderr)
+    soup = session.soup(list_url)
+    if not soup:
         return []
-    soup = BeautifulSoup(r.text, "html.parser")
 
     # title 이 있는 a 태그 (id=N&...) 만 — 빈 wrapper a 는 제외
     seen_ids: set[str] = set()
@@ -92,7 +82,6 @@ def _fetch_list(list_url: str, view_keyword: str) -> list[Event]:
 
         detail_url = (BASE + href) if href.startswith("/") else href
         detail = _parse_detail(detail_url)
-        time.sleep(0.3)
 
         # description 에 작가/장소/부문 합성
         desc_bits = []
@@ -129,8 +118,7 @@ def fetch() -> list[Event]:
         evs = _fetch_list(list_url, view_kw)
         all_events.extend(evs)
         print(f"[{SOURCE}] {view_kw}: {len(evs)}건", file=sys.stderr)
-    print(f"[{SOURCE}] fetched={len(all_events)}", file=sys.stderr)
-    return all_events
+    return report(SOURCE, all_events)
 
 
 if __name__ == "__main__":

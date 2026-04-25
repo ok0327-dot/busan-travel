@@ -12,14 +12,12 @@ from __future__ import annotations
 import re
 import sys
 
-import requests
-from bs4 import BeautifulSoup
-
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
 LIST_URL = "https://www.dureraum.org/bcc/ccontents/cCaleList.do?rbsIdx=39"
-from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "dureraum"
+session = HTTPSession(SOURCE)
 
 LAT, LON = 35.1717, 129.1286
 VENUE_NAME = "영화의전당"  # _venues.is_major_venue 매칭용
@@ -41,13 +39,9 @@ def _clean_title(raw_text: str) -> str:
 
 
 def fetch() -> list[Event]:
-    try:
-        r = requests.get(LIST_URL, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] list fail: {exc}", file=sys.stderr)
+    soup = session.soup(LIST_URL)
+    if not soup:
         return []
-    soup = BeautifulSoup(r.text, "html.parser")
 
     # year/month 추출 — 페이지 첫 'YYYY.MM' 매칭
     page_text = soup.get_text(" ", strip=True)
@@ -109,8 +103,7 @@ def fetch() -> list[Event]:
             trust_tier="S",
             raw={"code": code, "year": year, "month": month, "days": days},
         ))
-    print(f"[{SOURCE}] fetched={len(events)} (year={year} month={month})", file=sys.stderr)
-    return events
+    return report(SOURCE, events, year=year, month=month)
 
 
 if __name__ == "__main__":

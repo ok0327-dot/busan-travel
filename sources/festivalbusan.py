@@ -6,17 +6,13 @@ detail 페이지에서 정규식으로 날짜 범위 + og:image 추출. 기본 �
 from __future__ import annotations
 
 import re
-import sys
-import time
 from datetime import date
 
-import requests
-from bs4 import BeautifulSoup
-
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
-from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE_PREFIX = "festivalbusan"
+session = HTTPSession(SOURCE_PREFIX, rate_limit_s=0.4)
 
 # (key, url, title_default, venue, lat, lon)
 FESTIVALS: list[tuple[str, str, str, str, float, float]] = [
@@ -41,13 +37,9 @@ SUSPICIOUS_TITLE = re.compile(r"팝업|알림|오류|404|에러|로딩|준비|�
 
 
 def _parse_detail(url: str) -> dict:
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE_PREFIX}] detail fail {url}: {exc}", file=sys.stderr)
+    soup = session.soup(url)
+    if not soup:
         return {}
-    soup = BeautifulSoup(r.text, "html.parser")
     text = soup.get_text("\n", strip=True)
 
     # 제목 — og:title 또는 첫 h1
@@ -100,7 +92,6 @@ def fetch() -> list[Event]:
     events: list[Event] = []
     for key, url, title_default, venue, lat, lon in FESTIVALS:
         meta = _parse_detail(url)
-        time.sleep(0.4)  # rate limit
         title = (meta.get("title") or title_default).strip() or title_default
         events.append(Event(
             source=f"{SOURCE_PREFIX}:{key}",
@@ -117,8 +108,7 @@ def fetch() -> list[Event]:
             trust_tier="S",
             raw={"key": key, "title_default": title_default},
         ))
-    print(f"[{SOURCE_PREFIX}] fetched={len(events)}", file=sys.stderr)
-    return events
+    return report(SOURCE_PREFIX, events)
 
 
 if __name__ == "__main__":

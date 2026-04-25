@@ -9,18 +9,16 @@ from __future__ import annotations
 
 import html as _html
 import re
-import sys
 
-import requests
-
+from sources._adapter import HTTPSession, report
 from sources._venues import guess_venue_coords
 from storage.db import Event
 
 LIST_URL = "https://busandabom.net/play/list.nm"
 BASE = "https://busandabom.net"
-from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "dabom"
 MAX_PAGES = 30  # 총 16페이지(159건) 전후, 여유 있게
+session = HTTPSession(SOURCE, rate_limit_s=0.2)
 
 DATE_RANGE_RE = re.compile(r"(\d{4}\.\d{2}\.\d{2})\s*~\s*(\d{4}\.\d{2}\.\d{2})")
 FN_VIEW_RE = re.compile(r"fn_view\('(\d+)'\)")
@@ -111,16 +109,8 @@ def _parse_li(li: str) -> dict | None:
 
 
 def _fetch_page(page: int) -> list[dict]:
-    try:
-        r = requests.get(
-            LIST_URL,
-            params={"menuCd": 5, "page": page},
-            headers=HEADERS,
-            timeout=15,
-        )
-        r.raise_for_status()
-    except requests.RequestException as exc:
-        print(f"[{SOURCE}] page {page} fail: {exc}", file=sys.stderr)
+    r = session.get(LIST_URL, params={"menuCd": 5, "page": page})
+    if not r:
         return []
     section = _extract_list_section(r.text)
     if not section:
@@ -174,8 +164,7 @@ def fetch() -> list[Event]:
             ))
         if new_count == 0:
             break
-    print(f"[{SOURCE}] fetched={len(events)}", file=sys.stderr)
-    return events
+    return report(SOURCE, events)
 
 
 if __name__ == "__main__":

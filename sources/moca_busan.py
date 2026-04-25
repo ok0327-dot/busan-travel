@@ -9,17 +9,14 @@ from __future__ import annotations
 
 import re
 import sys
-import time
 
-import requests
-from bs4 import BeautifulSoup
-
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
 LIST_URL = "https://www.busan.go.kr/moca/exhibition01"
 BASE = "https://www.busan.go.kr"
-from sources._http import DEFAULT_HEADERS as HEADERS  # 한국 사이트 봇 차단 우회
 SOURCE = "moca_busan"
+session = HTTPSession(SOURCE, rate_limit_s=0.3)
 
 LAT, LON = 35.1021, 128.9991
 VENUE_NAME = "부산현대미술관"
@@ -46,13 +43,9 @@ def _line_after(text: str, label: str) -> str | None:
 
 
 def _parse_detail(detail_url: str) -> dict:
-    try:
-        r = requests.get(detail_url, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] detail fail {detail_url}: {exc}", file=sys.stderr)
+    soup = session.soup(detail_url)
+    if not soup:
         return {}
-    soup = BeautifulSoup(r.text, "html.parser")
     text = soup.get_text("\n", strip=True)
     return {
         "start":   _parse_date(_line_after(text, "전시시작일")),
@@ -63,13 +56,9 @@ def _parse_detail(detail_url: str) -> dict:
 
 
 def fetch() -> list[Event]:
-    try:
-        r = requests.get(LIST_URL, headers=HEADERS, timeout=15)
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] list fail: {exc}", file=sys.stderr)
+    soup = session.soup(LIST_URL)
+    if not soup:
         return []
-    soup = BeautifulSoup(r.text, "html.parser")
     wrap = soup.find("div", class_="thumbListType1Wrap")
     if not wrap:
         print(f"[{SOURCE}] no thumbListType1Wrap in list page", file=sys.stderr)
@@ -95,7 +84,6 @@ def fetch() -> list[Event]:
             image_url = (BASE + img["src"]) if img["src"].startswith("/") else img["src"]
 
         detail = _parse_detail(detail_url)
-        time.sleep(0.3)  # rate limit
 
         # description: 참여작가 + 전시장소 (장소 정보가 detail 본문에 풍부)
         desc_bits = []
@@ -122,8 +110,7 @@ def fetch() -> list[Event]:
             trust_tier="S",
             raw={"detail": detail, "href": a["href"]},
         ))
-    print(f"[{SOURCE}] fetched={len(events)}", file=sys.stderr)
-    return events
+    return report(SOURCE, events)
 
 
 if __name__ == "__main__":
