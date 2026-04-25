@@ -130,3 +130,33 @@ jobs:
             git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }}) [skip ci]"
             git push
           fi
+
+      # P1 — cron 실패 시 GitHub Issue 자동 생성 (사용자 알림용)
+      # 같은 날 동일 모드 실패가 이미 열려있으면 새 issue 생성 안 함 (중복 방지)
+      - name: Notify on failure (open GitHub Issue)
+        if: failure() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MODE="${{ steps.mode.outputs.mode }}"
+          DAY=$(date -u +'%Y-%m-%d')
+          TITLE="[cron 실패] $DAY · $MODE 모드"
+          # 동일 제목 open issue 가 있으면 skip
+          EXISTING=$(gh issue list --state open --search "in:title \"$DAY\" \"$MODE\"" --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "duplicate issue exists ($EXISTING). skip"
+            exit 0
+          fi
+          BODY="busan-travel collector workflow 실패. 점검 필요.
+
+          - 실행 모드: \`$MODE\`
+          - 워크플로 run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - 트리거: \`${{ github.event_name }}\`
+          - 시각: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+          ## 점검 체크리스트
+          - [ ] Run log 에서 어떤 step 이 실패했는지
+          - [ ] 외부 API (data.go.kr, visitbusan, 다봄, naver) 다운/스키마 변경 여부
+          - [ ] DATA_GO_KR_KEY / NAVER_CLIENT_ID/SECRET / GEMINI_API_KEY 만료 여부
+          - [ ] 수정 후 \`workflow_dispatch\` 로 재실행"
+          gh issue create --title "$TITLE" --body "$BODY" --label "cron-failure"
