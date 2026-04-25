@@ -518,6 +518,19 @@ def export_beaches(conn: sqlite3.Connection) -> int:
     return len(rows)
 
 
+def export_adapter_health(conn: sqlite3.Connection) -> dict:
+    """소스별 health 메타 — last_seen, row count, freshness staleness 판정용.
+
+    last_seen 은 어댑터가 마지막으로 해당 row 를 갱신한 UTC ISO. 모든 소스가
+    매 cron 마다 upsert 하므로 최근값이 어댑터 마지막 성공 시점에 해당.
+    """
+    rows = conn.execute(
+        "SELECT source, COUNT(*) as cnt, MAX(last_seen) as last_seen "
+        "FROM events GROUP BY source ORDER BY source"
+    ).fetchall()
+    return {r["source"]: {"rows": r["cnt"], "last_seen": r["last_seen"]} for r in rows}
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -532,6 +545,7 @@ def main():
     w_mid = export_weather_mid(conn)
     air = export_air_quality(conn)
     beaches = export_beaches(conn)
+    adapters = export_adapter_health(conn)
 
     manifest = {
         "generated_at": now,
@@ -546,6 +560,7 @@ def main():
             "air_quality_rows": air,
             "beaches": beaches,
         },
+        "adapters": adapters,
     }
     (OUT_DIR / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"

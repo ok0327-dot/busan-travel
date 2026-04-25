@@ -59,7 +59,15 @@
     </div>
     <div class="sheet-body">
       <div id="card-list" class="card-list" aria-live="polite"></div>
-      <div class="sheet-credit">built by minuk kang</div>
+      <div class="sheet-footer">
+        <button id="freshness-toggle" class="freshness" type="button" aria-expanded="false" aria-controls="freshness-detail">
+          <span class="freshness-dot"></span>
+          <span class="freshness-text">로딩 중…</span>
+          <span class="freshness-caret">⏷</span>
+        </button>
+        <div id="freshness-detail" class="freshness-detail" hidden></div>
+        <div class="sheet-credit">built by minuk kang</div>
+      </div>
     </div>
   </aside>
 

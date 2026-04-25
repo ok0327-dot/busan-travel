@@ -476,6 +476,46 @@ html, body {
   text-transform: lowercase;
 }
 
+/* ─── P0 데이터 freshness (v3.8) ─── */
+.sheet-footer { border-top: 1px solid rgba(255,255,255,0.06); margin-top: 8px; }
+.freshness {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 16px;
+  background: transparent; border: 0; cursor: pointer;
+  font: 500 12px/1.2 Pretendard, sans-serif;
+  color: var(--muted); text-align: left;
+}
+.freshness:hover { background: rgba(255,255,255,0.03); color: var(--fg); }
+.freshness-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #6b7280; flex-shrink: 0;
+}
+.freshness-dot.is-fresh { background: #22c55e; }
+.freshness-dot.is-stale-warn { background: #f59e0b; }
+.freshness-dot.is-stale-error { background: #ef4444; animation: freshness-pulse 1.5s ease-in-out infinite; }
+@keyframes freshness-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.freshness-text { flex: 1; }
+.freshness-caret { font-size: 10px; opacity: 0.6; }
+.freshness-detail {
+  padding: 0 16px 12px;
+  font: 400 11px/1.4 Pretendard, sans-serif;
+  color: var(--muted);
+}
+.freshness-table {
+  width: 100%; border-collapse: collapse;
+}
+.freshness-table th, .freshness-table td {
+  padding: 4px 6px; text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.freshness-table th { color: #94a3b8; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.freshness-table td.num, .freshness-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.freshness-table tr.fresh-warn td { color: #f59e0b; }
+.freshness-table tr.fresh-stale td { color: #ef4444; }
+
 /* ─── Phase 2.5: 향토음식 row 배지 ─── */
 .festival-row.foodie-row { border-left-color: #db2777; }
 .festival-row.foodie-row:hover { background: rgba(219,39,119,0.12); }

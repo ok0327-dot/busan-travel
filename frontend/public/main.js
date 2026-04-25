@@ -330,6 +330,62 @@ function refreshWeatherBadges(targetDate) {
 }
 
 // ───────── 상세 드로어 (enriched) ─────────
+// ───────── 데이터 freshness 가시화 (P0, v3.8) ─────────
+function renderFreshness(manifest) {
+  const ts = manifest?.generated_at;
+  const dot = document.querySelector(".freshness-dot");
+  const text = document.querySelector(".freshness-text");
+  const detail = document.getElementById("freshness-detail");
+  const btn = document.getElementById("freshness-toggle");
+  if (!ts || !dot || !text) return;
+
+  const generated = new Date(ts);
+  const ageMin = (Date.now() - generated) / 60000;
+  const ageH = ageMin / 60;
+  const kst = new Date(generated.getTime() + 9 * 3600000);
+  const ymd = kst.toISOString().slice(0, 10);
+  const hm = kst.toISOString().slice(11, 16);
+
+  let level, label;
+  if (ageH >= 48) { level = "stale-error"; label = `🚨 ${Math.floor(ageH)}시간 전 — 점검 필요`; }
+  else if (ageH >= 24) { level = "stale-warn"; label = `⚠ ${Math.floor(ageH)}시간 전 갱신`; }
+  else if (ageMin < 60) { level = "fresh"; label = `🔄 ${Math.max(1, Math.floor(ageMin))}분 전 갱신`; }
+  else { level = "fresh"; label = `🔄 ${ymd} ${hm} KST`; }
+  dot.classList.remove("is-fresh", "is-stale-warn", "is-stale-error");
+  dot.classList.add(`is-${level}`);
+  text.textContent = label;
+
+  // 어댑터별 detail 테이블
+  const adapters = manifest.adapters || {};
+  if (detail && Object.keys(adapters).length) {
+    const sorted = Object.entries(adapters)
+      .sort((a, b) => (b[1].last_seen || "").localeCompare(a[1].last_seen || ""));
+    const rows = sorted.map(([src, info]) => {
+      let cls = "";
+      let ageLabel = "—";
+      if (info.last_seen) {
+        const aH = (Date.now() - new Date(info.last_seen)) / 3600000;
+        if (aH < 24) ageLabel = "<24h";
+        else if (aH < 48) { ageLabel = `${Math.floor(aH)}h`; cls = "fresh-warn"; }
+        else { ageLabel = `${Math.floor(aH / 24)}d`; cls = "fresh-stale"; }
+      }
+      return `<tr class="${cls}"><td>${escape(src)}</td><td class="num">${info.rows ?? 0}</td><td>${ageLabel}</td></tr>`;
+    }).join("");
+    detail.innerHTML = `<table class="freshness-table">
+      <thead><tr><th>소스</th><th class="num">건수</th><th>갱신</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  }
+  if (btn) {
+    btn.onclick = () => {
+      const open = detail?.hidden;
+      if (detail) detail.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+      const caret = btn.querySelector(".freshness-caret");
+      if (caret) caret.textContent = open ? "⏶" : "⏷";
+    };
+  }
+}
+
 function renderStars(rating) {
   if (!rating) return "";
   const n = Math.round(rating);
@@ -773,7 +829,8 @@ async function init() {
   renderMarkers(places, beaches, allFestivalEvents, allBlogMarkers, favArr);
 
   const totalPoi = (places.places?.length || 0) + (beaches.beaches?.length || 0);
-  $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개 · ${manifest.generated_at?.slice(0, 10) || ""}`;
+  $status.textContent = `${totalPoi}개 POI · 날씨 격자 ${weatherShort.cells || 0}개`;
+  renderFreshness(manifest);
 
   // 초기: 오늘의 부산 하이라이트 (applyDateFilter 가 곧 다시 호출)
   renderTodayHighlights(new Date());
