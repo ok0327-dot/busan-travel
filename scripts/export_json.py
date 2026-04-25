@@ -274,9 +274,11 @@ def export_guides(conn: sqlite3.Connection) -> int:
     """guide 카테고리(visitbusan 매거진) → guides.json. 좌표가 있어도 마커 X, 읽을거리 탭 카드용.
 
     dedup: title 정규화. 우선순위: vb_theme > 기타.
+    정렬: visitbusan 게시 ID(raw.list_item.uc_seq) DESC = 최신순. 없으면 view_count DESC.
     """
+    import json as _json
     seen_titles: set = set()
-    rows = []
+    items = []
     for r in conn.execute(
         "SELECT * FROM events WHERE category='guide' "
         "ORDER BY CASE WHEN source='vb_theme' THEN 0 ELSE 1 END, title"
@@ -285,7 +287,22 @@ def export_guides(conn: sqlite3.Connection) -> int:
         if not title or title in seen_titles:
             continue
         seen_titles.add(title)
-        rows.append(_jsonable(r))
+        # visitbusan 게시 ID 추출
+        uc = 0
+        try:
+            raw = _json.loads(r["raw_json"] or "{}")
+            uc = int((raw.get("list_item") or {}).get("uc_seq") or 0)
+        except (ValueError, TypeError):
+            uc = 0
+        rec = _jsonable(r)
+        rec["_uc"] = uc
+        items.append(rec)
+    # 최신 게시 ID(uc_seq) 우선, 없으면 view_count
+    items.sort(key=lambda x: (x.get("_uc") or 0, x.get("views") or 0), reverse=True)
+    rows = []
+    for x in items:
+        x.pop("_uc", None)
+        rows.append(x)
     (OUT_DIR / "guides.json").write_text(
         json.dumps({"count": len(rows), "guides": rows}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
@@ -294,13 +311,16 @@ def export_guides(conn: sqlite3.Connection) -> int:
 
 
 def export_courses(conn: sqlite3.Connection) -> int:
-    """vb_courses → courses.json. 일정여행 코스 + 포함 POI 리스트."""
+    """vb_courses → courses.json. 일정여행 코스 + 포함 POI 리스트.
+
+    정렬: uc_seq DESC = visitbusan 게시 ID 최신순 (사용자 요청).
+    """
     import json as _json
     rows = []
     for r in conn.execute(
         "SELECT uc_seq, title, subtitle, duration, rating, view_count, image_url, "
         "       story_url, story_excerpt, tags_json, pois_json "
-        "FROM vb_courses ORDER BY view_count DESC NULLS LAST"
+        "FROM vb_courses ORDER BY uc_seq DESC"
     ):
         rows.append({
             "uc_seq": r[0],

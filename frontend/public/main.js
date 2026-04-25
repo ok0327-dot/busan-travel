@@ -720,13 +720,13 @@ async function init() {
     const newBp = p.blog_priority ?? -99;
     if (!cur || newBp > curBp) bestByKey.set(k, p);
   }
+  // 정렬: 게시일(start) DESC = 최신순. 같은 날짜는 blog_priority 보조키.
   const allBlogPosts = [...bestByKey.values()].sort((a, b) => {
+    const cmp = (b.start || "").localeCompare(a.start || "");
+    if (cmp !== 0) return cmp;
     const pa = a.blog_priority ?? a.priority ?? 0;
     const pb = b.blog_priority ?? b.priority ?? 0;
-    if (pa !== pb) return pb - pa;
-    const ia = a.image ? 1 : 0, ib = b.image ? 1 : 0;
-    if (ia !== ib) return ib - ia;
-    return (b.start || "").localeCompare(a.start || "");
+    return pb - pa;
   });
   window.__blogPosts = allBlogPosts;
 
@@ -882,6 +882,9 @@ function renderCourseList() {
     const thumb = hasThumb
       ? `<img class="course-thumb" src="${escape(busanImgUrl(c.image))}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`
       : "";
+    const storyBtn = c.story_url
+      ? `<a class="course-link" href="${escape(c.story_url)}" target="_blank" rel="noopener">${icon("ph-book-open-text")} 비짓부산에서 보기 →</a>`
+      : "";
     return `<div class="card course-card ${active}${hasThumb ? " with-thumb" : ""}" data-uc="${c.uc_seq}">
       ${thumb}
       <div class="course-body">
@@ -892,10 +895,15 @@ function renderCourseList() {
         <div class="card-meta">${poisCount}개 POI${c.views ? ` · 조회 ${c.views.toLocaleString()}` : ""}${c.rating ? ` · ★${c.rating}` : ""}</div>
         ${c.excerpt ? `<div class="card-excerpt">${escape(c.excerpt.slice(0, 160))}</div>` : ""}
         ${(c.tags || []).length ? `<div class="tag-chips">${c.tags.slice(0, 5).map(t => `<span class="tag-chip">#${escape(t)}</span>`).join("")}</div>` : ""}
+        ${storyBtn}
       </div>
     </div>`;
   }).join("");
 
+  // 카드 본문 클릭 → 지도에 POI 폴리라인. story 링크 클릭은 stopPropagation 으로 새 탭만.
+  $list.querySelectorAll(".course-link").forEach(a => {
+    a.addEventListener("click", e => e.stopPropagation());
+  });
   $list.querySelectorAll(".course-card").forEach(el => {
     el.addEventListener("click", () => {
       const uc = Number(el.dataset.uc);

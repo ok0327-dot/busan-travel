@@ -1101,3 +1101,19 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   color: #f4a261 !important;
   font-weight: 500;
 }
+
+/* ───────── 코스 카드 → visitbusan deep-link 버튼 ───────── */
+.course-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 8px 14px;
+  background: #0ea5e9;
+  color: #fff !important;
+  border-radius: 8px;
+  font: 600 12px/1 Pretendard, sans-serif;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.course-link:hover { background: #0284c7; }
