@@ -66,8 +66,9 @@ def _hero_tags(title: str | None, description: str | None) -> list[str]:
             break
     return out
 
-PLACE_CATEGORIES = {"food", "cafe", "attraction", "theme"}
+PLACE_CATEGORIES = {"food", "cafe", "attraction", "bar"}  # theme→guide 분리, bar 신규
 EVENT_CATEGORIES = {"festival", "blog_post"}
+# guide = visitbusan 매거진 가이드 글. 지도 마커 X, 읽을거리 탭에 매거진 카드로 노출
 
 # blog_post 필터 — 부산 공식 블로그(cooolbusan/bscf2009/hudpr) 피드에는 관광과 무관한
 # 시정·정책·보도자료·공모·지원금·산업박람회가 섞임. "읽을거리" 탭이 여행 맥락이므로
@@ -239,7 +240,7 @@ def export_places(conn: sqlite3.Connection) -> int:
     → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
     """
     rows_raw = list(conn.execute(
-        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','theme') "
+        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','bar') "
         "AND lat IS NOT NULL "
         # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
@@ -264,6 +265,29 @@ def export_places(conn: sqlite3.Connection) -> int:
     rows = list(seen.values())
     (OUT_DIR / "places.json").write_text(
         json.dumps({"count": len(rows), "places": rows}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    return len(rows)
+
+
+def export_guides(conn: sqlite3.Connection) -> int:
+    """guide 카테고리(visitbusan 매거진) → guides.json. 좌표가 있어도 마커 X, 읽을거리 탭 카드용.
+
+    dedup: title 정규화. 우선순위: vb_theme > 기타.
+    """
+    seen_titles: set = set()
+    rows = []
+    for r in conn.execute(
+        "SELECT * FROM events WHERE category='guide' "
+        "ORDER BY CASE WHEN source='vb_theme' THEN 0 ELSE 1 END, title"
+    ):
+        title = (r["title"] or "").strip()
+        if not title or title in seen_titles:
+            continue
+        seen_titles.add(title)
+        rows.append(_jsonable(r))
+    (OUT_DIR / "guides.json").write_text(
+        json.dumps({"count": len(rows), "guides": rows}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",
     )
     return len(rows)
@@ -432,6 +456,7 @@ def main():
     places = export_places(conn)
     events = export_events(conn)
     courses = export_courses(conn)
+    guides = export_guides(conn)
     w_short = export_weather_short(conn)
     w_mid = export_weather_mid(conn)
     air = export_air_quality(conn)
@@ -443,6 +468,7 @@ def main():
         "counts": {
             "places": places,
             "courses": courses,
+            "guides": guides,
             "events_by_month": events,
             "weather_short_rows": w_short,
             "weather_mid_rows": w_mid,
