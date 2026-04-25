@@ -18,7 +18,10 @@ from config import DB_PATH
 from sources import (
     busan_festival,
     busan_food,
+    dureraum,
+    festivalbusan,
     gov_tour,
+    moca_busan,
     naver_blogs,
     visitbusan,
 )
@@ -37,6 +40,10 @@ SOURCES = [
     ("vb_festival_curated",    visitbusan.fetch_festival_curated),
     ("vb_theme",               visitbusan.fetch_themes),
     ("vb_schedule_board",      visitbusan.fetch_schedule_board),
+    # Phase v3.4 — 메인 venue + 부산축제조직위 직접 스크래핑
+    ("moca_busan",             moca_busan.fetch),     # 부산현대미술관 전시
+    ("dureraum",               dureraum.fetch),       # 영화의전당 공연
+    ("festivalbusan",          festivalbusan.fetch),  # 부산축제조직위 8개 메인 축제
 ]
 
 
