@@ -1125,8 +1125,63 @@ function renderAiPickCard(target) {
   </article>`;
 }
 
+// ───────── 🆕 신규 추가 섹션 (Phase v3.5) — 식당/카페/공연/전시/축제 통합 ─────────
+// 데이터: source='naver_local' (네이버 동네 신상) + first_seen 최근 14일 모든 카테고리
+function _newItemsPool() {
+  const places = window.__data?.places?.places || [];
+  const events = window.__data?.allEventPoi || [];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  const pool = [];
+  // food/cafe — naver_local source 우선, 그 외는 first_seen 최근만
+  for (const p of places) {
+    if (p.source === "naver_local") {
+      pool.push({ ...p, _newKind: "신상" });
+      continue;
+    }
+    if ((p.first_seen || "").slice(0, 10) >= cutoffIso) {
+      pool.push({ ...p, _newKind: "최근 추가" });
+    }
+  }
+  // events — first_seen 최근만
+  for (const e of events) {
+    if ((e.first_seen || "").slice(0, 10) >= cutoffIso) {
+      pool.push({ ...e, _newKind: "최근 추가" });
+    }
+  }
+  // dedup by id
+  const seen = new Set();
+  const unique = [];
+  for (const x of pool) {
+    if (seen.has(x.id)) continue;
+    seen.add(x.id);
+    unique.push(x);
+  }
+  // 정렬: 신상 source 우선, 그 다음 first_seen DESC
+  unique.sort((a, b) => {
+    const sa = a._newKind === "신상" ? 1 : 0;
+    const sb = b._newKind === "신상" ? 1 : 0;
+    if (sa !== sb) return sb - sa;
+    return (b.first_seen || "").localeCompare(a.first_seen || "");
+  });
+  return unique;
+}
+
+function _newItemHTML(p, idx) {
+  const cat = CATEGORIES[p.category] || {};
+  const emoji = cat.emoji || "📌";
+  const venue = p.gugun || p.venue || (p.address || "").split(" ").slice(1, 2).join("") || "";
+  const meta = p.description ? p.description.slice(0, 35) : (p.start ? p.start.slice(5) : "");
+  return `<button class="new-card" data-idx="${idx}">
+    <span class="new-badge ${p._newKind === "신상" ? "is-naver" : ""}">🆕 ${escape(p._newKind)}</span>
+    <div class="new-title">${emoji} ${escape(p.title || "(제목 없음)")}</div>
+    <div class="new-meta">${escape(venue)}${meta ? " · " + escape(meta) : ""}</div>
+  </button>`;
+}
+
 // ───────── Phase E 재배치: 한눈에 들어오는 "오늘/이번주말 뭐할지" ─────────
-// 새 순서: ① AI Pick → ② Hero Top 3 → ③ D-30 사전 예약 → ④ 제철 → ⑤ 그 외 → ⑥ STORY
+// 새 순서: ① AI Pick → ② Hero Top 3 → ③ 🆕 신규 → ④ D-30 사전예약 → ⑤ 제철 → ⑥ 그 외 → ⑦ STORY
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
@@ -1194,7 +1249,26 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ③ D-30 사전 예약
+  // ③ 🆕 신규 추가 (식당/카페/공연/전시/축제 통합)
+  const newItems = _newItemsPool();
+  let newHTML = "";
+  if (newItems.length) {
+    const initial = 6;
+    const head = newItems.slice(0, initial);
+    const extra = newItems.slice(initial);
+    const extraHTML = extra.length
+      ? `<div class="new-extra" hidden>${extra.map((p, i) => _newItemHTML(p, i + initial)).join("")}</div>
+         <button class="new-more chip-more" type="button">+${extra.length}건 더 보기</button>`
+      : "";
+    newHTML = `<div class="highlight-section new-section">
+      <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 식당·카페·공연·전시</div>
+      <div class="hs-note">네이버 동네 신상 + 최근 2주 신규 등록 행사·POI 통합</div>
+      <div class="new-grid">${head.map((p, i) => _newItemHTML(p, i)).join("")}</div>
+      ${extraHTML}
+    </div>`;
+  }
+
+  // ④ D-30 사전 예약
   let reservationHTML = "";
   if (reservations.length) {
     reservationHTML = `<div class="highlight-section reservation-section">
@@ -1242,7 +1316,25 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+
+  // 🆕 신규 카드 클릭 → showDetail (places/events 의 원래 객체 사용)
+  $list.querySelectorAll(".new-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      const item = newItems[idx];
+      if (item) showDetail(item);
+    });
+  });
+  // 신규 더보기
+  const newMoreBtn = $list.querySelector(".new-more");
+  if (newMoreBtn) {
+    newMoreBtn.addEventListener("click", () => {
+      const ext = $list.querySelector(".new-extra");
+      if (ext) ext.hidden = false;
+      newMoreBtn.remove();
+    });
+  }
 
   // Hero + chip 클릭 → POI 상세
   $list.querySelectorAll(".hero-card, .chip").forEach(btn => {

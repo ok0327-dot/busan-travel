@@ -23,6 +23,7 @@ from sources import (
     gov_tour,
     moca_busan,
     naver_blogs,
+    naver_local,
     visitbusan,
 )
 from storage.db import Event, connect, upsert_events
@@ -44,6 +45,8 @@ SOURCES = [
     ("moca_busan",             moca_busan.fetch),     # 부산현대미술관 전시
     ("dureraum",               dureraum.fetch),       # 영화의전당 공연
     ("festivalbusan",          festivalbusan.fetch),  # 부산축제조직위 8개 메인 축제
+    # Phase v3.5 — 네이버 동네 신상 식당/카페
+    ("naver_local",            naver_local.fetch),    # NAVER local API 신상 키워드
 ]
 
 

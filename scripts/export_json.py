@@ -218,6 +218,7 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "views": _col(row, "view_count"),
         "reviews": _col(row, "review_count"),
         "tags": tags,
+        "first_seen": _col(row, "first_seen"),
         "story_url": _col(row, "story_url"),
         "excerpt": _col(row, "story_excerpt"),
         "hours": _col(row, "hours"),
