@@ -509,6 +509,19 @@ html, body {
   .install-btn .install-sub { display: inline; margin-left: auto; }
 }
 
+/* 인앱 브라우저 (카톡 등) hint — install 버튼 대신 노출 */
+.install-hint {
+  margin: 12px 12px 4px;
+  padding: 10px 14px;
+  font: 500 12px/1.4 var(--font-body);
+  color: var(--muted);
+  text-align: center;
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px dashed rgba(6, 182, 212, 0.3);
+  border-radius: 10px;
+}
+.install-hint strong { color: var(--busan-sea); font-weight: 700; }
+
 /* iOS Safari 가이드 모달 */
 .ios-install-modal {
   position: fixed; inset: 0; z-index: 9999;

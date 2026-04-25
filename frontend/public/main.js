@@ -1781,6 +1781,12 @@ if ("serviceWorker" in navigator) {
 }
 
 // 2) Install 버튼 — Chrome/Edge 는 beforeinstallprompt, iOS 는 모달 가이드
+// 카톡/네이버앱/페북/인스타 webview 는 install API 자체가 없어서 헛 instruction 안내 회피.
+function isInAppBrowser() {
+  const ua = navigator.userAgent || "";
+  return /KAKAOTALK|FB_IAB|FBAN|FBAV|Instagram|Line\/|NAVER\(inapp/i.test(ua);
+}
+
 function setupInstallButton() {
   const btn = document.getElementById("install-app");
   if (!btn) return;
@@ -1789,6 +1795,14 @@ function setupInstallButton() {
   const isStandalone = window.matchMedia("(display-mode: standalone)").matches
     || window.navigator.standalone === true;
   if (isStandalone) return;
+
+  // 카톡 등 인앱 브라우저 — install 불가 → 버튼 숨기고 hint 표시
+  if (isInAppBrowser()) {
+    btn.hidden = true;
+    const hint = document.getElementById("install-hint");
+    if (hint) hint.hidden = false;
+    return;
+  }
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
