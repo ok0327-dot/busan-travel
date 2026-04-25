@@ -1764,6 +1764,108 @@ function lockEmptyFilters() {
   });
 }
 
+// ─── PWA 앱 설치 (v3.9) ────────────────────────────────────────────
+// 1) Service Worker 등록 — Chrome installable 판정 조건
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).catch(err => {
+      console.warn("[busan-travel] SW register failed:", err);
+    });
+  });
+}
+
+// 2) Install 버튼 — Chrome/Edge 는 beforeinstallprompt, iOS 는 모달 가이드
+function setupInstallButton() {
+  const btn = document.getElementById("install-app");
+  if (!btn) return;
+
+  // 이미 설치된 사용자 (PWA standalone 모드) 에서는 표시 X
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+  if (isStandalone) return;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+  if (isIOS) {
+    // iOS Safari — beforeinstallprompt 미지원, 시각 가이드 모달
+    btn.hidden = false;
+    btn.addEventListener("click", showIosInstallModal);
+    return;
+  }
+
+  // Chrome/Edge/Samsung Internet — beforeinstallprompt
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.hidden = false;
+  });
+
+  btn.addEventListener("click", async () => {
+    if (!deferredPrompt) {
+      // 이벤트가 아직 없거나 이미 소비됨 — Chrome 의 native UI 가이드
+      showGenericInstallModal();
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    if (outcome === "accepted") btn.hidden = true;
+  });
+
+  // 설치 완료 → 버튼 숨김
+  window.addEventListener("appinstalled", () => {
+    btn.hidden = true;
+    deferredPrompt = null;
+  });
+}
+
+function showIosInstallModal() {
+  const modal = document.createElement("div");
+  modal.className = "ios-install-modal";
+  modal.innerHTML = `
+    <div class="iim-backdrop"></div>
+    <div class="iim-card">
+      <h3>📱 홈 화면에 추가하기</h3>
+      <ol>
+        <li>Safari 하단 <strong>공유 버튼 (□↑)</strong> 탭</li>
+        <li>목록에서 <strong>"홈 화면에 추가"</strong> 선택</li>
+        <li><strong>"추가"</strong> 탭 — 끝!</li>
+      </ol>
+      <p class="iim-hint">📌 Chrome 등 다른 브라우저는 Safari 로 열어야 설치 가능해요.</p>
+      <button class="iim-close" type="button">알겠어요</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector(".iim-close").addEventListener("click", close);
+  modal.querySelector(".iim-backdrop").addEventListener("click", close);
+}
+
+function showGenericInstallModal() {
+  const modal = document.createElement("div");
+  modal.className = "ios-install-modal";
+  modal.innerHTML = `
+    <div class="iim-backdrop"></div>
+    <div class="iim-card">
+      <h3>📱 앱처럼 설치하기</h3>
+      <ol>
+        <li>주소창 우측의 <strong>설치 아이콘</strong> 또는 메뉴 (⋮)</li>
+        <li><strong>"앱 설치"</strong> 또는 <strong>"홈 화면에 추가"</strong> 선택</li>
+        <li>확인 — 별도 창/아이콘으로 사용 가능</li>
+      </ol>
+      <p class="iim-hint">📌 안드로이드 Chrome 또는 데스크톱 Chrome/Edge 권장.</p>
+      <button class="iim-close" type="button">알겠어요</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector(".iim-close").addEventListener("click", close);
+  modal.querySelector(".iim-backdrop").addEventListener("click", close);
+}
+
+setupInstallButton();
+
 init().catch(err => {
   console.error("[busan-travel] init failed:", err);
   const msg = err?.message || err?.toString() || "알 수 없는 에러 (DevTools Console 확인)";
