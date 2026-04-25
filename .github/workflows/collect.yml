@@ -153,7 +153,10 @@ jobs:
             echo "no data changes"
           else
             TS=$(date -u +'%Y-%m-%dT%H:%MZ')
-            git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }}) [skip ci]"
+            # [skip ci] 미부착: collect.yml 자체는 schedule trigger 만이라
+            # GitHub Actions 무한 루프 위험 없음. Cloudflare Workers Builds 가
+            # 매 commit 자동 deploy 하도록 (기존엔 [skip ci] 때문에 라이브 stale).
+            git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }})"
             git push
           fi
 
