@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 from config import DB_PATH
 from sources import (
+    art_busan,
     busan_festival,
     busan_food,
     dureraum,
@@ -47,6 +48,8 @@ SOURCES = [
     ("festivalbusan",          festivalbusan.fetch),  # 부산축제조직위 8개 메인 축제
     # Phase v3.5 — 네이버 동네 신상 식당/카페
     ("naver_local",            naver_local.fetch),    # NAVER local API 신상 키워드
+    # Phase v3.6 — 부산시립미술관 추가 (Sprint 1 / A2)
+    ("art_busan",              art_busan.fetch),      # 부산시립미술관 전시
 ]
 
 

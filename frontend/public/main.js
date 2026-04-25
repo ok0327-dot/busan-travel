@@ -1097,6 +1097,19 @@ function _aiSegmentKey(target) {
 }
 const _AI_SEG_LABEL = { today: "오늘", tomorrow: "내일", weekend: "이번 주말", next_weekend: "다음 주말" };
 
+// B3 — AI picks title → places 의 menu/gugun lookup
+function _buildPlaceIndex() {
+  if (window._placeMenuIdx) return window._placeMenuIdx;
+  const idx = {};
+  for (const p of (window.__data?.places?.places || [])) {
+    if (p.title && (p.menu || p.gugun)) {
+      idx[p.title] = { menu: p.menu, gugun: p.gugun, category: p.category };
+    }
+  }
+  window._placeMenuIdx = idx;
+  return idx;
+}
+
 function renderAiPickCard(target) {
   const ai = window.__aiSummary;
   if (!ai) return "";
@@ -1105,9 +1118,14 @@ function renderAiPickCard(target) {
   if (!seg || !seg.summary) return "";
   const tag = _AI_SEG_LABEL[segKey] || "오늘";
   const wx = ai.weather?.[segKey];
-  const picksHTML = (seg.picks || []).slice(0, 3).map(p =>
-    `<li><strong>${escape(p.title || "")}</strong>${p.why ? ` — ${escape(p.why)}` : ""}</li>`
-  ).join("");
+  const placeIdx = _buildPlaceIndex();
+  const picksHTML = (seg.picks || []).slice(0, 3).map(p => {
+    const meta = placeIdx[p.title];
+    const menuLine = meta?.menu ? `<span class="ai-pick-menu">🍴 ${escape(meta.menu.slice(0, 40))}</span>` : "";
+    const gugunLine = meta?.gugun ? `<span class="ai-pick-gugun">📍 ${escape(meta.gugun)}</span>` : "";
+    const extras = [menuLine, gugunLine].filter(Boolean).join(" ");
+    return `<li><strong>${escape(p.title || "")}</strong>${p.why ? ` — ${escape(p.why)}` : ""}${extras ? `<br>${extras}` : ""}</li>`;
+  }).join("");
   const courses = (ai.courses || []).slice(0, 3);
   const courseTabs = courses.length
     ? `<div class="ai-courses">${courses.map((c, i) =>
@@ -1465,9 +1483,15 @@ function renderDateBadge(target, active, upcoming) {
   const seasonCount = season
     ? ((season.foods?.length || 0) + (season.blooms?.length || 0) + (season.scenes?.length || 0))
     : 0;
-  const total = (active || 0) + (upcoming || 0);
-  const stats = `🎪 추천 ${total}${seasonCount ? ` · 🍽 제철 ${seasonCount}` : ""}`;
-  parts.push(`<span class="db-sep">·</span><span class="db-stats">${stats}</span>`);
+  // C1: 라벨 명확화 — 진행중 / 임박(2개월내) / 제철 분리 표시
+  const activeN = active || 0, upcomingN = upcoming || 0;
+  const bits = [];
+  if (activeN) bits.push(`진행중 ${activeN}`);
+  if (upcomingN) bits.push(`임박 ${upcomingN}`);
+  if (!bits.length) bits.push("행사 0");
+  const eventsStr = `🎪 ${bits.join(" · ")}`;
+  const seasonStr = seasonCount ? ` · 🍽 제철 ${seasonCount}가지` : "";
+  parts.push(`<span class="db-sep">·</span><span class="db-stats">${eventsStr}${seasonStr}</span>`);
 
   $badge.innerHTML = parts.join("");
   $badge.hidden = false;
