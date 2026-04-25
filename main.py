@@ -36,6 +36,7 @@ from sources import (
     naver_local,
     visitbusan,
 )
+from sources._tour_filter import filter_events
 from storage.db import Event, connect, upsert_events
 
 # KOPIS 는 공연시설/기획제작사만 가입 가능해 사용 불가 — sources/kopis.py 는 보존
@@ -75,16 +76,24 @@ def run() -> int:
         return 1
     conn = connect(DB_PATH)
     total_new = total_upd = 0
+    total_filter = {"keep": 0, "minor": 0, "drop": 0}
     for name, fetch_fn in SOURCES:
         try:
             events: list[Event] = fetch_fn()
         except Exception as exc:
             print(f"[{name}] FAILED: {exc}", file=sys.stderr)
             continue
+        pre_count = len(events)
+        events, fstats = filter_events(events)
+        for k, v in fstats.items():
+            total_filter[k] += v
         ins, upd = upsert_events(conn, events)
         total_new += ins
         total_upd += upd
-        print(f"[{name}] fetched={len(events)} new={ins} updated={upd}")
+        print(
+            f"[{name}] fetched={pre_count} keep={fstats['keep']} "
+            f"minor={fstats['minor']} drop={fstats['drop']} new={ins} updated={upd}"
+        )
 
     # 일정여행 코스 — 별도 vb_courses 테이블 사용
     try:
@@ -104,7 +113,11 @@ def run() -> int:
     for row in upcoming:
         print(f"  {row['start_date'] or '?':<12} {row['title']}  @ {row['venue'] or '-'}")
 
-    print(f"\nTotal new={total_new} updated={total_upd}  db={DB_PATH}")
+    print(
+        f"\n=== Filter totals === keep={total_filter['keep']} "
+        f"minor={total_filter['minor']} drop={total_filter['drop']}"
+    )
+    print(f"Total new={total_new} updated={total_upd}  db={DB_PATH}")
     return 0
 
 
