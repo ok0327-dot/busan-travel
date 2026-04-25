@@ -31,45 +31,31 @@ WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
 SKY_MAP = {1: "맑음", 3: "구름많음", 4: "흐림"}
 PTY_MAP = {1: "비", 2: "비/눈", 3: "눈", 4: "소나기"}
 
+_SEG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "picks": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "why": {"type": "string"},
+                },
+                "required": ["title", "why"],
+            },
+        },
+    },
+    "required": ["summary", "picks"],
+}
 SCHEMA = {
     "type": "object",
     "properties": {
-        "today": {
-            "type": "object",
-            "properties": {
-                "summary": {"type": "string"},
-                "picks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "title": {"type": "string"},
-                            "why": {"type": "string"},
-                        },
-                        "required": ["title", "why"],
-                    },
-                },
-            },
-            "required": ["summary", "picks"],
-        },
-        "weekend": {
-            "type": "object",
-            "properties": {
-                "summary": {"type": "string"},
-                "picks": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "title": {"type": "string"},
-                            "why": {"type": "string"},
-                        },
-                        "required": ["title", "why"],
-                    },
-                },
-            },
-            "required": ["summary", "picks"],
-        },
+        "today":         _SEG_SCHEMA,
+        "tomorrow":      _SEG_SCHEMA,
+        "weekend":       _SEG_SCHEMA,
+        "next_weekend":  _SEG_SCHEMA,
         "courses": {
             "type": "array",
             "items": {
@@ -84,7 +70,7 @@ SCHEMA = {
             },
         },
     },
-    "required": ["today", "weekend", "courses"],
+    "required": ["today", "tomorrow", "weekend", "next_weekend", "courses"],
 }
 
 
@@ -188,10 +174,28 @@ def format_event_line(row, anchor: date) -> str:
     return f"TITLE: {title} | {cat_label} | {kind} | {place} | {period}"
 
 
-def build_prompt(today: date, weekend_start: date,
-                 today_weather: str | None, weekend_weather: str | None,
-                 season: dict | None,
-                 today_events: list, weekend_events: list) -> str:
+def fetch_top_places(conn: sqlite3.Connection, category: str, limit: int = 8) -> list:
+    """공식 출처(S) places 중 view_count 상위 — AI 후보 보강용 (행사 부족 시 명소 fallback)."""
+    return conn.execute(
+        """SELECT title, venue, address, gugun, menu, rating, view_count
+           FROM events WHERE category=? AND trust_tier='S' AND lat IS NOT NULL
+           ORDER BY view_count DESC NULLS LAST LIMIT ?""",
+        (category, limit),
+    ).fetchall()
+
+
+def format_place_line(row) -> str:
+    title, venue, addr, gugun, menu, rating, views = row
+    where = gugun or venue or (addr or "").split()[0] if addr else ""
+    extra = []
+    if menu: extra.append(f"메뉴 {menu[:30]}")
+    if rating: extra.append(f"★{rating}")
+    return f"- {title}{' (' + where + ')' if where else ''}{' · ' + ' '.join(extra) if extra else ''}"
+
+
+def build_prompt(today: date, tomorrow: date, weekend_start: date, next_weekend_start: date,
+                 weather: dict, season: dict | None,
+                 events_by_seg: dict, places_pool: dict) -> str:
     season_str = ""
     if season:
         foods = ", ".join(f.get("name", "") for f in (season.get("foods") or [])[:5])
@@ -200,32 +204,53 @@ def build_prompt(today: date, weekend_start: date,
         if foods: bits.append(f"제철 음식 — {foods}")
         if scenes: bits.append(f"풍경 — {scenes}")
         season_str = " / ".join(bits)
-    today_lines = "\n".join(f"- {format_event_line(r, today)}" for r in today_events) or "- (없음)"
-    weekend_lines = "\n".join(f"- {format_event_line(r, weekend_start)}" for r in weekend_events) or "- (없음)"
+
+    def evt_block(label: str, anchor: date, events: list) -> str:
+        if not events:
+            return f"[{label} ({anchor.isoformat()}) 행사 후보]\n- (없음 — 행사 한산. picks 는 명소·맛집 대안 후보에서 골라도 OK)"
+        lines = "\n".join(f"- {format_event_line(r, anchor)}" for r in events)
+        return f"[{label} ({anchor.isoformat()}) 행사 후보]\n{lines}"
+
+    blocks = [
+        evt_block("오늘", today, events_by_seg.get("today", [])),
+        evt_block("내일", tomorrow, events_by_seg.get("tomorrow", [])),
+        evt_block("이번 주말", weekend_start, events_by_seg.get("weekend", [])),
+        evt_block("다음 주말", next_weekend_start, events_by_seg.get("next_weekend", [])),
+    ]
+    place_block = (
+        "[명소·맛집·카페 인기 Top — 행사 부족 시 picks 또는 courses 에 활용]\n"
+        + "\n".join(format_place_line(p) for p in places_pool.get("attractions", [])[:6])
+        + "\n— 맛집:\n"
+        + "\n".join(format_place_line(p) for p in places_pool.get("foods", [])[:6])
+    )
+
     weekday = WEEKDAYS[today.weekday()]
     return f"""당신은 부산 여행 큐레이터입니다. 두 페르소나를 동시에 고려하세요:
 A) 매주 금요일 서울에서 부산 가족(아내·9세 아들)을 만나러 오는 가장 — 가족 시간 우선
 B) 부산 거주민으로 주말 뭐할지 고민하는 사람 — 평소 안 가본 동네 발굴 선호
 
 오늘은 {today.isoformat()} ({weekday}요일).
-오늘 부산 날씨: {today_weather or "정보 없음"}
-이번 주말 부산 날씨({weekend_start.isoformat()}~): {weekend_weather or "정보 없음"}
+부산 날씨:
+- 오늘({today.isoformat()}): {weather.get('today') or '정보 없음'}
+- 내일({tomorrow.isoformat()}): {weather.get('tomorrow') or '정보 없음'}
+- 이번 주말({weekend_start.isoformat()}~): {weather.get('weekend') or '정보 없음'}
+- 다음 주말({next_weekend_start.isoformat()}~): {weather.get('next_weekend') or '정보 없음'}
 {today.month}월 부산 — {season_str or "(제철 정보 없음)"}
 
-[오늘/임박 행사 후보]
-{today_lines}
+{chr(10).join(blocks)}
 
-[이번 주말 행사 후보]
-{weekend_lines}
+{place_block}
 
-응답 규칙:
-- 한국어 자연체, 친근하지만 정보가 명확.
-- summary 는 110자 이내. 날씨 한 마디 + 추천 1-2개를 한 문장으로 압축.
-- picks 는 위 후보 리스트에서만 선택. 후보가 빈약하면 picks 를 0~1건으로 줄여도 됨 (창작 금지).
-- picks.title 은 후보 리스트 라인의 'TITLE:' 다음 ' | ' 앞 부분을 그대로 복사. 카테고리·진행상태·D-x·장소·날짜 같은 메타는 절대 title 에 포함하지 마세요.
-- picks.why 는 30자 이내. 액션 가이드 ("9세 아이 좋아함" / "비 와도 OK").
-- courses 는 정확히 3개: label="가족(9세 아이)" / label="연인" / label="혼자/거주민".
-  각 stops 3~4개. 부산 실제 지명/명소를 사용. 비·눈 예보면 실내 옵션 강조.
+응답 규칙 (4 segment 모두 작성 필수: today / tomorrow / weekend / next_weekend):
+- 4 segment 는 반드시 서로 다른 내용 — 같은 picks/summary 반복 금지.
+- summary 는 110자 이내. 해당 segment 의 날씨 + 추천 1-2개를 한 문장으로.
+- picks 는 위 [행사 후보] 또는 [명소·맛집 인기 Top] 에서만 선택 (창작 금지).
+  행사가 한산한 segment 면 명소·맛집을 picks 로 골라도 됨.
+- picks.title 은 'TITLE:' 다음 ' | ' 앞 부분 또는 명소/맛집 이름 그대로 복사.
+  카테고리·진행상태·D-x·장소·날짜 메타는 title 에 포함 금지.
+- picks.why 는 30자 이내. 액션 가이드 ("9세 아이 좋아함" / "비 와도 OK" / "구월 제철").
+- courses 정확히 3개: label="가족(9세 아이)" / label="연인" / label="혼자/거주민".
+  각 stops 3~4개. 위 데이터의 실제 부산 지명/명소만 사용. 비·눈 예보면 실내 강조.
 - courses[i].note 는 50자 이내 팁 (이동 동선, 식사 타이밍 등).
 """
 
@@ -255,21 +280,34 @@ def main() -> int:
         return 0
 
     today = date.today()
-    # 다가오는 토요일 — 오늘이 토요일이면 그대로
+    tomorrow = today + timedelta(days=1)
     delta_to_sat = (5 - today.weekday()) % 7
     weekend_start = today + timedelta(days=delta_to_sat)
+    next_weekend_start = weekend_start + timedelta(days=7)
 
     conn = sqlite3.connect(DB_PATH)
-    # today=오늘+1일 (D-1까지), weekend=토+일
-    today_events = fetch_events_for_window(conn, today, days=1, limit=10)
-    weekend_events = fetch_events_for_window(conn, weekend_start, days=2, limit=10)
-    today_weather = fetch_weather(conn, today)
-    weekend_weather = fetch_weather(conn, weekend_start)
+    events_by_seg = {
+        "today":        fetch_events_for_window(conn, today, days=0, limit=8),
+        "tomorrow":     fetch_events_for_window(conn, tomorrow, days=0, limit=8),
+        "weekend":      fetch_events_for_window(conn, weekend_start, days=1, limit=10),
+        "next_weekend": fetch_events_for_window(conn, next_weekend_start, days=1, limit=10),
+    }
+    weather = {
+        "today":        fetch_weather(conn, today),
+        "tomorrow":     fetch_weather(conn, tomorrow),
+        "weekend":      fetch_weather(conn, weekend_start),
+        "next_weekend": fetch_weather(conn, next_weekend_start),
+    }
+    places_pool = {
+        "attractions": fetch_top_places(conn, "attraction", 8),
+        "foods":       fetch_top_places(conn, "food", 8),
+    }
     season = load_season(today.month)
 
-    prompt = build_prompt(today, weekend_start, today_weather, weekend_weather,
-                          season, today_events, weekend_events)
-    print(f"[ai_summary] today_evts={len(today_events)} weekend_evts={len(weekend_events)} prompt={len(prompt)}c")
+    prompt = build_prompt(today, tomorrow, weekend_start, next_weekend_start,
+                          weather, season, events_by_seg, places_pool)
+    counts = {k: len(v) for k, v in events_by_seg.items()}
+    print(f"[ai_summary] events={counts} places=attr:{len(places_pool['attractions'])} food:{len(places_pool['foods'])} prompt={len(prompt)}c")
 
     try:
         result = call_gemini(api_key, prompt)
@@ -280,8 +318,13 @@ def main() -> int:
     out = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "valid_for": today.isoformat(),
-        "weekend_for": weekend_start.isoformat(),
-        "weather": {"today": today_weather, "weekend": weekend_weather},
+        "dates": {
+            "today": today.isoformat(),
+            "tomorrow": tomorrow.isoformat(),
+            "weekend": weekend_start.isoformat(),
+            "next_weekend": next_weekend_start.isoformat(),
+        },
+        "weather": weather,
         **result,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)

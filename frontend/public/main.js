@@ -1084,16 +1084,27 @@ function _bookingRequired(p) {
   return _BOOKING_KEYWORDS.test(blob);
 }
 
-// ───────── AI Pick 카드 (Phase D) — ai-summary.json 기반 ─────────
+// ───────── AI Pick 카드 (Phase D) — ai-summary.json 4 segment ─────────
+function _aiSegmentKey(target) {
+  const ai = window.__aiSummary;
+  if (!ai?.dates) return "today";
+  const tStr = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,"0")}-${String(target.getDate()).padStart(2,"0")}`;
+  if (tStr === ai.dates.today) return "today";
+  if (tStr === ai.dates.tomorrow) return "tomorrow";
+  if (tStr === ai.dates.weekend) return "weekend";
+  if (tStr === ai.dates.next_weekend) return "next_weekend";
+  return "today";
+}
+const _AI_SEG_LABEL = { today: "오늘", tomorrow: "내일", weekend: "이번 주말", next_weekend: "다음 주말" };
+
 function renderAiPickCard(target) {
   const ai = window.__aiSummary;
   if (!ai) return "";
-  const today = new Date();
-  const isToday = target.toDateString() === today.toDateString();
-  // 이번 주말 chip 시 weekend, 그 외 today
-  const seg = isToday && ai.today ? ai.today : (ai.weekend || ai.today);
+  const segKey = _aiSegmentKey(target);
+  const seg = ai[segKey] || ai.today;
   if (!seg || !seg.summary) return "";
-  const tag = isToday ? "오늘" : "이번 주말";
+  const tag = _AI_SEG_LABEL[segKey] || "오늘";
+  const wx = ai.weather?.[segKey];
   const picksHTML = (seg.picks || []).slice(0, 3).map(p =>
     `<li><strong>${escape(p.title || "")}</strong>${p.why ? ` — ${escape(p.why)}` : ""}</li>`
   ).join("");
@@ -1106,8 +1117,8 @@ function renderAiPickCard(target) {
           ${c.note ? `<p class="ai-course-note">${escape(c.note)}</p>` : ""}
         </details>`).join("")}</div>`
     : "";
-  return `<article class="ai-pick" aria-label="AI 오늘의 부산 추천">
-    <div class="ai-pick-label">🤖 AI Pick · ${escape(tag)}의 부산</div>
+  return `<article class="ai-pick" aria-label="AI ${escape(tag)}의 부산 추천">
+    <div class="ai-pick-label">🤖 AI Pick · ${escape(tag)}의 부산${wx ? ` · ${escape(wx)}` : ""}</div>
     <p class="ai-pick-summary">${escape(seg.summary)}</p>
     ${picksHTML ? `<ul class="ai-pick-list">${picksHTML}</ul>` : ""}
     ${courseTabs}
