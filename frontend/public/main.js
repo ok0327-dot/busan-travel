@@ -1209,6 +1209,71 @@ function _newItemHTML(p, idx) {
   </button>`;
 }
 
+// ───────── 🔥 인기 큐레이션 (popularity_score 기반, v3.7) ─────────
+function _formatK(n) {
+  if (!n) return "";
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toLocaleString();
+}
+
+function _popularFoodPool(limit = 5) {
+  const places = window.__data?.places?.places || [];
+  return places
+    .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0)
+    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+    .slice(0, limit);
+}
+
+function _popularEventsPool(target, limit = 5) {
+  const events = window.__data?.allEventPoi || [];
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const weekEnd = new Date(t);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+
+  const isCultural = e => e.category === "exhibition" || e.category === "performance";
+  const cand = events.filter(e => {
+    if (!isCultural(e)) return false;
+    const start = parseDate(e.start); if (!start) return false;
+    const end = parseDate(e.end) || start;
+    return !(end < t || start > weekEnd);
+  });
+  let pool = cand;
+  if (pool.length < limit) {
+    // 폴백: 향후 3개월 upcoming 공연/전시 TOP
+    const horizon = new Date(t); horizon.setMonth(horizon.getMonth() + 3);
+    const future = events.filter(e => {
+      if (!isCultural(e)) return false;
+      const start = parseDate(e.start); if (!start) return false;
+      return start >= t && start <= horizon;
+    });
+    pool = future;
+  }
+  return pool
+    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+    .slice(0, limit);
+}
+
+function _popularItemHTML(p, idx, kind) {
+  const cat = CATEGORIES[p.category] || {};
+  const emoji = cat.emoji || "📌";
+  const trailing = kind === "food"
+    ? (p.naver_reviews ? `📝 ${_formatK(p.naver_reviews)}` : (p.gugun || ""))
+    : (p.start ? `${(p.start || "").slice(5)}${p.end && p.end !== p.start ? "~" + (p.end || "").slice(5) : ""}` : (p.venue || ""));
+  const sub = kind === "food"
+    ? (p.gugun ? escape(p.gugun) : "")
+    : (p.venue ? escape(p.venue) : "");
+  const thumb = p.image
+    ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
+    : `<div class="popular-thumb popular-thumb-empty">${emoji}</div>`;
+  return `<button class="popular-card" data-idx="${idx}" data-kind="${kind}">
+    ${thumb}
+    <div class="popular-rank">${idx + 1}</div>
+    <div class="popular-body">
+      <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
+      <div class="popular-meta">${trailing}${sub ? " · " + sub : ""}</div>
+    </div>
+  </button>`;
+}
+
 // ───────── Phase E 재배치: 한눈에 들어오는 "오늘/이번주말 뭐할지" ─────────
 // 새 순서: ① AI Pick → ② Hero Top 3 → ③ 🆕 신규 → ④ D-30 사전예약 → ⑤ 제철 → ⑥ 그 외 → ⑦ STORY
 function renderTodayHighlights(target) {
@@ -1278,7 +1343,27 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ③ 🆕 신규 추가 (식당/카페/공연/전시/축제 통합)
+  // ③ 🔥 인기 맛집 TOP 5 (popularity_score 기반)
+  const popularFood = _popularFoodPool(5);
+  const popularFoodHTML = popularFood.length >= 3
+    ? `<div class="highlight-section popular-section">
+        <div class="hs-title">🔥 인기 맛집·카페 TOP ${popularFood.length}</div>
+        <div class="hs-note">네이버 블로그 언급 수 + 평점 종합</div>
+        <div class="popular-grid">${popularFood.map((p, i) => _popularItemHTML(p, i, "food")).join("")}</div>
+      </div>`
+    : "";
+
+  // ④ 🎭 이번주 공연/전시 TOP 5
+  const popularEvents = _popularEventsPool(target, 5);
+  const popularEventsHTML = popularEvents.length >= 2
+    ? `<div class="highlight-section popular-section popular-events">
+        <div class="hs-title">🎭 이번주 공연·전시 TOP ${popularEvents.length}</div>
+        <div class="hs-note">부산 메이저 venue 중심 · ${popularEvents.some(e => parseDate(e.start) && parseDate(e.start) >= new Date(target.getFullYear(), target.getMonth(), target.getDate() + 7)) ? "다가오는 3개월 포함" : "이번주 진행 중"}</div>
+        <div class="popular-grid">${popularEvents.map((p, i) => _popularItemHTML(p, i, "event")).join("")}</div>
+      </div>`
+    : "";
+
+  // ⑤ 🆕 신규 추가 (식당/카페/공연/전시/축제 통합)
   const newItems = _newItemsPool();
   let newHTML = "";
   if (newItems.length) {
@@ -1345,7 +1430,17 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+
+  // 🔥/🎭 인기 카드 클릭 → showDetail
+  $list.querySelectorAll(".popular-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      const kind = btn.dataset.kind;
+      const item = kind === "food" ? popularFood[idx] : popularEvents[idx];
+      if (item) showDetail(item);
+    });
+  });
 
   // 🆕 신규 카드 클릭 → showDetail (places/events 의 원래 객체 사용)
   $list.querySelectorAll(".new-card").forEach(btn => {

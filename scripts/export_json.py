@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import sys
 from collections import defaultdict
@@ -36,6 +37,40 @@ BLOG_SOURCE_WEIGHTS = {
     "naver_blog:bsdonggublog": +2,   # 동구청
     "naver_blog:cooolbusan":   +1,   # 부산광역시 공식
 }
+
+
+def compute_popularity(row, priority: int | None = None) -> int:
+    """카테고리별 0~100 popularity score.
+
+    food/cafe   : naver_review_count log10 + vb rating ±10 + naver_local +8
+    attraction  : view_count log10 + vb rating ±16
+    festival/exhibition/performance : importance_score (priority) × 8
+    """
+    cat = row["category"]
+    if cat in ("food", "cafe"):
+        # 블로그 언급이 주 신호 (변별력), vb rating 은 거의 5.0 이라 보조만
+        nrv = _col(row, "naver_review_count") or 0
+        if nrv > 0:
+            base = min(85.0, 20 * math.log10(nrv))  # 1K→60, 10K→80, 100K→85
+        else:
+            base = 0.0  # enrich 안 된 POI 는 후순위
+        rating = _col(row, "rating") or 0
+        if rating:
+            base += (rating - 3) * 2  # 약한 보정
+        if row["source"] == "naver_local":
+            base += 10  # 신상 가산점
+        return max(0, min(100, round(base)))
+    if cat == "attraction":
+        views = _col(row, "view_count") or 0
+        base = min(80.0, 15 * math.log10(views + 1)) if views > 0 else 30.0
+        rating = _col(row, "rating") or 0
+        if rating:
+            base += (rating - 3) * 8
+        return max(0, min(100, round(base)))
+    if cat in ("festival", "exhibition", "performance"):
+        p = priority or 0
+        return max(0, min(100, round(p * 8)))
+    return 0
 
 
 def _duration_days(start: str | None, end: str | None) -> int | None:
@@ -188,6 +223,7 @@ def _jsonable(row: sqlite3.Row) -> dict:
         # 읽을거리 전용 priority — 소스 가중치 반영
         blog_priority = priority + BLOG_SOURCE_WEIGHTS.get(row["source"], 0)
 
+    popularity_score = compute_popularity(row, priority=priority)
     return {
         "id": row["id"],
         "source": row["source"],
@@ -196,6 +232,7 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "trust_tier": _col(row, "trust_tier"),
         "menu": _col(row, "menu"),
         "gugun": _col(row, "gugun"),
+        "popularity_score": popularity_score,
         "title": row["title"],
         "venue": row["venue"],
         "address": row["address"],
