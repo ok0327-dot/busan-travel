@@ -1039,9 +1039,9 @@ function _renderCourseFilter() {
   const vbCount = (coursesData?.courses || []).length;
   const filters = [
     { key: "all", label: `전체 ${galmaetCount + walkingCount + vbCount}` },
-    { key: "galmaet", label: `🥾 갈맷길 ${galmaetCount}` },
     { key: "walking", label: `🚶 도보 ${walkingCount}` },
     { key: "vb", label: `🚗 종합 ${vbCount}` },
+    { key: "galmaet", label: `🥾 갈맷길 ${galmaetCount}` },
   ];
   return `<div class="course-filter-row">${filters.map(f =>
     `<button class="course-filter-chip${_courseFilter === f.key ? " active" : ""}" data-filter="${f.key}">${escape(f.label)}</button>`
@@ -1122,17 +1122,17 @@ function renderCourseList() {
     </div>`;
   }).join("");
 
-  // filter 적용
+  // filter 적용 — 순서: 도보 → 종합 → 갈맷길
   let bodyHTML = "";
   const f = _courseFilter;
-  if (f === "all" || f === "galmaet") {
-    if (galmaetCardsHTML) bodyHTML += `<div class="course-section-header">🥾 갈맷길 (영구 도보 인프라)</div>${galmaetCardsHTML}`;
-  }
   if (f === "all" || f === "walking") {
     if (walkingCardsHTML) bodyHTML += `<div class="course-section-header">🚶 도보 코스 (테마 큐레이션)</div>${walkingCardsHTML}`;
   }
   if (f === "all" || f === "vb") {
     if (vbCardsHTML) bodyHTML += `<div class="course-section-header">🚗 종합 코스 (1박2일·하루)</div>${vbCardsHTML}`;
+  }
+  if (f === "all" || f === "galmaet") {
+    if (galmaetCardsHTML) bodyHTML += `<div class="course-section-header">🥾 갈맷길 (영구 도보 인프라)</div>${galmaetCardsHTML}`;
   }
 
   $list.innerHTML = _renderCourseFilter() + bodyHTML;
