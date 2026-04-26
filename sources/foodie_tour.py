@@ -15,11 +15,21 @@ NOTE: data.go.kr API ID 미확정 → registry 우회 직접 호출.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 import requests
 
 from storage.db import Event
+
+# 다국어 표기 접미사 제거 — 예: "M543 Cafe(한,영,중간,중번,일)" → "M543 Cafe"
+_LANG_SUFFIX = re.compile(r'\s*\((?:[한영중간번일][,\s]*)+\)$')
+
+
+def _clean_title(title: str) -> str:
+    if not title:
+        return title
+    return _LANG_SUFFIX.sub("", title).strip()
 
 SOURCE = "foodie_tour"
 BASE_URL = "http://apis.data.go.kr/6260000/FoodieService/getFoodieKr"
@@ -28,7 +38,7 @@ PAGE_SIZE = 100
 
 def _parse_item(raw: dict) -> Event | None:
     uc_seq = str(raw.get("UC_SEQ") or "").strip()
-    title = (raw.get("MAIN_TITLE") or raw.get("TITLE") or "").strip()
+    title = _clean_title((raw.get("MAIN_TITLE") or raw.get("TITLE") or "").strip())
     if not uc_seq or not title:
         return None
     full_body = (raw.get("ITEMCNTNTS") or "").strip()
