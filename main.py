@@ -30,6 +30,7 @@ from sources import (
     dabom,
     dureraum,
     festivalbusan,
+    foodie_tour,
     galmaet,
     gov_tour,
     moca_busan,
@@ -64,6 +65,8 @@ SOURCES = [
     ("art_busan",              art_busan.fetch),      # 부산시립미술관 전시
     # Sprint 2 — 부산문화포털 다봄 (부산 전체 공연 통합, 159건)
     ("dabom",                  dabom.fetch),
+    # Phase v3.10 — 부산 푸디투어 향토음식 매거진 (92건, vb_* 매칭 0%, 완전 새 콘텐츠)
+    ("foodie_tour",            foodie_tour.fetch),
 ]
 
 
