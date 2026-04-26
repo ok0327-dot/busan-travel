@@ -1,0 +1,150 @@
+{
+  "_doc": "부산 주요 연례 축제 사전 예약 캘린더. title_keywords 매칭 시 booking_opens_at 추정. annual_month 는 본행사 월 (UTC 기준 한국 시즌). booking_offset_days = 본행사 N일 전 발매 시작.",
+  "_updated_at": "2026-04-26",
+  "festivals": [
+    {
+      "name": "부산국제영화제 (BIFF)",
+      "title_keywords": ["부산국제영화제", "BIFF", "부산영화제"],
+      "annual_month": 10,
+      "booking_offset_days": 14,
+      "booking_type": "예매 (인터파크/예스24)",
+      "note": "10월 초 개막. 9월 중순 예매 시작."
+    },
+    {
+      "name": "부산불꽃축제 (유료석)",
+      "title_keywords": ["부산불꽃축제", "광안리불꽃축제"],
+      "annual_month": 10,
+      "booking_offset_days": 60,
+      "booking_type": "유료 관람석",
+      "note": "10월 말 개최. 8월 말 유료석 발매."
+    },
+    {
+      "name": "부산국제연극제 (BIPF)",
+      "title_keywords": ["부산국제연극제", "BIPF"],
+      "annual_month": 5,
+      "booking_offset_days": 21,
+      "booking_type": "공연 예매",
+      "note": "5월 초 개막. 4월 중순 예매."
+    },
+    {
+      "name": "부산바다축제",
+      "title_keywords": ["부산바다축제"],
+      "annual_month": 8,
+      "booking_offset_days": 30,
+      "booking_type": "체험 신청",
+      "note": "8월 초 개최. 7월 초 체험 부스 신청."
+    },
+    {
+      "name": "해운대 모래축제",
+      "title_keywords": ["해운대모래축제", "해운대 모래축제"],
+      "annual_month": 5,
+      "booking_offset_days": 14,
+      "booking_type": "체험 신청",
+      "note": "5월 말 ~ 6월 초. 5월 중순 체험 신청."
+    },
+    {
+      "name": "부산국제록페스티벌",
+      "title_keywords": ["부산국제록페스티벌", "부산락페", "부산 락페"],
+      "annual_month": 10,
+      "booking_offset_days": 30,
+      "booking_type": "예매 (티켓)",
+      "note": "10월 초 ~ 중순. 9월 초 예매."
+    },
+    {
+      "name": "부산비엔날레",
+      "title_keywords": ["부산비엔날레"],
+      "annual_month": 9,
+      "booking_offset_days": 14,
+      "booking_type": "도슨트 예약",
+      "note": "격년 9월 ~ 11월. 도슨트는 사전 예약 권장."
+    },
+    {
+      "name": "동래읍성역사축제",
+      "title_keywords": ["동래읍성", "동래읍성역사축제"],
+      "annual_month": 10,
+      "booking_offset_days": 14,
+      "booking_type": "체험 신청",
+      "note": "10월 초. 9월 중순 체험 부스 신청."
+    },
+    {
+      "name": "센텀맥주축제",
+      "title_keywords": ["센텀맥주축제"],
+      "annual_month": 5,
+      "booking_offset_days": 21,
+      "booking_type": "예매 (티켓)",
+      "note": "5월 말. 5월 초 예매."
+    },
+    {
+      "name": "조선통신사 축제",
+      "title_keywords": ["조선통신사축제", "조선통신사 축제", "조선통신사"],
+      "annual_month": 5,
+      "booking_offset_days": 21,
+      "booking_type": "체험 모집",
+      "note": "5월 초. 4월 중순 체험단 모집."
+    },
+    {
+      "name": "부산항축제",
+      "title_keywords": ["부산항축제"],
+      "annual_month": 10,
+      "booking_offset_days": 30,
+      "booking_type": "체험 신청",
+      "note": "10월 초. 9월 초 체험 부스."
+    },
+    {
+      "name": "부산스텝업댄스페스티벌",
+      "title_keywords": ["부산스텝업댄스", "스텝업댄스페스티벌"],
+      "annual_month": 5,
+      "booking_offset_days": 14,
+      "booking_type": "공연 예매",
+      "note": "5월 중순. 5월 초 예매."
+    },
+    {
+      "name": "광안리 M 드론라이트쇼 (월별)",
+      "title_keywords": ["광안리 M 드론", "광안리 드론라이트쇼", "M 드론라이트쇼"],
+      "annual_month": null,
+      "booking_offset_days": 14,
+      "booking_type": "관람 예약",
+      "note": "매월 진행. 월 초 예약 페이지 오픈."
+    },
+    {
+      "name": "부산국제건축제",
+      "title_keywords": ["부산국제건축제"],
+      "annual_month": 10,
+      "booking_offset_days": 14,
+      "booking_type": "투어 신청",
+      "note": "10월. 9월 중순 투어 신청."
+    },
+    {
+      "name": "시민뜨락축제",
+      "title_keywords": ["시민뜨락축제"],
+      "annual_month": 4,
+      "booking_offset_days": 14,
+      "booking_type": "참여 신청",
+      "note": "4월 ~ 5월. 4월 초 참여 신청."
+    },
+    {
+      "name": "부산원도심활성화축제 (택슐랭)",
+      "title_keywords": ["부산원도심활성화축제", "택슐랭"],
+      "annual_month": 5,
+      "booking_offset_days": 14,
+      "booking_type": "체험 신청",
+      "note": "5월 말. 5월 초 체험 신청."
+    },
+    {
+      "name": "부산밀페스티벌",
+      "title_keywords": ["부산밀페스티벌", "부산 밀 페스티벌"],
+      "annual_month": 5,
+      "booking_offset_days": 21,
+      "booking_type": "예매",
+      "note": "5월 중순. 4월 말 예매."
+    },
+    {
+      "name": "부산국제광고제",
+      "title_keywords": ["부산국제광고제", "AD STARS"],
+      "annual_month": 8,
+      "booking_offset_days": 30,
+      "booking_type": "참가 등록",
+      "note": "8월 말. 7월 말 참가 등록."
+    }
+  ]
+}

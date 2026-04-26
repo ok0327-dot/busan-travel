@@ -510,6 +510,7 @@ function showDetail(poi) {
       ${poi.menu ? `<div class="card-meta foody-menu">${icon("ph-bowl-food")} 대표메뉴 · ${escape(poi.menu)}</div>` : ""}
       ${poi.gugun && !poi.address?.includes(poi.gugun) ? `<div class="card-meta">${icon("ph-map-pin")} ${escape(poi.gugun)}</div>` : ""}
       ${poi.galmaet_course ? `<div class="card-meta galmaet-badge">🥾 갈맷길 ${poi.galmaet_course}코스${poi.galmaet_gugan ? ` ${poi.galmaet_gugan}구간` : ""} stop</div>` : ""}
+      ${(() => { const fs = _foodieStoryFor(poi); return fs ? `<div class="card-meta foodie-story-link"><a href="${escape(fs.story_url || fs.url || '#')}" target="_blank" rel="noopener">🥘 향토음식 유래: <strong>${escape(fs.title.replace(/\([^)]*\)/g, '').trim())}</strong> 보기 →</a></div>` : ""; })()}
       ${excerpt ? `<div class="card-excerpt">${escape(excerpt.slice(0, 280))}</div>` : ""}
       ${renderTags(poi.tags)}
       ${infoRow(icon("ph-clock") + " 영업", poi.hours)}
@@ -522,6 +523,7 @@ function showDetail(poi) {
         <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-map-pin")} 카카오맵 길찾기</a>
         ${poi.story_url ? `<a href="${escape(poi.story_url)}" target="_blank" style="padding:6px 10px;background:#0ea5e9;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-book-open")} 비짓부산</a>` : ""}
         ${poi.url && poi.url !== poi.story_url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-globe")} 홈페이지</a>` : ""}
+        ${_bookingRequired(poi) && poi.url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">${icon("ph-ticket")} 예매하기 →</a>` : ""}
       </div>
     </div>
   `;
@@ -1346,12 +1348,69 @@ function renderNarrativeHero() {
 }
 
 // ───────── 사전 예약 휴리스틱 ─────────
-// description/url/title 키워드로 booking_required 추정. DB 의 booking_required=1 우선.
-const _BOOKING_KEYWORDS = /예매|티켓팅|티켓 오픈|사전신청|사전 신청|선착|온라인 신청|예약 필수|예약필수|선예매|티켓 예매/;
+// 백엔드 (sources/_booking_extractor.py) 가 booking_required 채움 → 우선 사용.
+// 백엔드 미적용 row 위한 fallback 키워드 (확장 동기화).
+const _BOOKING_KEYWORDS = /예매|티켓팅|티켓 ?오픈|사전 ?예약|사전 ?신청|신청기간|접수기간|선착|예약 필수|예약필수|선예매|티켓 예매|예매하기|예매처/;
 function _bookingRequired(p) {
   if (p.booking_required === 1 || p.booking_required === true) return true;
   const blob = `${p.title || ""} ${p.description || ""} ${p.url || ""}`;
   return _BOOKING_KEYWORDS.test(blob);
+}
+
+// ───────── 향토음식 매거진 매핑 (Phase 6) ─────────
+// food/cafe POI → 푸디투어 향토음식 매거진 lookup. title (가게명) 또는 menu (음식명) 매칭.
+function _foodieStoryFor(poi) {
+  if (poi.category !== "food" && poi.category !== "cafe") return null;
+  const guides = window.__guides || [];
+  const foodie = guides.filter(g => g.subtype === "향토음식");
+  if (!foodie.length) return null;
+  const stripParen = (s) => (s || "").replace(/\([^)]*\)/g, "").trim();
+  const poiName = stripParen(poi.title).toLowerCase();
+  // 1) 가게명 정확 매칭
+  const exact = foodie.find(g => stripParen(g.title).toLowerCase() === poiName);
+  if (exact) return exact;
+  // 2) 음식명 매칭 (menu 필드에 향토음식 title 포함)
+  if (poi.menu) {
+    const menuLower = poi.menu.toLowerCase();
+    for (const g of foodie) {
+      const t = stripParen(g.title).toLowerCase();
+      if (t.length >= 2 && menuLower.includes(t)) return g;
+    }
+  }
+  return null;
+}
+
+// 카테고리 우선순위: 축제 > 전시 > 공연 (사용자 결정 2026-04-26)
+const _BOOKING_CATEGORY_ORDER = { festival: 1, exhibition: 2, performance: 3 };
+function _bookingCategoryGroup(p) {
+  if (p.category === "festival") return { key: "festival", label: "🎪 축제 사전 신청", icon: "🎪" };
+  if (p.category === "exhibition") return { key: "exhibition", label: "🎨 전시 도슨트·예약", icon: "🎨" };
+  if (p.category === "performance" || p.subtype === "performance") return { key: "performance", label: "🎭 공연 예매", icon: "🎭" };
+  return { key: "other", label: "🗓 기타 사전 예약", icon: "🗓" };
+}
+
+// booking 임박 행사 추출 (D-N 이내, deadline 또는 start 기준)
+function _bookingPool(combined, target, maxDays) {
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const out = [];
+  for (let i = 0; i < combined.length; i++) {
+    const p = combined[i];
+    if (!_bookingRequired(p)) continue;
+    // deadline 우선, 없으면 start_date
+    const refDate = parseDate(p.booking_deadline) || parseDate(p.start);
+    if (!refDate) continue;
+    const daysTo = Math.round((refDate - t) / 86400000);
+    if (daysTo < 0 || daysTo > maxDays) continue;
+    out.push({ poi: p, idx: i, daysTo, refKind: p.booking_deadline ? "마감" : "시작" });
+  }
+  // 정렬: 카테고리 우선순위 (축제>전시>공연) → daysTo 오름차순
+  out.sort((a, b) => {
+    const ca = _BOOKING_CATEGORY_ORDER[a.poi.category] || 9;
+    const cb = _BOOKING_CATEGORY_ORDER[b.poi.category] || 9;
+    if (ca !== cb) return ca - cb;
+    return a.daysTo - b.daysTo;
+  });
+  return out;
 }
 
 // ───────── AI Pick 카드 (Phase D) — ai-summary.json 4 segment ─────────
@@ -1576,20 +1635,13 @@ function renderTodayHighlights(target) {
   const hero = combined.slice(0, 5);
   const tail = combined.slice(5);
 
-  // D-30 사전 예약 — combined 인덱스 보존(클릭 시 detail 매핑)
-  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-  const reservations = [];
-  for (let i = 0; i < combined.length; i++) {
-    const p = combined[i];
-    if (p._k !== "upcoming") continue;
-    if (!_bookingRequired(p)) continue;
-    const start = parseDate(p.start);
-    if (!start) continue;
-    const daysTo = Math.round((start - t) / 86400000);
-    if (daysTo < 1 || daysTo > 30) continue;
-    reservations.push({ poi: p, idx: i, daysTo });
-  }
-  reservations.sort((a, b) => a.daysTo - b.daysTo);
+  // 사전 예약 — D-7 (urgent) + D-30 (full) 두 단계
+  const reservationsUrgent = _bookingPool(combined, target, 7);
+  const reservations = _bookingPool(combined, target, 30);
+
+  // 오늘 발매 ("🆕 오늘 티켓 오픈") — booking_opens_at == 오늘
+  const todayIso = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,"0")}-${String(target.getDate()).padStart(2,"0")}`;
+  const opensToday = combined.filter(p => p.booking_opens_at === todayIso);
 
   const season = (window.__seasonal?.months || {})[month];
   const today = new Date();
@@ -1602,6 +1654,24 @@ function renderTodayHighlights(target) {
     <div class="hh-date">${escape(heroDate)} · 부산</div>
     <div class="hh-sub">${escape(heroSub)} · 추천 ${combined.length}건${reservations.length ? ` · 🗓 사전예약 ${reservations.length}` : ""}</div>
   </div>`;
+
+  // ⓪ 상단 긴급 알림 — D-7 이내 마감 임박 (축제 우선) + 오늘 발매
+  let urgentAlertHTML = "";
+  if (reservationsUrgent.length || opensToday.length) {
+    const urgentItems = reservationsUrgent.slice(0, 5).map(({ poi, idx, daysTo, refKind }) => {
+      const grp = _bookingCategoryGroup(poi);
+      const dLabel = daysTo === 0 ? "오늘" : `D-${daysTo}`;
+      return `<li data-idx="${idx}"><strong>${dLabel}</strong> <span class="urg-cat">${grp.icon}</span> ${escape(poi.title.slice(0, 40))} <span class="urg-kind">${refKind}</span></li>`;
+    }).join("");
+    const opensHTML = opensToday.slice(0, 3).map((p, i) =>
+      `<li class="urg-opens"><strong>🆕 오늘 발매</strong> ${escape(p.title.slice(0, 40))}</li>`
+    ).join("");
+    urgentAlertHTML = `<div class="urgent-alert">
+      <div class="urg-title">🚨 이번주 마감·발매 ${reservationsUrgent.length + opensToday.length}건</div>
+      <ul class="urg-list">${opensHTML}${urgentItems}</ul>
+      ${reservationsUrgent.length > 5 ? `<div class="urg-more">+${reservationsUrgent.length - 5}건 더 — ④번 카드에서 전체 보기</div>` : ""}
+    </div>`;
+  }
 
   // ① AI Pick
   const aiPickHTML = renderAiPickCard(target);
@@ -1661,15 +1731,30 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ④ D-30 사전 예약
+  // ④ D-30 사전 예약 — 카테고리 그룹화 (축제 > 전시 > 공연)
   let reservationHTML = "";
   if (reservations.length) {
+    const grouped = { festival: [], exhibition: [], performance: [], other: [] };
+    for (const r of reservations) {
+      const g = _bookingCategoryGroup(r.poi);
+      grouped[g.key].push(r);
+    }
+    const groupHTML = ["festival", "exhibition", "performance", "other"].map(key => {
+      const items = grouped[key];
+      if (!items.length) return "";
+      const grp = _bookingCategoryGroup(items[0].poi);
+      const expanded = key !== "performance"; // 공연은 기본 접힘 (사용자 결정: 축제 위주)
+      return `<details class="reservation-group" ${expanded ? "open" : ""}>
+        <summary>${grp.label} · ${items.length}건</summary>
+        <div class="chip-list">${items.map(({ poi, idx, daysTo }) =>
+          reservationChipHTML(poi, idx, daysTo)
+        ).join("")}</div>
+      </details>`;
+    }).join("");
     reservationHTML = `<div class="highlight-section reservation-section">
       <div class="hs-title">🗓 사전 예약 권장 · D-30 이내 ${reservations.length}건</div>
-      <div class="hs-note">예매·티켓팅·사전신청 키워드 매칭. 미리 알아둬야 자리 잡혀요.</div>
-      <div class="chip-list">${reservations.map(({ poi, idx, daysTo }) =>
-        reservationChipHTML(poi, idx, daysTo)
-      ).join("")}</div>
+      <div class="hs-note">축제 우선 표시. 공연은 접힌 상태 (인터파크 등 자체 알림 권장).</div>
+      ${groupHTML}
     </div>`;
   }
 
@@ -1709,7 +1794,14 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+  $list.innerHTML = urgentAlertHTML + aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+  // 상단 긴급 알림 → 클릭 시 ④번 D-30 카드로 스크롤 (idx 보존된 행사로)
+  $list.querySelectorAll(".urgent-alert .urg-list li").forEach(li => {
+    li.addEventListener("click", () => {
+      const reservation = $list.querySelector(".reservation-section");
+      if (reservation) reservation.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 
   // 🔥/🎭 인기 카드 클릭 → showDetail
   $list.querySelectorAll(".popular-card").forEach(btn => {

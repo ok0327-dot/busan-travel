@@ -39,6 +39,8 @@ from sources import (
     visitbusan,
     walking_tour,
 )
+from sources._booking_calendar import apply_calendar
+from sources._booking_extractor import enrich_booking
 from sources._tour_filter import filter_events
 from storage.db import Event, connect, upsert_events
 
@@ -92,6 +94,13 @@ def run() -> int:
         events, fstats = filter_events(events)
         for k, v in fstats.items():
             total_filter[k] += v
+        # 사전 예약 메타 자동 추출 (booking_required/deadline/opens_at)
+        for ev in events:
+            if ev.category in ("festival", "performance", "exhibition", "blog_post"):
+                enrich_booking(ev)
+            # 연례 축제 정적 캘린더 매칭 (선견지명 — 본행사 1~2개월 전 발매 추정)
+            if ev.category == "festival":
+                apply_calendar(ev)
         ins, upd = upsert_events(conn, events)
         total_new += ins
         total_upd += upd

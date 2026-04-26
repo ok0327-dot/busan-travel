@@ -1305,6 +1305,105 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   color: #fff !important;
 }
 
+/* ───────── 상단 긴급 알림 박스 (Phase 4) ───────── */
+.urgent-alert {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: #fff;
+  padding: 14px 16px;
+  margin: 12px 8px 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+  border-left: 4px solid #fca5a5;
+}
+.urgent-alert .urg-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: 0.3px;
+}
+.urgent-alert .urg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.urgent-alert .urg-list li {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.urgent-alert .urg-list li:last-child { border-bottom: none; }
+.urgent-alert .urg-list li:hover { opacity: 0.85; }
+.urgent-alert .urg-list li strong {
+  color: #fef2f2;
+  margin-right: 6px;
+  font-weight: 700;
+}
+.urgent-alert .urg-cat { margin-right: 4px; }
+.urgent-alert .urg-kind {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-left: 4px;
+}
+.urgent-alert .urg-opens strong { color: #fde68a; }
+.urgent-alert .urg-more {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* ───────── 사전 예약 카드 그룹화 (details/summary) ───────── */
+.reservation-group {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  padding: 4px 0;
+}
+.reservation-group summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fbbf24;
+  cursor: pointer;
+  list-style: none;
+}
+.reservation-group summary::-webkit-details-marker { display: none; }
+.reservation-group summary::before {
+  content: "▸ ";
+  color: #94a3b8;
+  margin-right: 4px;
+  transition: transform 0.15s;
+}
+.reservation-group[open] summary::before {
+  content: "▾ ";
+}
+.reservation-group .chip-list {
+  padding: 0 8px 8px;
+}
+
+/* ───────── 향토음식 유래 링크 (Phase 6) ───────── */
+.foodie-story-link {
+  background: rgba(244, 162, 97, 0.08);
+  border-left: 3px solid #f4a261;
+  padding: 8px 12px;
+  margin-top: 6px;
+  border-radius: 4px;
+}
+.foodie-story-link a {
+  color: #f4a261;
+  text-decoration: none;
+  font-weight: 500;
+}
+.foodie-story-link a:hover {
+  color: #fbbf24;
+  text-decoration: underline;
+}
+.foodie-story-link strong {
+  color: #fde68a;
+}
+
 /* ═══ 4탭 분리 (today / map / course / read) — 핵심 정보 vs 지도 분리 ═══ */
 /* view-today: AI Pick + 오늘의 부산 등 카드를 풀화면. 지도/필터/FAB 숨김 */
 body.view-today #map { display: none; }

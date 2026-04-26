@@ -186,6 +186,31 @@ def fetch_top_places(conn: sqlite3.Connection, category: str, limit: int = 8) ->
     ).fetchall()
 
 
+def fetch_booking_urgent(conn: sqlite3.Connection, today: date, limit: int = 5) -> list:
+    """D-30 이내 사전 예약 임박 행사 — 축제 우선 (사용자 결정 2026-04-26).
+
+    booking_deadline 우선, 없으면 start_date 기준 days_to 계산.
+    카테고리 우선: festival > exhibition > performance.
+    """
+    horizon = (today + timedelta(days=30)).isoformat()
+    rows = conn.execute(
+        """SELECT title, category, booking_deadline, booking_opens_at, start_date
+           FROM events
+           WHERE booking_required = 1
+             AND COALESCE(booking_deadline, start_date) BETWEEN ? AND ?
+           ORDER BY
+             CASE category
+                WHEN 'festival' THEN 1
+                WHEN 'exhibition' THEN 2
+                WHEN 'performance' THEN 3
+                ELSE 9 END,
+             COALESCE(booking_deadline, start_date)
+           LIMIT ?""",
+        (today.isoformat(), horizon, limit),
+    ).fetchall()
+    return rows
+
+
 def format_place_line(row) -> str:
     title, venue, addr, gugun, menu, rating, views = row
     where = gugun or venue or (addr or "").split()[0] if addr else ""
@@ -195,9 +220,22 @@ def format_place_line(row) -> str:
     return f"- {title}{' (' + where + ')' if where else ''}{' · ' + ' '.join(extra) if extra else ''}"
 
 
+def format_booking_line(row, today: date) -> str:
+    title, cat, deadline, opens_at, start = row
+    cat_label = {"festival": "축제", "exhibition": "전시", "performance": "공연"}.get(cat, cat or "")
+    ref = deadline or start
+    try:
+        d_to = (date.fromisoformat(ref[:10]) - today).days
+    except (ValueError, TypeError):
+        d_to = 999
+    kind = "마감" if deadline else "시작"
+    return f"- D-{d_to} {cat_label} {kind} | {title}"
+
+
 def build_prompt(today: date, tomorrow: date, weekend_start: date, next_weekend_start: date,
                  weather: dict, season: dict | None,
-                 events_by_seg: dict, places_pool: dict) -> str:
+                 events_by_seg: dict, places_pool: dict,
+                 booking_urgent: list | None = None) -> str:
     season_str = ""
     if season:
         foods = ", ".join(f.get("name", "") for f in (season.get("foods") or [])[:5])
@@ -226,6 +264,13 @@ def build_prompt(today: date, tomorrow: date, weekend_start: date, next_weekend_
         + "\n".join(format_place_line(p) for p in places_pool.get("foods", [])[:6])
     )
 
+    booking_block = ""
+    if booking_urgent:
+        booking_lines = "\n".join(format_booking_line(r, today) for r in booking_urgent)
+        booking_block = (
+            f"\n[D-30 이내 사전 예약 임박 — 축제 우선 (사용자 결정)]\n{booking_lines}\n"
+        )
+
     weekday = WEEKDAYS[today.weekday()]
     return f"""당신은 부산 여행 큐레이터입니다. 두 페르소나를 동시에 고려하세요:
 A) 매주 금요일 서울에서 부산 가족(아내·9세 아들)을 만나러 오는 가장 — 가족 시간 우선
@@ -242,10 +287,11 @@ B) 부산 거주민으로 주말 뭐할지 고민하는 사람 — 평소 안 �
 {chr(10).join(blocks)}
 
 {place_block}
-
+{booking_block}
 응답 규칙 (4 segment 모두 작성 필수: today / tomorrow / weekend / next_weekend):
 - 4 segment 는 반드시 서로 다른 내용 — 같은 picks/summary 반복 금지.
 - summary 는 110자 이내. 해당 segment 의 날씨 + 추천 1-2개를 한 문장으로.
+- D-30 사전 예약 블록에 축제(festival) 항목이 있으면 today.summary 끝에 "⚠ 사전예약: <축제명> D-N" 1건 첨가 (1건만, 공연 제외).
 - picks 는 위 [행사 후보] 또는 [명소·맛집 인기 Top] 에서만 선택 (창작 금지).
   행사가 한산한 segment 면 명소·맛집을 picks 로 골라도 됨.
 - picks.title 은 'TITLE:' 다음 ' | ' 앞 부분 또는 명소/맛집 이름 그대로 복사.
@@ -308,9 +354,11 @@ def main() -> int:
         "foods":       fetch_top_places(conn, "food", 8),
     }
     season = load_season(today.month)
+    booking_urgent = fetch_booking_urgent(conn, today, limit=5)
 
     prompt = build_prompt(today, tomorrow, weekend_start, next_weekend_start,
-                          weather, season, events_by_seg, places_pool)
+                          weather, season, events_by_seg, places_pool,
+                          booking_urgent=booking_urgent)
     counts = {k: len(v) for k, v in events_by_seg.items()}
     print(f"[ai_summary] events={counts} places=attr:{len(places_pool['attractions'])} food:{len(places_pool['foods'])} prompt={len(prompt)}c")
 

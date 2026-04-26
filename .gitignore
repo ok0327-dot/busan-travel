@@ -11,7 +11,9 @@ __pycache__/
 *.pyo
 .venv/
 venv/
-/data/
+/data/*
+# 정적 메타데이터는 commit 대상 (자동 수집 결과물 X)
+!/data/booking_calendar.json
 /reports/
 .DS_Store
 # vendored gov-api-kr 는 readonly: 내부 캐시/출력물은 커밋 안 함
