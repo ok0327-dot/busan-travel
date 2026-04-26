@@ -1262,6 +1262,49 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   margin-top: 2px;
 }
 
+/* ───────── 코스 탭 chip filter + 섹션 헤더 ───────── */
+.course-filter-row, .blog-filter-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 8px 8px;
+  position: sticky;
+  top: 0;
+  background: rgba(15, 17, 23, 0.95);
+  z-index: 5;
+}
+.course-filter-chip, .blog-filter-chip {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.course-filter-chip:hover, .blog-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.course-filter-chip.active, .blog-filter-chip.active {
+  background: #fbbf24;
+  color: #111827;
+  border-color: #fbbf24;
+  font-weight: 600;
+}
+.course-section-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fbbf24;
+  padding: 16px 12px 6px;
+  letter-spacing: 0.3px;
+}
+.walking-badge {
+  background: #16a34a !important;
+  color: #fff !important;
+}
+
 /* ═══ 4탭 분리 (today / map / course / read) — 핵심 정보 vs 지도 분리 ═══ */
 /* view-today: AI Pick + 오늘의 부산 등 카드를 풀화면. 지도/필터/FAB 숨김 */
 body.view-today #map { display: none; }

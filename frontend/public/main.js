@@ -994,13 +994,108 @@ function setViewMode(mode) {
 }
 
 // ───────── Course 모드 ─────────
+// 3 종 코스 통합: 🥾 갈맷길 (9코스, POI 그룹) / 🚶 도보 (매거진 51) / 🚗 종합 (vb_courses 48)
+let _courseFilter = "all"; // all | galmaet | walking | vb
+
+function _galmaetCoursesGrouped() {
+  const places = window.__data?.places?.places || [];
+  const stops = places.filter(p => p.galmaet_course);
+  const grouped = {};
+  for (const s of stops) {
+    const c = s.galmaet_course;
+    if (!grouped[c]) grouped[c] = [];
+    grouped[c].push(s);
+  }
+  // 9개 코스 카드 생성
+  return Object.keys(grouped).sort((a, b) => a - b).map(c => ({
+    type: "galmaet",
+    course_no: Number(c),
+    title: `갈맷길 ${c}코스`,
+    subtitle: `${grouped[c].length}개 stops 산책 코스`,
+    duration: "도보",
+    stops: grouped[c],
+  }));
+}
+
+function _walkingTourCourses() {
+  const guides = window.__data?.guides?.guides || [];
+  return guides.filter(g => g.subtype === "도보코스").map(g => ({
+    type: "walking",
+    title: g.title,
+    subtitle: g.transport ? "🚌 대중교통 안내 포함" : null,
+    image: g.image,
+    excerpt: g.excerpt || g.description,
+    transport: g.transport,
+    tip: g.tip,
+    story_url: g.story_url || g.url,
+  }));
+}
+
+function _renderCourseFilter() {
+  const galmaetCount = _galmaetCoursesGrouped().length;
+  const walkingCount = _walkingTourCourses().length;
+  const vbCount = (coursesData?.courses || []).length;
+  const filters = [
+    { key: "all", label: `전체 ${galmaetCount + walkingCount + vbCount}` },
+    { key: "galmaet", label: `🥾 갈맷길 ${galmaetCount}` },
+    { key: "walking", label: `🚶 도보 ${walkingCount}` },
+    { key: "vb", label: `🚗 종합 ${vbCount}` },
+  ];
+  return `<div class="course-filter-row">${filters.map(f =>
+    `<button class="course-filter-chip${_courseFilter === f.key ? " active" : ""}" data-filter="${f.key}">${escape(f.label)}</button>`
+  ).join("")}</div>`;
+}
+
 function renderCourseList() {
-  const courses = coursesData?.courses || [];
-  if (!courses.length) {
+  const galmaetCourses = _galmaetCoursesGrouped();
+  const walkingCourses = _walkingTourCourses();
+  const vbCourses = (coursesData?.courses || []);
+
+  if (!galmaetCourses.length && !walkingCourses.length && !vbCourses.length) {
     $list.innerHTML = `<div class="card"><div class="card-meta">코스 데이터가 아직 준비되지 않았습니다.</div></div>`;
     return;
   }
-  $list.innerHTML = courses.slice(0, 50).map(c => {
+
+  // 갈맷길 카드 HTML
+  const galmaetCardsHTML = galmaetCourses.map(g => {
+    const titles = g.stops.slice(0, 3).map(s => s.title).join(" · ");
+    return `<div class="card course-card galmaet-course" data-galmaet="${g.course_no}">
+      <div class="course-body">
+        <div class="card-title">
+          <span class="course-badge galmaet-badge">🥾 ${g.course_no}코스</span>
+          ${escape(g.title)}
+        </div>
+        <div class="card-meta">${g.stops.length}개 stops · 도보 산책</div>
+        <div class="card-excerpt">${escape(titles)}${g.stops.length > 3 ? ` 외 ${g.stops.length - 3}곳` : ""}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  // 도보 매거진 카드 HTML
+  const walkingCardsHTML = walkingCourses.map(w => {
+    const thumb = w.image
+      ? `<img class="course-thumb" src="${escape(busanImgUrl(w.image))}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`
+      : "";
+    const storyBtn = w.story_url
+      ? `<a class="course-link" href="${escape(w.story_url)}" target="_blank" rel="noopener">${icon("ph-book-open-text")} 비짓부산에서 보기 →</a>`
+      : "";
+    return `<div class="card course-card walking-course${w.image ? " with-thumb" : ""}">
+      ${thumb}
+      <div class="course-body">
+        <div class="card-title">
+          <span class="course-badge walking-badge">🚶 도보</span>
+          ${escape(w.title || "")}
+        </div>
+        ${w.subtitle ? `<div class="card-meta">${escape(w.subtitle)}</div>` : ""}
+        ${w.tip ? `<div class="card-meta">♿ ${escape(w.tip.slice(0, 50))}</div>` : ""}
+        ${w.excerpt ? `<div class="card-excerpt">${escape(w.excerpt.slice(0, 160))}</div>` : ""}
+        ${storyBtn}
+      </div>
+    </div>`;
+  }).join("");
+
+  // 종합 코스 (기존)
+  const vbCardsHTML = vbCourses.slice(0, 50).map(c => {
     const poisCount = (c.pois || []).length;
     const active = c.uc_seq === activeCourseId ? "active" : "";
     const hasThumb = !!c.image;
@@ -1014,7 +1109,7 @@ function renderCourseList() {
       ${thumb}
       <div class="course-body">
         <div class="card-title">
-          ${c.duration ? `<span class="course-badge">${escape(c.duration)}</span>` : ""}
+          <span class="course-badge">🚗 ${c.duration ? escape(c.duration) : "종합"}</span>
           ${escape(c.title || "")}
         </div>
         <div class="card-meta">${poisCount}개 POI${c.views ? ` · 조회 ${c.views.toLocaleString()}` : ""}${c.rating ? ` · ★${c.rating}` : ""}</div>
@@ -1025,16 +1120,65 @@ function renderCourseList() {
     </div>`;
   }).join("");
 
-  // 카드 본문 클릭 → 지도에 POI 폴리라인. story 링크 클릭은 stopPropagation 으로 새 탭만.
+  // filter 적용
+  let bodyHTML = "";
+  const f = _courseFilter;
+  if (f === "all" || f === "galmaet") {
+    if (galmaetCardsHTML) bodyHTML += `<div class="course-section-header">🥾 갈맷길 (영구 도보 인프라)</div>${galmaetCardsHTML}`;
+  }
+  if (f === "all" || f === "walking") {
+    if (walkingCardsHTML) bodyHTML += `<div class="course-section-header">🚶 도보 코스 (테마 큐레이션)</div>${walkingCardsHTML}`;
+  }
+  if (f === "all" || f === "vb") {
+    if (vbCardsHTML) bodyHTML += `<div class="course-section-header">🚗 종합 코스 (1박2일·하루)</div>${vbCardsHTML}`;
+  }
+
+  $list.innerHTML = _renderCourseFilter() + bodyHTML;
+
+  // 이벤트 바인딩
+  $list.querySelectorAll(".course-filter-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _courseFilter = btn.dataset.filter;
+      renderCourseList();
+    });
+  });
   $list.querySelectorAll(".course-link").forEach(a => {
     a.addEventListener("click", e => e.stopPropagation());
   });
-  $list.querySelectorAll(".course-card").forEach(el => {
+  $list.querySelectorAll(".course-card[data-uc]").forEach(el => {
     el.addEventListener("click", () => {
       const uc = Number(el.dataset.uc);
       activateCourse(uc);
     });
   });
+  $list.querySelectorAll(".galmaet-course").forEach(el => {
+    el.addEventListener("click", () => {
+      const courseNo = Number(el.dataset.galmaet);
+      activateGalmaetCourse(courseNo);
+    });
+  });
+}
+
+function activateGalmaetCourse(courseNo) {
+  // 갈맷길 N코스의 stops 만 지도에 highlight + 폴리라인
+  clearCourseOverlay();
+  const stops = (window.__data?.places?.places || []).filter(p => p.galmaet_course === courseNo);
+  if (!stops.length) return;
+  const path = stops.filter(s => s.lat && s.lon).map(s => new kakao.maps.LatLng(s.lat, s.lon));
+  if (path.length < 2) return;
+  const polyline = new kakao.maps.Polyline({
+    path,
+    strokeWeight: 4,
+    strokeColor: "#16a34a",
+    strokeOpacity: 0.85,
+    strokeStyle: "solid",
+    map,
+  });
+  courseOverlay.polyline = polyline;
+  // 지도 영역을 코스 stops 에 맞춤
+  const bounds = new kakao.maps.LatLngBounds();
+  path.forEach(p => bounds.extend(p));
+  map.setBounds(bounds);
 }
 
 function clearCourseOverlay() {
@@ -1098,6 +1242,9 @@ function activateCourse(uc_seq) {
   renderCourseList(); // 선택 상태 반영 재렌더
 }
 
+// 매거진 chip filter — 전체 / 도보코스 / 향토음식 / 일반
+let _blogFilter = "all";
+
 function renderBlogFeed() {
   const blogs = window.__blogPosts || [];
   const guides = window.__guides || [];
@@ -1110,8 +1257,31 @@ function renderBlogFeed() {
     return;
   }
 
+  // chip filter 적용
+  const filtered = posts.filter(p => {
+    if (_blogFilter === "all") return true;
+    if (_blogFilter === "walking") return p._kind === "guide" && p.subtype === "도보코스";
+    if (_blogFilter === "foodie") return p._kind === "guide" && p.subtype === "향토음식";
+    if (_blogFilter === "general") return p._kind === "guide" && p.subtype !== "도보코스" && p.subtype !== "향토음식";
+    return true;
+  });
+
+  // chip header
+  const counts = {
+    all: posts.length,
+    walking: posts.filter(p => p._kind === "guide" && p.subtype === "도보코스").length,
+    foodie: posts.filter(p => p._kind === "guide" && p.subtype === "향토음식").length,
+    general: posts.filter(p => p._kind === "guide" && p.subtype !== "도보코스" && p.subtype !== "향토음식").length,
+  };
+  const chipsHTML = `<div class="blog-filter-row">${[
+    { k: "all", l: `전체 ${counts.all}` },
+    { k: "walking", l: `🚶 도보 ${counts.walking}` },
+    { k: "foodie", l: `🥘 향토음식 ${counts.foodie}` },
+    { k: "general", l: `📖 매거진 ${counts.general}` },
+  ].map(c => `<button class="blog-filter-chip${_blogFilter === c.k ? " active" : ""}" data-filter="${c.k}">${escape(c.l)}</button>`).join("")}</div>`;
+
   // P3 — 중요도 정렬(priority → 이미지 → 날짜). Top 3 은 hero_tags 칩으로 규모 강조
-  $list.innerHTML = posts.slice(0, 120).map((p, i) => {
+  const cardsHTML = filtered.slice(0, 120).map((p, i) => {
     const isGuide = p._kind === "guide";
     const src = isGuide ? "비짓부산 매거진" : (p.source || "").replace("naver_blog:", "");
     const date = (p.start || "").slice(0, 10);
@@ -1144,6 +1314,14 @@ function renderBlogFeed() {
       </div>
     </article>`;
   }).join("");
+
+  $list.innerHTML = chipsHTML + cardsHTML;
+  $list.querySelectorAll(".blog-filter-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      _blogFilter = btn.dataset.filter;
+      renderBlogFeed();
+    });
+  });
 }
 
 // P3 — 월간 내러티브 Hero (Faroe 스타일): 이번 달 부산 이야기 1건 큐레이션
