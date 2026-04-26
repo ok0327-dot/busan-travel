@@ -42,7 +42,7 @@ def _parse_item(raw: dict) -> Event | None:
         start_date=None,
         venue=raw.get("PLACE") or None,
         image_url=raw.get("MAIN_IMG_NORMAL") or raw.get("MAIN_IMG_THUMB"),
-        description=full_body[:600] or None,
+        description=full_body or None,  # 매거진 본문 전체 (cap 없음 — 향토음식 유래는 길수록 가치 ↑)
         story_excerpt=full_body[:240] or None,
         subtype="향토음식",  # 매거진 카드에서 식별
         trust_tier="S",

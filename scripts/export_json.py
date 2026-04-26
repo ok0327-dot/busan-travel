@@ -181,7 +181,10 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "address": row["address"],
         "url": row["url"],
         "image": row["image_url"],
-        "description": (row["description"] or "")[:400] if row["description"] else None,
+        # guide 카테고리(매거진)는 description cap 없음 — 향토음식·도보 매거진 본문 전체 노출.
+        # 그 외(food/cafe/festival 등)는 카드 lead 용 400자.
+        "description": (row["description"] if row["category"] == "guide"
+                        else ((row["description"] or "")[:400] if row["description"] else None)),
         "lat": row["lat"],
         "lon": row["lon"],
         "nx": row["nx"],
