@@ -510,6 +510,7 @@ function showDetail(poi) {
       ${beachLine}
       ${poi.menu ? `<div class="card-meta foody-menu">${icon("ph-bowl-food")} 대표메뉴 · ${escape(poi.menu)}</div>` : ""}
       ${poi.gugun && !poi.address?.includes(poi.gugun) ? `<div class="card-meta">${icon("ph-map-pin")} ${escape(poi.gugun)}</div>` : ""}
+      ${poi.galmaet_course ? `<div class="card-meta galmaet-badge">🥾 갈맷길 ${poi.galmaet_course}코스${poi.galmaet_gugan ? ` ${poi.galmaet_gugan}구간` : ""} stop</div>` : ""}
       ${excerpt ? `<div class="card-excerpt">${escape(excerpt.slice(0, 280))}</div>` : ""}
       ${renderTags(poi.tags)}
       ${infoRow(icon("ph-clock") + " 영업", poi.hours)}

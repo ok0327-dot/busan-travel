@@ -30,6 +30,7 @@ from sources import (
     dabom,
     dureraum,
     festivalbusan,
+    galmaet,
     gov_tour,
     moca_busan,
     naver_blogs,
@@ -101,6 +102,13 @@ def run() -> int:
         print(f"[vb_courses] new={c_ins} updated={c_upd}")
     except Exception as exc:
         print(f"[vb_courses] FAILED: {exc}", file=sys.stderr)
+
+    # 갈맷길 enrich — 9코스 85 stops, vb_* row 에 galmaet_course/gugan 메타만 머지
+    try:
+        g_enr, g_new = galmaet.enrich_and_upsert(conn)
+        print(f"[galmaet] enriched={g_enr} new_standalone={g_new}")
+    except Exception as exc:
+        print(f"[galmaet] FAILED: {exc}", file=sys.stderr)
 
     today = date.today().isoformat()
     upcoming = conn.execute(

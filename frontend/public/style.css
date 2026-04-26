@@ -1251,6 +1251,17 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   font-weight: 500;
 }
 
+/* ───────── 갈맷길 배지 (15077606 enrich) ───────── */
+.galmaet-badge {
+  color: #16a34a !important;
+  font-weight: 600;
+  background: rgba(22, 163, 74, 0.08);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 2px;
+}
+
 /* ═══ 4탭 분리 (today / map / course / read) — 핵심 정보 vs 지도 분리 ═══ */
 /* view-today: AI Pick + 오늘의 부산 등 카드를 풀화면. 지도/필터/FAB 숨김 */
 body.view-today #map { display: none; }

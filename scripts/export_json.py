@@ -208,6 +208,9 @@ def _jsonable(row: sqlite3.Row) -> dict:
         "transport": _col(row, "transport"),
         "tip": _col(row, "tip"),
         "phone": _col(row, "phone"),
+        # 갈맷길 enrich (15077606): course 1~9, gugan 1~3
+        "galmaet_course": _col(row, "galmaet_course"),
+        "galmaet_gugan": _col(row, "galmaet_gugan"),
         # Hero Top 3 재설계용 (이벤트에만 값, places 는 None)
         "priority": priority,
         "blog_priority": blog_priority,
@@ -224,8 +227,8 @@ def export_places(conn: sqlite3.Connection) -> int:
     rows_raw = list(conn.execute(
         "SELECT * FROM events WHERE category IN ('food','cafe','attraction','bar') "
         "AND lat IS NOT NULL "
-        # vb_* source 우선 정렬 → 같은 dedup 키에서 먼저 들어온 vb_ 가 채택됨
-        "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 ELSE 1 END, category, title"
+        # vb_* + galmaet (단독 추가) 도 명소로 export. 정렬: vb_* > galmaet > 기타
+        "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 WHEN source='galmaet' THEN 1 ELSE 2 END, category, title"
     ))
     # 카테고리 specificity (낮을수록 specific). 같은 좌표·제목 충돌 시
     # 더 specific 한 카테고리(cafe/bar)가 generic(food/attraction)을 덮어쓴다.

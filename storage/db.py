@@ -90,6 +90,9 @@ _MIGRATIONS = {
     "google_place_id":      "TEXT",     # Places place_id (재호출용)
     "naver_review_count":   "INTEGER",  # 네이버 블로그 검색 결과 수
     "ratings_enriched_at":  "TEXT",     # 마지막 enrich 일시 (ISO)
+    # 갈맷길 enrich (15077606): 부산 영구 도보 코스 9개 + 구간 1~3
+    "galmaet_course":       "INTEGER",  # 1~9 (갈맷길 코스 번호)
+    "galmaet_gugan":        "INTEGER",  # 1~3 (코스 내 구간)
 }
 
 EXTRA_TABLES_SQL = """
@@ -220,6 +223,8 @@ class Event:
     trust_tier: str | None = None
     menu: str | None = None
     gugun: str | None = None
+    galmaet_course: int | None = None
+    galmaet_gugan: int | None = None
     raw: dict = field(default_factory=dict)
 
 
@@ -298,6 +303,7 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
             e.story_url, e.story_excerpt, e.hours, e.holiday, e.fee,
             e.transport, e.tip, e.etiquette, e.phone, e.subtype,
             e.trust_tier, e.menu, e.gugun,
+            e.galmaet_course, e.galmaet_gugan,
         )
         if row:
             conn.execute(
@@ -328,6 +334,8 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     trust_tier=COALESCE(?, trust_tier),
                     menu=COALESCE(?, menu),
                     gugun=COALESCE(?, gugun),
+                    galmaet_course=COALESCE(?, galmaet_course),
+                    galmaet_gugan=COALESCE(?, galmaet_gugan),
                     raw_json=?, last_seen=?
                    WHERE id=?""",
                 (*core_fields, *vb_fields, raw_json, now, row["id"]),
@@ -345,8 +353,9 @@ def upsert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> tuple[in
                     story_url, story_excerpt, hours, holiday, fee,
                     transport, tip, etiquette, phone, subtype,
                     trust_tier, menu, gugun,
+                    galmaet_course, galmaet_gugan,
                     raw_json, first_seen, last_seen
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (e.source, e.source_id, *core_fields, *vb_fields, raw_json, now, now),
             )
             inserted += 1
