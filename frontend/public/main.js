@@ -1097,7 +1097,8 @@ function renderBlogFeed() {
     const isGuide = p._kind === "guide";
     const src = isGuide ? "비짓부산 매거진" : (p.source || "").replace("naver_blog:", "");
     const date = (p.start || "").slice(0, 10);
-    const label = isGuide ? "GUIDE · 비짓부산 매거진"
+    const label = isGuide && p.subtype === "도보코스" ? "🚶 도보 코스 · 비짓부산"
+                : isGuide ? "GUIDE · 비짓부산 매거진"
                 : p.category === "festival" ? "FESTIVAL · 축제"
                 : p.subtype === "performance" ? "PERFORMANCE · 공연"
                 : p.subtype === "exhibition" ? "EXHIBITION · 전시"

@@ -36,6 +36,7 @@ from sources import (
     naver_blogs,
     naver_local,
     visitbusan,
+    walking_tour,
 )
 from sources._tour_filter import filter_events
 from storage.db import Event, connect, upsert_events
@@ -109,6 +110,13 @@ def run() -> int:
         print(f"[galmaet] enriched={g_enr} new_standalone={g_new}")
     except Exception as exc:
         print(f"[galmaet] FAILED: {exc}", file=sys.stderr)
+
+    # 도보여행 enrich — 51 코스 매거진. vb_theme row 에 transport/tip/story_excerpt 보강
+    try:
+        w_enr, w_new = walking_tour.enrich_and_upsert(conn)
+        print(f"[walking_tour] enriched={w_enr} new_standalone={w_new}")
+    except Exception as exc:
+        print(f"[walking_tour] FAILED: {exc}", file=sys.stderr)
 
     today = date.today().isoformat()
     upcoming = conn.execute(
