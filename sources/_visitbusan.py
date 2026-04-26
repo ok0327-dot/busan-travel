@@ -135,7 +135,7 @@ def total_count(html_or_text: str) -> int | None:
 
 
 def parse_list_page(soup: BeautifulSoup) -> list[dict]:
-    """명소/음식/숙박/축제 리스트 페이지에서 {uc_seq, title, image_url, href, view_count} 추출.
+    """명소/음식/축제 리스트 페이지에서 {uc_seq, title, image_url, href, view_count} 추출.
 
     uc_seq 가 있는 a 를 앵커로 각 카드 추출 (페이지네이션 a 는 ucl_seq 등만 있고 uc_seq 없음 → 자연 배제).
     """

@@ -46,7 +46,7 @@ def _fetch_curated(
 ) -> list[Event]:
     """리스트 → 디테일 크롤 후 Event 리스트 반환. 공통 로직.
 
-    enrichment: 어댑터별 후처리 훅 (e.g. 숙박 subtype, 미식 subtype 추출).
+    enrichment: 어댑터별 후처리 훅 (e.g. 미식 subtype 추출).
     """
     client = VisitBusanClient()
     try:
