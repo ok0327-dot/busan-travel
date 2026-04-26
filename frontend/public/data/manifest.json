@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-04-26T12:59:55+00:00",
-  "version": "20260426T125955",
+  "generated_at": "2026-04-26T13:24:09+00:00",
+  "version": "20260426T132409",
   "scope": "all",
   "counts": {
     "places": 661,
     "courses": 48,
-    "guides": 316,
+    "guides": 315,
     "events_by_month": {
       "undated": 51,
       "2018-06": 1,
@@ -94,7 +94,7 @@
     },
     "foodie_tour": {
       "rows": 92,
-      "last_seen": "2026-04-26T12:14:45+00:00"
+      "last_seen": "2026-04-26T13:24:09+00:00"
     },
     "galmaet": {
       "rows": 4,
