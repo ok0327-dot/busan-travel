@@ -710,6 +710,25 @@ async function init() {
   map.setMaxLevel(9);
   // 모바일 핀치 줌 / 더블탭 줌 / 마우스 휠 확대·축소 보장
   map.setZoomable(true);
+
+  // 부산 bbox 외부로 panning 차단 (center_changed 시 강제 clamp)
+  const BUSAN_PAN_BOUNDS = { swLat: 34.85, swLng: 128.65, neLat: 35.55, neLng: 129.45 };
+  let _clamping = false;
+  kakao.maps.event.addListener(map, "center_changed", () => {
+    if (_clamping) return;
+    const c = map.getCenter();
+    let lat = c.getLat(), lng = c.getLng(), needClamp = false;
+    if (lat < BUSAN_PAN_BOUNDS.swLat) { lat = BUSAN_PAN_BOUNDS.swLat; needClamp = true; }
+    else if (lat > BUSAN_PAN_BOUNDS.neLat) { lat = BUSAN_PAN_BOUNDS.neLat; needClamp = true; }
+    if (lng < BUSAN_PAN_BOUNDS.swLng) { lng = BUSAN_PAN_BOUNDS.swLng; needClamp = true; }
+    else if (lng > BUSAN_PAN_BOUNDS.neLng) { lng = BUSAN_PAN_BOUNDS.neLng; needClamp = true; }
+    if (needClamp) {
+      _clamping = true;
+      map.setCenter(new kakao.maps.LatLng(lat, lng));
+      _clamping = false;
+    }
+  });
+
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
