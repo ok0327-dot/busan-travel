@@ -1381,6 +1381,22 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   padding: 0 8px 8px;
 }
 
+/* ───────── 매거진 카드 이미지 ───────── */
+.blog-card-image {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px 8px 0 0;
+  background: #1f2937;
+}
+.blog-card-with-image .blog-card-body {
+  padding: 14px 16px 16px;
+}
+.blog-card-featured.blog-card-with-image .blog-card-image {
+  height: 240px;
+}
+
 /* ───────── 매거진 카드 inline expand (향토음식 등 url 없는 매거진) ───────── */
 .blog-card-expandable {
   cursor: pointer;

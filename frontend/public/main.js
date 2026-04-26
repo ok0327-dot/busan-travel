@@ -1308,15 +1308,21 @@ function renderBlogFeed() {
     // url 없고 description 길면 클릭 시 inline expand
     const fullText = p.description || "";
     const expandable = !url && fullText.length > leadLen;
-    return `<article class="blog-card${featured}${isGuide ? " blog-card-guide" : ""}${expandable ? " blog-card-expandable" : ""}" data-idx="${i}">
-      <div class="blog-card-category">${escape(label)}</div>
-      ${tagHTML}
-      <h3 class="blog-card-title">${escape(p.title)}</h3>
-      ${lead ? `<p class="blog-card-lead">${lead}</p>` : ""}
-      ${expandable ? `<div class="blog-card-fulltext" hidden>${escape(fullText)}</div>` : ""}
-      <div class="blog-card-meta">
-        <span>${escape(src)}${date ? " · " + escape(date) : ""}</span>
-        ${url ? `<a class="blog-card-readmore" href="${escape(url)}" target="_blank" rel="noopener">${linkLabel}</a>` : (expandable ? `<button class="blog-card-readmore blog-card-expand-btn" type="button">▾ 전체 보기</button>` : "")}
+    const imgHTML = p.image
+      ? `<img class="blog-card-image" src="${escape(busanImgUrl(p.image))}" loading="lazy" decoding="async" onerror="this.style.display='none'" alt="">`
+      : "";
+    return `<article class="blog-card${featured}${isGuide ? " blog-card-guide" : ""}${expandable ? " blog-card-expandable" : ""}${p.image ? " blog-card-with-image" : ""}" data-idx="${i}">
+      ${imgHTML}
+      <div class="blog-card-body">
+        <div class="blog-card-category">${escape(label)}</div>
+        ${tagHTML}
+        <h3 class="blog-card-title">${escape(p.title)}</h3>
+        ${lead ? `<p class="blog-card-lead">${lead}</p>` : ""}
+        ${expandable ? `<div class="blog-card-fulltext" hidden>${escape(fullText)}</div>` : ""}
+        <div class="blog-card-meta">
+          <span>${escape(src)}${date ? " · " + escape(date) : ""}</span>
+          ${url ? `<a class="blog-card-readmore" href="${escape(url)}" target="_blank" rel="noopener">${linkLabel}</a>` : (expandable ? `<button class="blog-card-readmore blog-card-expand-btn" type="button">▾ 전체 보기</button>` : "")}
+        </div>
       </div>
     </article>`;
   }).join("");
