@@ -138,8 +138,10 @@ def fetch_weather(conn: sqlite3.Connection, target_date: date) -> str | None:
         bits.append(PTY_MAP[pty])
     if tmp is not None:
         bits.append(f"{round(tmp)}°")
-    if pop:
-        bits.append(f"강수 {pop}%")
+    if pop is not None:
+        # 60% 임계값: 부산은 야외 활동이 핵심 가치 → 60% 미만이면 야외 우선 권장.
+        rain_hint = " (실내 권장)" if pop >= 60 else " (야외 가능)"
+        bits.append(f"강수 {pop}%{rain_hint}")
     return " · ".join(bits) if bits else None
 
 
@@ -250,7 +252,9 @@ B) 부산 거주민으로 주말 뭐할지 고민하는 사람 — 평소 안 �
   카테고리·진행상태·D-x·장소·날짜 메타는 title 에 포함 금지.
 - picks.why 는 30자 이내. 액션 가이드 ("9세 아이 좋아함" / "비 와도 OK" / "구월 제철").
 - courses 정확히 3개: label="가족(9세 아이)" / label="연인" / label="혼자/거주민".
-  각 stops 3~4개. 위 데이터의 실제 부산 지명/명소만 사용. 비·눈 예보면 실내 강조.
+  각 stops 3~4개. 위 데이터의 실제 부산 지명/명소만 사용.
+  실내 활동 권장 기준: 강수확률 ≥ 60% (날씨 라인의 "(실내 권장)" 마커) 또는 PTY(비/눈/소나기) 표시될 때만.
+  강수 60% 미만이면 야외 활동 우선 추천 (부산 가족 시간의 핵심 가치 = 야외 — 의심스러우면 야외).
 - courses[i].note 는 50자 이내 팁 (이동 동선, 식사 타이밍 등).
 """
 
