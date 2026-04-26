@@ -13,7 +13,6 @@ const CATEGORIES = {
   attraction:  { label: "명소",   emoji: "🏛", icon: "ph-buildings",      color: "#3b82f6", letter: "명" },
   food:        { label: "맛집",   emoji: "🍜", icon: "ph-bowl-food",      color: "#f97316", letter: "맛" },
   cafe:        { label: "카페",   emoji: "☕", icon: "ph-coffee",         color: "#a16207", letter: "카" },
-  bar:         { label: "술집",   emoji: "🍻", icon: "ph-beer-stein",     color: "#7c3aed", letter: "바" },
   blog:        { label: "블로그", emoji: "📝", icon: "ph-notebook",       color: "#ec4899", letter: "블" },
   // guide 는 visitbusan 매거진 가이드 글. 지도 마커 X, 읽을거리 탭 카드용 (CATEGORIES 에 두면 라벨/색 재사용 가능)
   guide:       { label: "가이드", emoji: "📖", icon: "ph-book-open-text", color: "#94a3b8", letter: "가" },
@@ -1252,7 +1251,7 @@ function _newItemsPool() {
   }
   // 라운드로빈 다양화: 카테고리당 한 사이클 1개 → head 6 가 카페/식당으로 쏠리지 않음.
   // 사이클 우선순위: 공연 → 전시 → 축제 → 명소 → 식당 → 카페 → 술집
-  const ORDER = ["performance", "exhibition", "festival", "attraction", "food", "cafe", "bar"];
+  const ORDER = ["performance", "exhibition", "festival", "attraction", "food", "cafe"];
   const buckets = Object.fromEntries(ORDER.map(k => [k, []]));
   for (const x of unique) {
     if (buckets[x.category]) buckets[x.category].push(x);

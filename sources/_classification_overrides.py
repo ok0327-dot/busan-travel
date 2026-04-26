@@ -16,13 +16,14 @@ from __future__ import annotations
 
 # (source, source_id) → 정정 카테고리 / Override category
 CATEGORY_OVERRIDES: dict[tuple[str, str], str] = {
-    # → bar (from food)
-    ('busan_food', '1497'): 'bar',  # 노는바다
-    ('busan_food', '2360'): 'bar',  # 아펙트
-    ('busan_food', '2361'): 'bar',  # 야키토리 백탄
-    ('vb_food', '1497'): 'bar',  # 노는바다
-    ('vb_food', '2360'): 'bar',  # 아펙트
-    ('vb_food', '2361'): 'bar',  # 야키토리 백탄
+    # bar 카테고리 폐기 (2026-04-26) — 지도 표시 단순화. 술집 6건 모두 food 로 통합
+    # (이전 v3.9 분리 결정 → 사용자 결정으로 통합 변경)
+    ('busan_food', '1497'): 'food',  # 노는바다
+    ('busan_food', '2360'): 'food',  # 아펙트
+    ('busan_food', '2361'): 'food',  # 야키토리 백탄
+    ('vb_food', '1497'): 'food',  # 노는바다
+    ('vb_food', '2360'): 'food',  # 아펙트
+    ('vb_food', '2361'): 'food',  # 야키토리 백탄
 
     # → cafe (from attraction)
     ('busan_attraction', '2119'): 'cafe',  # 2만여 장 LP 속으로 풍덩! 뮤직컴플렉스 서울 부산점

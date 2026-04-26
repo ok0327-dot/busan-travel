@@ -225,7 +225,8 @@ def export_places(conn: sqlite3.Connection) -> int:
     → 좌표 근접성(소수 3자리) + 제목 첫 4글자 로 dedup. visitbusan 소스 우선(스토리 풍부).
     """
     rows_raw = list(conn.execute(
-        "SELECT * FROM events WHERE category IN ('food','cafe','attraction','bar') "
+        # bar 카테고리 폐기 (2026-04-26) — 술집은 food 로 통합. 옛 bar row 가 잔존해도 export 에서 자동 제외 (UPDATE 후 cron 정합).
+        "SELECT * FROM events WHERE category IN ('food','cafe','attraction') "
         "AND lat IS NOT NULL "
         # vb_* + galmaet (단독 추가) 도 명소로 export. 정렬: vb_* > galmaet > 기타
         "ORDER BY CASE WHEN source LIKE 'vb_%' THEN 0 WHEN source='galmaet' THEN 1 ELSE 2 END, category, title"
@@ -233,7 +234,7 @@ def export_places(conn: sqlite3.Connection) -> int:
     # 카테고리 specificity (낮을수록 specific). 같은 좌표·제목 충돌 시
     # 더 specific 한 카테고리(cafe/bar)가 generic(food/attraction)을 덮어쓴다.
     # v3.9 override 이후 새 데이터가 들어와도 silent bug 재발 방지.
-    SPEC_RANK = {"cafe": 0, "bar": 0, "food": 1, "attraction": 2}
+    SPEC_RANK = {"cafe": 0, "food": 1, "attraction": 2}
 
     seen: dict[tuple, dict] = {}
     for r in rows_raw:

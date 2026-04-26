@@ -130,15 +130,16 @@ _BAR_PAT = re.compile(r"혼술 맛집|혼술에 특화|뮤직 ?바|음악 ?바|�
 
 
 def _attraction_postprocess(_raw: dict, ev: Event) -> None:
-    # 1) override 우선 (Naver 검증으로 cafe/food/bar 결정된 케이스)
+    # 1) override 우선 (Naver 검증으로 cafe/food 결정된 케이스)
     new_cat = apply_override(ev.source, ev.source_id, None)
     if new_cat:
         ev.category = new_cat
         return
-    # 2) 키워드 fallback — 신규 attraction 중 명백한 외식업소 패턴
+    # 2) 키워드 fallback — 신규 attraction 중 명백한 외식업소 패턴 → food
+    # (bar 카테고리 폐기 2026-04-26: 술집 패턴 매치도 food 로 분류)
     blob = f"{ev.title or ''} {ev.description or ''}"
     if _BAR_PAT.search(blob):
-        ev.category = "bar"
+        ev.category = "food"
 
 
 def _food_postprocess(_raw: dict, ev: Event) -> None:
