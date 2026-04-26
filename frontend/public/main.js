@@ -1305,14 +1305,18 @@ function renderBlogFeed() {
       : "";
     const url = p.url || p.story_url;
     const linkLabel = isGuide ? "📖 비짓부산 →" : "원문 →";
-    return `<article class="blog-card${featured}${isGuide ? " blog-card-guide" : ""}">
+    // url 없고 description 길면 클릭 시 inline expand
+    const fullText = p.description || "";
+    const expandable = !url && fullText.length > leadLen;
+    return `<article class="blog-card${featured}${isGuide ? " blog-card-guide" : ""}${expandable ? " blog-card-expandable" : ""}" data-idx="${i}">
       <div class="blog-card-category">${escape(label)}</div>
       ${tagHTML}
       <h3 class="blog-card-title">${escape(p.title)}</h3>
       ${lead ? `<p class="blog-card-lead">${lead}</p>` : ""}
+      ${expandable ? `<div class="blog-card-fulltext" hidden>${escape(fullText)}</div>` : ""}
       <div class="blog-card-meta">
         <span>${escape(src)}${date ? " · " + escape(date) : ""}</span>
-        ${url ? `<a class="blog-card-readmore" href="${escape(url)}" target="_blank" rel="noopener">${linkLabel}</a>` : ""}
+        ${url ? `<a class="blog-card-readmore" href="${escape(url)}" target="_blank" rel="noopener">${linkLabel}</a>` : (expandable ? `<button class="blog-card-readmore blog-card-expand-btn" type="button">▾ 전체 보기</button>` : "")}
       </div>
     </article>`;
   }).join("");
@@ -1323,6 +1327,21 @@ function renderBlogFeed() {
       _blogFilter = btn.dataset.filter;
       renderBlogFeed();
     });
+  });
+  // url 없는 매거진 카드 inline expand (향토음식 등)
+  $list.querySelectorAll(".blog-card-expandable").forEach(card => {
+    const toggle = (e) => {
+      e.stopPropagation();
+      const full = card.querySelector(".blog-card-fulltext");
+      const lead = card.querySelector(".blog-card-lead");
+      const btn = card.querySelector(".blog-card-expand-btn");
+      if (!full) return;
+      const expanded = !full.hidden;
+      full.hidden = expanded;
+      if (lead) lead.style.display = expanded ? "" : "none";
+      if (btn) btn.textContent = expanded ? "▾ 전체 보기" : "▴ 접기";
+    };
+    card.addEventListener("click", toggle);
   });
 }
 

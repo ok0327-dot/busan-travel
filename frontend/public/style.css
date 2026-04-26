@@ -1381,6 +1381,38 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   padding: 0 8px 8px;
 }
 
+/* ───────── 매거진 카드 inline expand (향토음식 등 url 없는 매거진) ───────── */
+.blog-card-expandable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.blog-card-expandable:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.blog-card-fulltext {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: #d1d5db;
+  font-size: 14px;
+  margin: 8px 0 4px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border-left: 3px solid #f4a261;
+}
+.blog-card-expand-btn {
+  background: rgba(244, 162, 97, 0.12);
+  color: #f4a261;
+  border: 1px solid rgba(244, 162, 97, 0.3);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.blog-card-expand-btn:hover {
+  background: rgba(244, 162, 97, 0.2);
+}
+
 /* ───────── 향토음식 유래 링크 (Phase 6) ───────── */
 .foodie-story-link {
   background: rgba(244, 162, 97, 0.08);
