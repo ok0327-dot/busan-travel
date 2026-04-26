@@ -1794,14 +1794,7 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = urgentAlertHTML + aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
-  // 상단 긴급 알림 → 클릭 시 ④번 D-30 카드로 스크롤 (idx 보존된 행사로)
-  $list.querySelectorAll(".urgent-alert .urg-list li").forEach(li => {
-    li.addEventListener("click", () => {
-      const reservation = $list.querySelector(".reservation-section");
-      if (reservation) reservation.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
 
   // 🔥/🎭 인기 카드 클릭 → showDetail
   $list.querySelectorAll(".popular-card").forEach(btn => {

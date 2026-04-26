@@ -1305,21 +1305,21 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   color: #fff !important;
 }
 
-/* ───────── 상단 긴급 알림 박스 (Phase 4) ───────── */
+/* ───────── 임박 알림 박스 (Phase 4) — D-30 카드 위에 위치, 부드러운 amber 톤 ───────── */
 .urgent-alert {
-  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-  color: #fff;
-  padding: 14px 16px;
-  margin: 12px 8px 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
-  border-left: 4px solid #fca5a5;
+  background: rgba(217, 119, 6, 0.12);
+  color: #fde68a;
+  padding: 12px 14px;
+  margin: 12px 8px 4px;
+  border-radius: 10px;
+  border-left: 3px solid #d97706;
 }
 .urgent-alert .urg-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   margin-bottom: 8px;
-  letter-spacing: 0.3px;
+  color: #fbbf24;
+  letter-spacing: 0.2px;
 }
 .urgent-alert .urg-list {
   list-style: none;
@@ -1327,30 +1327,28 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   padding: 0;
 }
 .urgent-alert .urg-list li {
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(217, 119, 6, 0.15);
   font-size: 13px;
-  cursor: pointer;
-  transition: opacity 0.15s;
+  color: #e5e7eb;
 }
 .urgent-alert .urg-list li:last-child { border-bottom: none; }
-.urgent-alert .urg-list li:hover { opacity: 0.85; }
 .urgent-alert .urg-list li strong {
-  color: #fef2f2;
+  color: #fbbf24;
   margin-right: 6px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .urgent-alert .urg-cat { margin-right: 4px; }
 .urgent-alert .urg-kind {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(229, 231, 235, 0.6);
   margin-left: 4px;
 }
 .urgent-alert .urg-opens strong { color: #fde68a; }
 .urgent-alert .urg-more {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 8px;
+  color: rgba(229, 231, 235, 0.55);
+  margin-top: 6px;
   font-style: italic;
 }
 
