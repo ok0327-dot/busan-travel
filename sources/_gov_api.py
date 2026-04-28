@@ -1,13 +1,16 @@
 """gov-api-kr 어댑터 — data.go.kr API 호출을 통일 경로로.
 
-이 모듈은 gov-api-kr 프로젝트의 `call_api`를 import 해서 rate limiter + 24h
-cache + 재시도 + 에러분류 + applied_pending pre-flight 을 공짜로 얻는다.
+이 모듈은 vendor/gov-api-kr/snippets/_caller_template.py 를 import 해서
+rate limiter + 24h cache + 재시도 + 에러분류를 얻는다.
+
+원본 gov-api-kr repo는 2026-04-28 archived (`ok0327-dot/gov-api-kr` → 후속
+ok0327-dot/api-vault). vendor 카피만 유지. sibling fallback 경로는 archive
+시점에 제거 — vendor 자립.
 
 필요 조건:
-- GOV_API_KR_HOME 환경변수 또는 아래 자동탐지 경로 중 하나에 gov-api-kr 체크아웃
-- 해당 프로젝트의 .env 에 DATA_GO_KR_KEY 또는 이 프로세스의 env 에 주입
-
-BUSAN_FESTIVAL_API_KEY 가 세팅돼 있으면 하위 호환으로 DATA_GO_KR_KEY 로 승격.
+- 이 프로세스의 env 에 DATA_GO_KR_KEY 주입 (api-vault/.env 또는 시스템 환경변수)
+- BUSAN_FESTIVAL_API_KEY 가 세팅돼 있으면 하위 호환으로 DATA_GO_KR_KEY 로 승격
+- GOV_API_KR_HOME 환경변수로 다른 경로 강제 가능 (e.g. CI에서 vendor와 별도 위치)
 """
 from __future__ import annotations
 
@@ -16,9 +19,8 @@ import sys
 from pathlib import Path
 
 _CANDIDATES = (
-    Path(__file__).resolve().parent.parent / "vendor" / "gov-api-kr",  # CI/배포 (vendored) — 1순위
-    Path.home() / "my_playground" / "gov-api-kr",                      # 로컬 dev (monorepo sibling)
-    Path("/root/workspace/gov-api-kr"),                                # RunPod 기타
+    Path(__file__).resolve().parent.parent / "vendor" / "gov-api-kr",  # vendor 카피 — 표준 경로
+    Path("/root/workspace/gov-api-kr"),                                # RunPod 기타 (선택)
 )
 
 
