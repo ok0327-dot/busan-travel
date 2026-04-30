@@ -5,7 +5,7 @@
 // 그 외     → 정적 에셋 (frontend/public)
 
 import { handleApi } from "./api.js";
-import { handleRobots, handleSitemap } from "./seo.js";
+import { handleRobots, handleSitemap, handleSpaPage } from "./seo.js";
 
 const API_PREFIX = "/api/v1/";
 const IMG_PREFIX = "/img/";
@@ -41,6 +41,17 @@ export default {
       url.pathname === "/sources"
     ) {
       return env.ASSETS.fetch(new Request(url.origin + url.pathname + ".html", request));
+    }
+
+    // SPA deep link fallback (Wave 2) — /poi/{id}, /festival/{id}, /area/{slug}
+    // index.html 서빙 + HTMLRewriter 로 path 별 OG/canonical/Schema.org 동적 주입.
+    // /api·/img·/img-proxy·robots·sitemap·정적 SEO 는 위에서 이미 처리 — 영향 X.
+    if (
+      /^\/poi\/\d+$/.test(url.pathname) ||
+      /^\/festival\/\d+$/.test(url.pathname) ||
+      /^\/area\/[a-z]+$/.test(url.pathname)
+    ) {
+      return handleSpaPage(request, env, ctx, url);
     }
 
     // /img/* → R2 (pre-gen variants)

@@ -2212,8 +2212,56 @@ function showGenericInstallModal() {
 
 setupInstallButton();
 
-init().catch(err => {
-  console.error("[busan-travel] init failed:", err);
-  const msg = err?.message || err?.toString() || "알 수 없는 에러 (DevTools Console 확인)";
-  $status.textContent = `로딩 실패: ${msg}`;
-});
+// === Wave 2 — Path-based deep link router (Step 3) ===
+// /poi/{id}, /festival/{id}, /area/{slug} — Worker SPA fallback 로 들어오면 init 후 자동 처리.
+const _AREA_TO_CENTER = {
+  haeundae: [35.163, 129.163], suyeong: [35.145, 129.114], busanjin: [35.163, 129.053],
+  jung: [35.106, 129.032], gijang: [35.245, 129.222], dongnae: [35.205, 129.083],
+  dong: [35.130, 129.045], nam: [35.137, 129.084], yeongdo: [35.091, 129.068],
+  gangseo: [35.212, 128.981], yeonje: [35.176, 129.080], sasang: [35.151, 128.991],
+  geumjeong: [35.243, 129.092], saha: [35.105, 128.974], buk: [35.197, 129.012], seo: [35.097, 129.024],
+};
+
+function routeFromPath() {
+  if (!window.__data) return;
+  const p = location.pathname;
+
+  let m = p.match(/^\/poi\/(\d+)$/);
+  if (m) {
+    const id = parseInt(m[1], 10);
+    const poi = (window.__data.places?.places || []).find(x => x.id === id);
+    if (poi && typeof showDetail === "function") showDetail(poi);
+    return;
+  }
+
+  m = p.match(/^\/festival\/(\d+)$/);
+  if (m) {
+    const id = parseInt(m[1], 10);
+    const ev = (window.__data.allEventPoi || []).find(x => x.id === id);
+    if (ev && typeof showDetail === "function") showDetail(ev);
+    return;
+  }
+
+  m = p.match(/^\/area\/([a-z]+)$/);
+  if (m) {
+    const center = _AREA_TO_CENTER[m[1]];
+    if (center && window.__map && window.kakao?.maps) {
+      window.__map.setCenter(new kakao.maps.LatLng(center[0], center[1]));
+      window.__map.setLevel(5);
+    }
+    return;
+  }
+}
+
+setupInstallButton();
+
+init()
+  .then(() => {
+    routeFromPath();
+    window.addEventListener("popstate", routeFromPath);
+  })
+  .catch(err => {
+    console.error("[busan-travel] init failed:", err);
+    const msg = err?.message || err?.toString() || "알 수 없는 에러 (DevTools Console 확인)";
+    $status.textContent = `로딩 실패: ${msg}`;
+  });

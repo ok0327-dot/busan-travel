@@ -4,7 +4,7 @@
 const SCHEMA_VERSION = "1.0";
 
 // 부산 16 자치구 — gugun 한글명 ↔ slug ↔ 중심 좌표 (대표 지점)
-const AREAS = [
+export const AREAS = [
   { code: "haeundae",  name_ko: "해운대구", lat: 35.163, lon: 129.163 },
   { code: "suyeong",   name_ko: "수영구",   lat: 35.145, lon: 129.114 },
   { code: "busanjin",  name_ko: "부산진구", lat: 35.163, lon: 129.053 },
@@ -57,7 +57,7 @@ async function getManifest(env) {
   return await fetchAssetJson(env, "/data/manifest.json");
 }
 
-async function getPlaces(env) {
+export async function getPlaces(env) {
   const manifest = await getManifest(env);
   if (_cache.places && _cache.manifest?.generated_at === manifest.generated_at) {
     return { places: _cache.places, manifest };
@@ -85,7 +85,7 @@ async function getEventsForMonth(env, yyyymm) {
   return { events: _cache.events[yyyymm], manifest };
 }
 
-async function getAllEvents(env) {
+export async function getAllEvents(env) {
   const manifest = await getManifest(env);
   const months = [];
   const now = new Date();
