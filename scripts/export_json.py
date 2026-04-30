@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 import sys
 from collections import defaultdict
@@ -30,6 +31,34 @@ from sources._tour_filter import (  # noqa: E402
     NEGATIVE_KEYWORDS as TOUR_NEGATIVE_KEYWORDS,
 )
 from sources._venues import is_major_venue  # noqa: E402
+
+# P1-7 (audit 2026-04-25): cross-source dedup — busan_* + vb_* 페어 외에도
+# naver_local 과 visitbusan 의 같은 POI 가 title 길이/suffix 차이로 escape 하던 위험.
+# 1차 매칭은 source_id contentid 일치 (visitbusan 계열), 2차는 정규화 키.
+_TITLE_SUFFIX_RE = re.compile(
+    r"\s*(본점|직영점|점|지점|매장|공항점|역점|광안점|해운대점|서면점|남포점|"
+    r"광복점|중앙점|동래점|기장점|사상점|연산점|온천점)\s*$"
+)
+_TITLE_NOISE_RE = re.compile(r"[\s\-\(\)\[\]\.,·_/]+")
+
+
+def _normalize_title(title: str | None) -> str:
+    if not title:
+        return ""
+    t = title.strip()
+    while True:
+        nxt = _TITLE_SUFFIX_RE.sub("", t).strip()
+        if nxt == t:
+            break
+        t = nxt
+    return _TITLE_NOISE_RE.sub("", t).lower()
+
+
+def _dedup_key(row) -> tuple:
+    lat, lon = row["lat"], row["lon"]
+    norm = _normalize_title(row["title"])[:8]
+    return (round(lat, 3), round(lon, 3), norm)
+
 
 # 읽을거리 탭 전용 소스 가중치 — 공식 블로그만 채택 (Phase A 정비, 2026-04-25)
 BLOG_SOURCE_WEIGHTS = {
@@ -243,7 +272,8 @@ def export_places(conn: sqlite3.Connection) -> int:
     for r in rows_raw:
         if r["lat"] is None or r["lon"] is None:
             continue
-        key = (round(r["lat"], 3), round(r["lon"], 3), (r["title"] or "")[:4])
+        # P1-7 dedup key — title prefix(4) → 정규화(suffix/공백 제거 후 [:8])
+        key = _dedup_key(r)
         if key in seen:
             existing = seen[key]
             # Phase B — 부산푸디(busan_food) 의 menu/gugun 을 vb_food 레코드에 머지

@@ -49,6 +49,9 @@ jobs:
       - name: Install deps
         run: pip install -r requirements.txt
 
+      - name: Lint overrides (audit P1-2 가드 / classification override coverage)
+        run: python scripts/lint_overrides.py
+
       - name: Restore SQLite cache (fallback)
         uses: actions/cache@v4
         with:
@@ -94,6 +97,22 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: python main.py
 
+      # P1-4 — RSS 신규 글 자동 라벨/좌표 (audit 2026-04-25)
+      # apply_blog_labels.py = 정적 수동 라벨 (LLM 무관, idempotent)
+      # geocode_blogs.py = lat IS NULL 인 row 만 Gemini+Kakao 로 좌표 해소 (idempotent)
+      - name: Apply blog labels (정적 수동 라벨 / static labels)
+        if: steps.mode.outputs.mode != 'weather-only'
+        run: python scripts/apply_blog_labels.py
+
+      # GEMINI_API_KEY 누락 시 exit 1 → step fail (P0-4 silent skip 차단 정신).
+      # KAKAO_REST_KEY 누락 시 graceful skip — 좌표 해소만 건너뜀, 장소명 추출은 진행.
+      - name: Geocode blog posts (Gemini + Kakao, lat IS NULL 만)
+        if: steps.mode.outputs.mode != 'weather-only'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
+        run: python scripts/geocode_blogs.py
+
       - name: Seed beach POIs
         if: steps.mode.outputs.mode != 'weather-only'
         env:
@@ -136,6 +155,11 @@ jobs:
           echo "-> scope=$SCOPE"
           python scripts/export_json.py --scope "$SCOPE"
 
+      # 회귀 테스트 — audit 2026-04-25 P0/P1 정합성 자동 검증
+      - name: Verify info flow (audit 회귀 테스트)
+        if: steps.mode.outputs.mode != 'weather-only'
+        run: python scripts/verify_info_flow.py
+
       # GEMINI_API_KEY 누락 시 ai_summary.py 가 exit 1 → step fail → workflow fail.
       # silent skip 으로 어제 picks 가 stale 노출되던 위험 차단.
       - name: AI summary (Gemini 2.5 Flash, 매일만)
@@ -161,15 +185,24 @@ jobs:
           fi
 
       # R2 backup — 어댑터들이 새로 fetch 한 db 영속화. cache 보다 안정.
+      # P1-5 (audit 2026-04-25): upload 가 latest + db/archive/events-YYYY-MM-DD.db 둘 다 저장.
       # if: always() 제거 — 앞 step (어댑터/export/ai-summary) 이 실패하면 R2 갱신 안 함.
       # 어제 정상 db 가 R2 에 그대로 남아 있어야 다음 빌드가 fresh start 위험 없이 재시도 가능.
-      # 부분 실패한 db 를 R2 에 올리면 다음 빌드의 silent overwrite 원인이 됨.
-      - name: Backup events.db to R2
+      - name: Backup events.db to R2 (latest + daily archive)
         env:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: python scripts/db_sync.py upload
+
+      # P1-5 — 30일 retention rule (idempotent, 권한 부족 시 graceful)
+      - name: Setup R2 archive lifecycle (idempotent, 30d)
+        continue-on-error: true
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python scripts/db_sync.py setup-lifecycle
 
       # P1 — cron 실패 시 GitHub Issue 자동 생성 (사용자 알림용)
       # 같은 날 동일 모드 실패가 이미 열려있으면 새 issue 생성 안 함 (중복 방지)

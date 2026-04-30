@@ -1,20 +1,21 @@
-"""R2 에서 events.db 다운로드 / 업로드 (cron 영속화).
+"""R2 에서 events.db 다운로드 / 업로드 (cron 영속화) + daily archive + 30일 retention.
 
-배경:
-- data/events.db 가 .gitignore — repo 영속 X
-- GitHub Actions cache 만으론 eviction 위험 (한국 사이트 차단 + 빈 db 시작 = 빈 export)
-- R2 S3-API 로 매 cron 시작/끝 sync → 어제 데이터 보존
+audit P1-5 (2026-04-25): 백본 외부 의존 시 disaster recovery 필수. 매 upload 시
+ latest + 일자 archive 둘 다 저장. lifecycle rule 로 30일 후 archive 자동 정리.
 
-Usage (워크플로 호출):
-    python scripts/db_sync.py download   # cron 시작 — 없으면 fresh start (warn only)
-    python scripts/db_sync.py upload     # cron 끝 — overwrite
+Usage:
+    python scripts/db_sync.py download         # cron 시작 — 없으면 fresh start
+    python scripts/db_sync.py upload           # latest + archive 둘 다
+    python scripts/db_sync.py setup-lifecycle  # archive prefix 30일 retention rule (idempotent)
 
 환경 변수 (GitHub Secrets):
     R2_ACCOUNT_ID
     R2_ACCESS_KEY_ID
     R2_SECRET_ACCESS_KEY
-    R2_BUCKET            (옵션, 기본 'busan-travel-images')
-    R2_DB_KEY            (옵션, 기본 'db/events.db')
+    R2_BUCKET                  (옵션, 기본 'busan-travel-images')
+    R2_DB_KEY                  (옵션, 기본 'db/events.db')
+    R2_DB_ARCHIVE_PREFIX       (옵션, 기본 'db/archive')
+    R2_DB_RETENTION_DAYS       (옵션, 기본 30)
 
 설정 미존재 시 즉시 종료 (exit 0) — workflow 가 graceful degrade 하도록.
 """
@@ -22,11 +23,14 @@ from __future__ import annotations
 
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "events.db"
 BUCKET = os.environ.get("R2_BUCKET", "busan-travel-images")
 KEY = os.environ.get("R2_DB_KEY", "db/events.db")
+ARCHIVE_PREFIX = os.environ.get("R2_DB_ARCHIVE_PREFIX", "db/archive").rstrip("/")
+RETENTION_DAYS = int(os.environ.get("R2_DB_RETENTION_DAYS", "30"))
 
 
 def _client():
@@ -79,16 +83,50 @@ def upload() -> None:
         return
     client = _client()
     size = DB_PATH.stat().st_size
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    archive_key = f"{ARCHIVE_PREFIX}/events-{today}.db"
     try:
         client.upload_file(str(DB_PATH), BUCKET, KEY)
-        print(f"[db_sync] uploaded {DB_PATH} → {KEY} ({size:,} bytes)")
+        print(f"[db_sync] uploaded latest → {KEY} ({size:,} bytes)")
+        client.upload_file(str(DB_PATH), BUCKET, archive_key)
+        print(f"[db_sync] uploaded archive → {archive_key}")
     except Exception as e:
         print(f"[db_sync] upload FAILED: {e}", file=sys.stderr)
         sys.exit(1)
 
 
+def setup_lifecycle() -> None:
+    client = _client()
+    rule_id = f"expire-{ARCHIVE_PREFIX.replace('/', '-')}-{RETENTION_DAYS}d"
+    config = {
+        "Rules": [
+            {
+                "ID": rule_id,
+                "Status": "Enabled",
+                "Filter": {"Prefix": f"{ARCHIVE_PREFIX}/"},
+                "Expiration": {"Days": RETENTION_DAYS},
+            }
+        ]
+    }
+    try:
+        client.put_bucket_lifecycle_configuration(
+            Bucket=BUCKET, LifecycleConfiguration=config
+        )
+        print(
+            f"[db_sync] lifecycle rule 적용 — prefix={ARCHIVE_PREFIX}/ retention={RETENTION_DAYS}d (id={rule_id})"
+        )
+    except Exception as e:
+        print(f"[db_sync] lifecycle 적용 실패: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 2 or sys.argv[1] not in ("download", "upload"):
-        print("Usage: python scripts/db_sync.py {download|upload}", file=sys.stderr)
+    cmd = sys.argv[1] if len(sys.argv) == 2 else None
+    handlers = {"download": download, "upload": upload, "setup-lifecycle": setup_lifecycle}
+    if cmd not in handlers:
+        print(
+            "Usage: python scripts/db_sync.py {download|upload|setup-lifecycle}",
+            file=sys.stderr,
+        )
         sys.exit(2)
-    (download if sys.argv[1] == "download" else upload)()
+    handlers[cmd]()

@@ -3,9 +3,9 @@
   "version": "20260430T111921",
   "scope": "weather",
   "counts": {
-    "places": 661,
+    "places": 664,
     "courses": 48,
-    "guides": 314,
+    "guides": 315,
     "events_by_month": {
       "undated": 51,
       "2018-06": 1,
