@@ -20,7 +20,13 @@ info:
     v1 은 v2 도입 후 최소 6개월 유지.
 
     ## Rate limit
-    무인증 read: 60 req/min/IP. 초과 시 429 + `Retry-After` 헤더.
+    무인증 read: 60 req/min/IP (cf-connecting-ip 기반, KV bucket).
+    모든 응답에 `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` 헤더.
+    초과 시 429 + `Retry-After`. `_health` 는 미적용.
+
+    ## Observability
+    Worker stderr 에 표준 로그 — `[api] {handler} status={N} total={N} ms={N} ip={...}`.
+    어댑터 컨트랙트(HTTPSession+report) 패턴을 외부 API layer 에 적용 (Step 1.5).
   contact:
     name: ok0327
     url: https://github.com/ok0327-dot/busan-travel
@@ -40,6 +46,8 @@ tags:
     description: popularity 기반 순위
   - name: freshness
     description: 데이터 신선도·drift 알림
+  - name: meta
+    description: API 자체 health·uptime
 
 paths:
   /api/v1/poi:
@@ -190,6 +198,41 @@ paths:
                 required: [data, meta]
         "400": { $ref: "#/components/responses/BadRequest" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/_health:
+    get:
+      tags: [meta]
+      summary: 백본 health / uptime
+      description: |
+        manifest age + adapter staleness summary + worker schema 버전.
+        rate limit 미적용 — uptime monitoring 용.
+      responses:
+        "200":
+          description: health 정보
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [status, manifest_age_minutes, adapters, worker_schema_version]
+                    properties:
+                      status:
+                        type: string
+                        enum: [ok, degraded]
+                        description: stale_crit > 0 이면 degraded
+                      manifest_age_minutes: { type: integer }
+                      manifest_generated_at: { type: string, format: date-time }
+                      adapters:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          stale_warn: { type: integer }
+                          stale_crit: { type: integer }
+                      worker_schema_version: { type: string }
+                  meta: { $ref: "#/components/schemas/ItemMeta" }
+                required: [data, meta]
 
   /api/v1/freshness-alerts:
     get:

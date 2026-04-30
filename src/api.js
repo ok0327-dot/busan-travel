@@ -36,8 +36,13 @@ const CORS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, OPTIONS",
   "access-control-allow-headers": "content-type, x-api-key",
+  "access-control-expose-headers": "x-api-schema-version, x-ratelimit-remaining, x-ratelimit-reset",
   "access-control-max-age": "86400",
 };
+
+// Rate limit — 60 req/min/IP, KV bucket 키 = rl:{ip}:{minute}, TTL 120s.
+// last-write-wins race 일부 허용 (soft limit). _health/OPTIONS 는 미적용.
+const RATE_LIMIT_PER_MIN = 60;
 
 // Module-level cache — Worker isolate 동안 메모리 보관. manifest.generated_at 변경 시 invalidate.
 const _cache = { manifest: null, places: null, events: {} };
@@ -349,6 +354,87 @@ async function handleFreshnessAlerts(request, env, url) {
   return ok(alerts, listMeta(manifest, alerts.length));
 }
 
+// Step 1.4 — IP 추출 + KV 카운터. Soft limit (race 일부 허용).
+async function checkRateLimit(env, request) {
+  const ip = request.headers.get("cf-connecting-ip") ||
+             (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+             "unknown";
+  const minute = Math.floor(Date.now() / 60000);
+  const key = `rl:${ip}:${minute}`;
+  let count = 0;
+  if (env.RATE_LIMIT) {
+    const cur = await env.RATE_LIMIT.get(key);
+    count = (cur ? parseInt(cur, 10) : 0) + 1;
+    // 초과 후엔 put 생략 — KV writes 절약, 다음 분 bucket 으로 자연 회복
+    if (count <= RATE_LIMIT_PER_MIN) {
+      await env.RATE_LIMIT.put(key, String(count), { expirationTtl: 120 });
+    }
+  }
+  const resetSec = Math.max(1, Math.ceil(((minute + 1) * 60000 - Date.now()) / 1000));
+  return {
+    ip,
+    count,
+    remaining: Math.max(0, RATE_LIMIT_PER_MIN - count),
+    resetSec,
+    exceeded: count > RATE_LIMIT_PER_MIN,
+  };
+}
+
+// Step 1.5 — 어댑터 컨트랙트 패턴 (HTTPSession+report) 외부 API 적용.
+// stderr structured log: [api] handler status=N total=N ms=N ip=...
+function reportRequest(handler, status, total, ms, ip) {
+  const totalPart = total != null ? ` total=${total}` : "";
+  console.log(`[api] ${handler} status=${status}${totalPart} ms=${ms} ip=${ip}`);
+}
+
+function handlerFromPath(path) {
+  if (path === "/api/v1/poi") return "poi-list";
+  if (/^\/api\/v1\/poi\/\d+$/.test(path)) return "poi-detail";
+  if (path === "/api/v1/festival") return "festival";
+  if (path === "/api/v1/area-list") return "area-list";
+  if (path === "/api/v1/popularity-ranked") return "popularity-ranked";
+  if (path === "/api/v1/freshness-alerts") return "freshness-alerts";
+  if (path === "/api/v1/_health") return "health";
+  return "unknown";
+}
+
+// Step 1.5 — _health endpoint: manifest age + adapter staleness summary
+async function handleHealth(request, env, url) {
+  const manifest = await getManifest(env);
+  const adapters = manifest.adapters || {};
+  const now = Date.now();
+  let staleWarn = 0, staleCrit = 0;
+  for (const info of Object.values(adapters)) {
+    if (!info.last_seen) continue;
+    const ageHours = (now - new Date(info.last_seen).getTime()) / 3600000;
+    if (ageHours > FRESHNESS_CRIT_HOURS) staleCrit++;
+    else if (ageHours > FRESHNESS_WARN_HOURS) staleWarn++;
+  }
+  const manifestAgeMin = Math.floor((now - new Date(manifest.generated_at).getTime()) / 60000);
+  const status = staleCrit > 0 ? "degraded" : "ok";
+  return jsonResponse({
+    data: {
+      status,
+      manifest_age_minutes: manifestAgeMin,
+      manifest_generated_at: manifest.generated_at,
+      adapters: { total: Object.keys(adapters).length, stale_warn: staleWarn, stale_crit: staleCrit },
+      worker_schema_version: SCHEMA_VERSION,
+    },
+    meta: { schema_version: SCHEMA_VERSION, last_updated: manifest.generated_at },
+  });
+}
+
+async function dispatchHandler(request, env, url, path) {
+  if (path === "/api/v1/poi") return await handlePoiList(request, env, url);
+  const m = path.match(/^\/api\/v1\/poi\/(\d+)$/);
+  if (m) return await handlePoiDetail(request, env, url, m[1]);
+  if (path === "/api/v1/festival") return await handleFestival(request, env, url);
+  if (path === "/api/v1/area-list") return await handleAreaList(request, env, url);
+  if (path === "/api/v1/popularity-ranked") return await handlePopularityRanked(request, env, url);
+  if (path === "/api/v1/freshness-alerts") return await handleFreshnessAlerts(request, env, url);
+  return err(404, "NOT_FOUND", `path ${path} not found`);
+}
+
 export async function handleApi(request, env, ctx, url) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS });
@@ -356,17 +442,50 @@ export async function handleApi(request, env, ctx, url) {
   if (request.method !== "GET") {
     return err(405, "METHOD_NOT_ALLOWED", `${request.method} not allowed`);
   }
+  const t0 = Date.now();
   const path = url.pathname;
-  try {
-    if (path === "/api/v1/poi") return await handlePoiList(request, env, url);
-    const m = path.match(/^\/api\/v1\/poi\/(\d+)$/);
-    if (m) return await handlePoiDetail(request, env, url, m[1]);
-    if (path === "/api/v1/festival") return await handleFestival(request, env, url);
-    if (path === "/api/v1/area-list") return await handleAreaList(request, env, url);
-    if (path === "/api/v1/popularity-ranked") return await handlePopularityRanked(request, env, url);
-    if (path === "/api/v1/freshness-alerts") return await handleFreshnessAlerts(request, env, url);
-    return err(404, "NOT_FOUND", `path ${path} not found`);
-  } catch (e) {
-    return err(500, "SERVER_ERROR", e.message || "internal error");
+  const handlerName = handlerFromPath(path);
+
+  // _health 는 rate limit 미적용 (모니터링/uptime 핸들러)
+  if (path === "/api/v1/_health") {
+    const res = await handleHealth(request, env, url);
+    reportRequest("health", res.status, null, Date.now() - t0, "internal");
+    return res;
   }
+
+  // Rate limit
+  const rl = await checkRateLimit(env, request);
+  if (rl.exceeded) {
+    reportRequest(handlerName, 429, null, Date.now() - t0, rl.ip);
+    return jsonResponse(
+      { error: { code: "RATE_LIMITED", message: `${RATE_LIMIT_PER_MIN}/min 초과` },
+        meta: { schema_version: SCHEMA_VERSION } },
+      429,
+      {
+        "retry-after": String(rl.resetSec),
+        "x-ratelimit-limit": String(RATE_LIMIT_PER_MIN),
+        "x-ratelimit-remaining": "0",
+        "x-ratelimit-reset": String(rl.resetSec),
+      },
+    );
+  }
+
+  let res;
+  try {
+    res = await dispatchHandler(request, env, url, path);
+  } catch (e) {
+    res = err(500, "SERVER_ERROR", e.message || "internal error");
+  }
+
+  // body 한 번 읽고 total 뽑은 뒤 새 Response — rate-limit 헤더 첨부
+  const text = await res.text();
+  let total = null;
+  try { total = JSON.parse(text).meta?.total ?? null; } catch {}
+  reportRequest(handlerName, res.status, total, Date.now() - t0, rl.ip);
+
+  const headers = new Headers(res.headers);
+  headers.set("x-ratelimit-limit", String(RATE_LIMIT_PER_MIN));
+  headers.set("x-ratelimit-remaining", String(rl.remaining));
+  headers.set("x-ratelimit-reset", String(rl.resetSec));
+  return new Response(text, { status: res.status, headers });
 }

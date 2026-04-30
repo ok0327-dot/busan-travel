@@ -13,3 +13,8 @@ not_found_handling = "404-page"
 [[r2_buckets]]
 binding = "IMAGES"
 bucket_name = "busan-travel-images"
+
+# KV: API rate limit 카운터 (60 req/min/IP, TTL 120s) — Step 1.4
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "0faeb4998cb64538bbf2a73be3aa4dc3"
