@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 사용 정책 — 주말부산 / AI Disclosure — Busan Weekend</title>
+<meta name="description" content="주말부산의 AI 사용 범위·인간 검증 단계·출처 표기 정책. 분류 보조, 좌표 추출, 페르소나 콘텐츠 — 모두 출처 명시." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://busan-travel.dk0327.workers.dev/ai-disclosure" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Pretendard","Apple SD Gothic Neo",sans-serif;max-width:720px;margin:0 auto;padding:24px 20px 48px;line-height:1.65;color:#e7eaf0;background:#0b1220}
+h1{font-size:1.75rem;margin:0 0 8px}
+h2{font-size:1.1rem;margin:24px 0 8px;color:#9eb1d6}
+a{color:#6ea8ff}
+nav{font-size:.9rem;opacity:.7;margin-bottom:16px}
+nav a{color:#9eb1d6;text-decoration:none;margin-right:12px}
+section{margin-bottom:18px}
+ul{padding-left:1.25em}
+li{margin:4px 0}
+.en{opacity:.7;font-size:.95em}
+hr{border:0;border-top:1px solid #2a3142;margin:32px 0 16px}
+footer{font-size:.85em;opacity:.6}
+code{background:#1a2030;padding:1px 6px;border-radius:4px;font-size:.9em}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #2a3142;font-size:.95em}
+th{color:#9eb1d6;font-weight:600}
+</style>
+</head>
+<body>
+<nav><a href="/">← 주말부산 홈</a> · <a href="/about">소개</a> · <a href="/ai-disclosure">AI 사용</a> · <a href="/sources">데이터 출처</a></nav>
+
+<h1>AI 사용 정책 / AI Disclosure</h1>
+
+<section>
+<p>본 사이트는 데이터 정리·분류·요약에 AI 모델을 보조 도구로 사용합니다. 각 단계가 어떤 AI 를 사용하고 어디서 인간 검증이 들어가는지 투명하게 공개합니다.</p>
+<p class="en">This site uses AI models as auxiliary tools for data classification, summarization, and place-name extraction. Each stage is documented below with human-verification checkpoints.</p>
+</section>
+
+<h2>AI 사용 범위 / Where AI is used</h2>
+<section>
+<table>
+<tr><th>단계</th><th>AI 모델</th><th>역할</th><th>인간 검증</th></tr>
+<tr><td>장소명 추출</td><td>Gemini 2.5 Flash</td><td>RSS 블로그 글 → place_name 구조화 추출</td><td>confidence ≥ 0.6 만 채택, 행정 공지 자동 제외</td></tr>
+<tr><td>좌표 매핑</td><td>Kakao Places (검색 API)</td><td>place_name → (lat, lon)</td><td>부산 bbox 검증 (34.9~35.5, 128.7~129.4)</td></tr>
+<tr><td>오늘의 추천</td><td>Gemini 2.5 Flash</td><td>이벤트 후보 → 가족 친화도 평가 + 한줄 추천</td><td>매일 cron 검증, stale 24h 초과 시 알림</td></tr>
+<tr><td>분류 정정</td><td>없음 (수동)</td><td>—</td><td>Naver Local API 좌표 + category 매칭 검증, false positive 0 보장</td></tr>
+</table>
+</section>
+
+<h2>인간 검증 / Human verification</h2>
+<section>
+<ul>
+<li>분류 정정 표(<code>CATEGORY_OVERRIDES</code>) — 운영자 수동 관리, 외부 검증 데이터(Naver Local) 매칭</li>
+<li>185 건의 블로그 글 라벨 — Claude 가 직접 읽고 수동 추출 후 정적 표로 캐시</li>
+<li>매 cron 마다 회귀 테스트(<code>verify_info_flow.py</code>) — 깨짐 즉시 GitHub Issue 자동 생성</li>
+<li>cron 실패 시 운영자 알림 — silent skip 차단 정책</li>
+</ul>
+</section>
+
+<h2>출처 표기 / Attribution</h2>
+<section>
+<p>모든 콘텐츠는 원 출처를 표기합니다. 향후 AI 페르소나 합성 콘텐츠 발행 시 (Phase 4 예정) 글 상단에 명시 라벨 부여 예정.</p>
+<p class="en">All content carries its origin source. Future AI-persona-synthesized content (Phase 4) will be labeled at top.</p>
+</section>
+
+<h2>AI 학습 크롤러 정책 / AI training crawler policy</h2>
+<section>
+<p><a href="/robots.txt">/robots.txt</a> 에서 GPTBot · ClaudeBot · CCBot · Google-Extended · PerplexityBot 등 주요 AI 학습 크롤러를 <strong>허용</strong>합니다. 단 출처 표기 (이 페이지 + <a href="/sources">/sources</a>) 와 attribution 정책 준수를 전제로 합니다.</p>
+<p class="en">Major AI training crawlers (GPTBot, ClaudeBot, CCBot, Google-Extended, PerplexityBot) are <strong>allowed</strong> with the expectation of attribution to this site and its data sources.</p>
+</section>
+
+<hr>
+<footer>
+<p>© 2026 busan-travel. 운영자 정보는 <a href="/about">/about</a>, 원본 데이터 출처는 <a href="/sources">/sources</a>.</p>
+</footer>
+</body>
+</html>

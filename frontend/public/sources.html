@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>데이터 출처 — 주말부산 / Data Sources — Busan Weekend</title>
+<meta name="description" content="주말부산이 사용하는 모든 데이터의 원 출처. 부산관광공사, 공공데이터포털, Naver, KMA 등 14개 소스 명시." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://busan-travel.dk0327.workers.dev/sources" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Pretendard","Apple SD Gothic Neo",sans-serif;max-width:720px;margin:0 auto;padding:24px 20px 48px;line-height:1.65;color:#e7eaf0;background:#0b1220}
+h1{font-size:1.75rem;margin:0 0 8px}
+h2{font-size:1.1rem;margin:24px 0 8px;color:#9eb1d6}
+a{color:#6ea8ff}
+nav{font-size:.9rem;opacity:.7;margin-bottom:16px}
+nav a{color:#9eb1d6;text-decoration:none;margin-right:12px}
+section{margin-bottom:18px}
+ul{padding-left:1.25em}
+li{margin:4px 0}
+.en{opacity:.7;font-size:.95em}
+hr{border:0;border-top:1px solid #2a3142;margin:32px 0 16px}
+footer{font-size:.85em;opacity:.6}
+code{background:#1a2030;padding:1px 6px;border-radius:4px;font-size:.9em}
+.src-grid{display:grid;grid-template-columns:1fr;gap:8px;margin:8px 0}
+.src{padding:10px 12px;background:#11182a;border-radius:8px;border:1px solid #1f2737}
+.src strong{color:#cfd8e8}
+.src small{display:block;opacity:.7;margin-top:2px}
+</style>
+</head>
+<body>
+<nav><a href="/">← 주말부산 홈</a> · <a href="/about">소개</a> · <a href="/ai-disclosure">AI 사용</a> · <a href="/sources">데이터 출처</a></nav>
+
+<h1>데이터 출처 / Data Sources</h1>
+
+<section>
+<p>주말부산은 다음 공공·공식 출처에서만 데이터를 수집합니다. 모든 콘텐츠는 원 출처에 귀속되며, 본 사이트는 이를 큐레이션·표시할 뿐입니다.</p>
+<p class="en">All data on this site originates from the public/official sources listed below. Content rights belong to the original sources; this site curates and displays only.</p>
+</section>
+
+<h2>공식 관광 / Official tourism</h2>
+<section>
+<div class="src-grid">
+<div class="src"><strong>부산관광공사 visitbusan.net</strong><small>POI · 매거진 · 공식 사진 — 출처 표기로 사용</small></div>
+<div class="src"><strong>한국관광공사 TourAPI</strong><small>data.go.kr 경유 부산 4종 (음식·관광·축제·코스)</small></div>
+<div class="src"><strong>부산문화재단 / 해운대구청 / 북구·동구·중구·연제구 공식 블로그 (RSS)</strong><small>공식 매거진 글</small></div>
+<div class="src"><strong>부산현대미술관 (MOCA Busan), 영화의전당 (Dureraum), 부산문화회관, 부산영상위원회</strong><small>전시·공연 일정</small></div>
+<div class="src"><strong>festivalbusan.com / artbusan.go.kr / 다봄</strong><small>축제 / 예술 / 지역 행사</small></div>
+</div>
+</section>
+
+<h2>위치·검색 / Location & Search</h2>
+<section>
+<div class="src-grid">
+<div class="src"><strong>Kakao Local API</strong><small>장소 검색 · 좌표 변환 · 지도 렌더 (KakaoMaps SDK)</small></div>
+<div class="src"><strong>Naver Local API</strong><small>장소 카테고리 검증 (false positive 차단)</small></div>
+</div>
+</section>
+
+<h2>날씨 / Weather</h2>
+<section>
+<div class="src-grid">
+<div class="src"><strong>기상청 (KMA)</strong><small>data.go.kr 경유 단기예보 (3시간 격자) + 중기예보 (D+3~D+10)</small></div>
+<div class="src"><strong>한국환경공단 (Air Korea)</strong><small>대기질 측정소별 최신값</small></div>
+</div>
+</section>
+
+<h2>이미지 / Images</h2>
+<section>
+<p>모든 이미지는 원 출처(visitbusan.net 등)에서 직접 fetch 또는 R2 캐시 서빙. 변형은 가하지 않으며, 무단 재배포가 아닌 큐레이션 표시 목적입니다.</p>
+<p class="en">Images served via direct fetch or R2 edge cache from original sources. No transformations applied; curation/display purpose only, not redistribution.</p>
+</section>
+
+<h2>라이선스 정책 / License</h2>
+<section>
+<ul>
+<li>본 사이트의 <strong>코드</strong> — MIT 라이선스 (오픈소스)</li>
+<li>본 사이트의 <strong>큐레이션·정렬·태깅 메타데이터</strong> — CC-BY 4.0</li>
+<li><strong>원본 콘텐츠·이미지</strong> — 각 출처의 라이선스를 따름</li>
+</ul>
+</section>
+
+<hr>
+<footer>
+<p>© 2026 busan-travel. 운영 정보는 <a href="/about">/about</a>, AI 사용 정책은 <a href="/ai-disclosure">/ai-disclosure</a>.</p>
+</footer>
+</body>
+</html>

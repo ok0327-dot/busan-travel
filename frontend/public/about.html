@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>소개 — 주말부산 / About — Busan Weekend</title>
+<meta name="description" content="주말부산은 부산 거주·정기 방문자의 가족 활동 의사결정을 위한 관광 큐레이션 도구입니다. 660+ POI, Kakao Maps, 매일 자동 갱신." />
+<meta name="robots" content="index, follow" />
+<link rel="canonical" href="https://busan-travel.dk0327.workers.dev/about" />
+<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Pretendard","Apple SD Gothic Neo",sans-serif;max-width:720px;margin:0 auto;padding:24px 20px 48px;line-height:1.65;color:#e7eaf0;background:#0b1220}
+h1{font-size:1.75rem;margin:0 0 8px}
+h2{font-size:1.1rem;margin:24px 0 8px;color:#9eb1d6}
+a{color:#6ea8ff}
+nav{font-size:.9rem;opacity:.7;margin-bottom:16px}
+nav a{color:#9eb1d6;text-decoration:none;margin-right:12px}
+section{margin-bottom:18px}
+ul{padding-left:1.25em}
+li{margin:4px 0}
+.en{opacity:.7;font-size:.95em}
+hr{border:0;border-top:1px solid #2a3142;margin:32px 0 16px}
+footer{font-size:.85em;opacity:.6}
+code{background:#1a2030;padding:1px 6px;border-radius:4px;font-size:.9em}
+</style>
+</head>
+<body>
+<nav><a href="/">← 주말부산 홈</a> · <a href="/about">소개</a> · <a href="/ai-disclosure">AI 사용</a> · <a href="/sources">데이터 출처</a></nav>
+
+<h1>주말부산 소개 / About</h1>
+
+<section>
+<p>주말부산(busan-travel)은 부산 거주자·정기 방문자의 <strong>주말·가족 단위 활동 의사결정</strong>을 돕는 관광 큐레이션 도구입니다. Kakao Maps 기반 지도 + 660+ POI(맛집·카페·관광지) + 축제·공연·전시 + 공식 블로그 매거진 + 단기 예보를 한 화면에 모아 제공합니다.</p>
+<p class="en">busan-travel curates Busan tourism data — restaurants, cafés, attractions, festivals, official blog magazines, weather — for residents and frequent visitors making weekend/family decisions. Map-first UI with daily auto-refresh.</p>
+</section>
+
+<h2>운영 주체 / Operator</h2>
+<section>
+<p>개인 프로젝트입니다. GitHub: <a href="https://github.com/ok0327-dot/busan-travel">ok0327-dot/busan-travel</a> (오픈소스, 코드/데이터 구조 공개).</p>
+<p class="en">Personal project. Open source on GitHub.</p>
+</section>
+
+<h2>데이터 갱신 정책 / Update policy</h2>
+<section>
+<ul>
+<li><strong>매일 06:23 KST</strong> — 전체 수집 (POI / 축제 / 블로그 RSS / 매거진 / 단기 예보)</li>
+<li><strong>3시간마다</strong> — 단기 예보만 재갱신</li>
+<li>모든 데이터는 R2 백업 + 30일 daily archive 보관 (재해 복구)</li>
+</ul>
+<p class="en">Daily full collection at 06:23 KST. Weather refresh every 3 hours. R2 backup with 30-day archive retention.</p>
+</section>
+
+<h2>품질 정책 / Quality policy</h2>
+<section>
+<ul>
+<li>분류 정정 표(<code>CATEGORY_OVERRIDES</code>) — Naver Local API 검증으로 false positive 0 보장</li>
+<li>cross-source dedup — 좌표 + 정규화된 제목 매칭</li>
+<li>회귀 테스트 자동화 (<code>verify_info_flow.py</code>) — 정합성 깨짐 즉시 감지</li>
+<li>적용 audit: <a href="https://github.com/ok0327-dot/busan-travel/blob/main/docs/audit/2026-04-25-info-flow.md">2026-04-25 정보 흐름 감사</a></li>
+</ul>
+</section>
+
+<h2>API / Public API</h2>
+<section>
+<p>외부 콘텐츠 사이트가 read 가능한 JSON API v1 제공. spec: <a href="https://github.com/ok0327-dot/busan-travel/blob/main/docs/api/openapi.yaml">OpenAPI 3.1</a>.</p>
+<ul>
+<li><a href="/api/v1/_health">/api/v1/_health</a> — 백본 health</li>
+<li><code>/api/v1/poi</code> — POI 리스트</li>
+<li><code>/api/v1/festival</code> — 축제·공연·전시</li>
+<li><code>/api/v1/area-list</code> — 16 자치구</li>
+<li><code>/api/v1/popularity-ranked</code> — 인기 정렬</li>
+</ul>
+</section>
+
+<hr>
+<footer>
+<p>© 2026 busan-travel. 데이터 출처는 <a href="/sources">/sources</a>, AI 사용 정책은 <a href="/ai-disclosure">/ai-disclosure</a> 참조.</p>
+</footer>
+</body>
+</html>

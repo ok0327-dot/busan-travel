@@ -5,6 +5,7 @@
 // 그 외     → 정적 에셋 (frontend/public)
 
 import { handleApi } from "./api.js";
+import { handleRobots, handleSitemap } from "./seo.js";
 
 const API_PREFIX = "/api/v1/";
 const IMG_PREFIX = "/img/";
@@ -27,6 +28,19 @@ export default {
     // /api/v1/* → JSON API v1 (Step 1.2)
     if (url.pathname.startsWith(API_PREFIX)) {
       return handleApi(request, env, ctx, url);
+    }
+
+    // SEO endpoints (Step 3.1/3.2)
+    if (url.pathname === "/robots.txt") return handleRobots(request, env, url);
+    if (url.pathname === "/sitemap.xml") return handleSitemap(request, env, url);
+
+    // 정적 SEO 페이지 명시 매핑 — wrangler ASSETS 자동 확장 의존 회피 (Step 3.5)
+    if (
+      url.pathname === "/about" ||
+      url.pathname === "/ai-disclosure" ||
+      url.pathname === "/sources"
+    ) {
+      return env.ASSETS.fetch(new Request(url.origin + url.pathname + ".html", request));
     }
 
     // /img/* → R2 (pre-gen variants)
