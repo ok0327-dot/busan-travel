@@ -1,7 +1,12 @@
 // busan-travel Cloudflare Worker
-// /img/* → R2 버킷 (busan-travel-images) 에서 이미지 서빙, 나머지 → 정적 에셋.
-// R2 에서 pre-generated variants 를 직접 서빙 (cf.image 트랜스폼 없음 = 무료).
+// /api/v1/* → JSON API v1 (백본, src/api.js — Step 1.2)
+// /img/*    → R2 (busan-travel-images) pre-generated variants 직접 서빙
+// /img-proxy/visitbusan/{id} → visitbusan.net 원본 + 엣지 캐시
+// 그 외     → 정적 에셋 (frontend/public)
 
+import { handleApi } from "./api.js";
+
+const API_PREFIX = "/api/v1/";
 const IMG_PREFIX = "/img/";
 const IMG_PREFIX_LEN = IMG_PREFIX.length;
 const PROXY_PREFIX = "/img-proxy/visitbusan/";
@@ -18,6 +23,11 @@ const VISITBUSAN_ID_RE = /^\d{14,20}$/;
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // /api/v1/* → JSON API v1 (Step 1.2)
+    if (url.pathname.startsWith(API_PREFIX)) {
+      return handleApi(request, env, ctx, url);
+    }
 
     // /img/* → R2 (pre-gen variants)
     if (url.pathname.startsWith(IMG_PREFIX)) {

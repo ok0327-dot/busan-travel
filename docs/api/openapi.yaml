@@ -1,0 +1,425 @@
+openapi: 3.1.0
+info:
+  title: busan-travel API
+  version: "1.0.0"
+  description: |
+    부산 관광 데이터 백본 API — 외부 콘텐츠 사이트(blog-automation, 마이크로사이트)가
+    POI/축제/freshness 정보를 read 하는 인터페이스.
+    Backbone API for external content sites to consume Busan tourism data.
+
+    ## 응답 envelope / Response envelope
+    모든 성공 응답은 `{ data, meta }` 구조. `meta.schema_version` 로 호환성 추적.
+    에러는 `{ error: { code, message }, meta }` 구조.
+
+    ## 인증 / Auth
+    v1 read 엔드포인트는 무인증. rate limit 만 적용 (X-Forwarded-For 기반).
+    write/ingest 엔드포인트(Step 2 도입)는 X-API-Key 헤더 필수.
+
+    ## Deprecation 정책
+    breaking change 시 v2 신설 + v1 응답에 `Deprecation`/`Sunset` 헤더 부여.
+    v1 은 v2 도입 후 최소 6개월 유지.
+
+    ## Rate limit
+    무인증 read: 60 req/min/IP. 초과 시 429 + `Retry-After` 헤더.
+  contact:
+    name: ok0327
+    url: https://github.com/ok0327-dot/busan-travel
+
+servers:
+  - url: https://busan-travel.dk0327.workers.dev
+    description: Production (Cloudflare Workers)
+
+tags:
+  - name: poi
+    description: 관광지·맛집·카페 (Points of Interest)
+  - name: festival
+    description: 축제·공연·전시 이벤트
+  - name: area
+    description: 부산 16 자치구
+  - name: ranking
+    description: popularity 기반 순위
+  - name: freshness
+    description: 데이터 신선도·drift 알림
+
+paths:
+  /api/v1/poi:
+    get:
+      tags: [poi]
+      summary: POI 리스트 / List POIs
+      description: |
+        food/cafe/attraction 카테고리의 POI 를 페이지 단위로 반환.
+        area·category·popularity_min 으로 필터링 가능.
+      parameters:
+        - $ref: "#/components/parameters/Area"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [food, cafe, attraction]
+          description: 카테고리 필터
+        - name: popularity_min
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+          description: popularity_score 최소값
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: POI 리스트
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/POISummary" }
+                  meta: { $ref: "#/components/schemas/PageMeta" }
+                required: [data, meta]
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/poi/{id}:
+    get:
+      tags: [poi]
+      summary: POI 상세 / Get POI by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: POI 상세 + freshness
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/POIDetail" }
+                  meta: { $ref: "#/components/schemas/ItemMeta" }
+                required: [data, meta]
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/festival:
+    get:
+      tags: [festival]
+      summary: 축제·공연·전시 리스트
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+          description: YYYY-MM (지정 시 해당 월에 진행 중인 이벤트만)
+        - $ref: "#/components/parameters/Area"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Festival 리스트
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Festival" }
+                  meta: { $ref: "#/components/schemas/PageMeta" }
+                required: [data, meta]
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/area-list:
+    get:
+      tags: [area]
+      summary: 부산 자치구 리스트
+      description: 16 자치구 코드·한글명·중심 좌표.
+      responses:
+        "200":
+          description: Area 리스트
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Area" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+                required: [data, meta]
+
+  /api/v1/popularity-ranked:
+    get:
+      tags: [ranking]
+      summary: popularity 정렬 POI top N
+      description: |
+        popularity_score 내림차순. area·category 로 그룹 좁히기 가능.
+        리스트 응답이지만 `meta.scoring_method` 명시.
+      parameters:
+        - $ref: "#/components/parameters/Area"
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [food, cafe, attraction]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: 순위 리스트
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/POISummary" }
+                  meta: { $ref: "#/components/schemas/RankingMeta" }
+                required: [data, meta]
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/freshness-alerts:
+    get:
+      tags: [freshness]
+      summary: 데이터 drift 알림 리스트
+      description: |
+        cron freshness threshold 초과·source 별 last_seen 노화 등 운영자용 알림.
+        외부 사이트가 stale 데이터 사용 회피용으로 조회 가능.
+      responses:
+        "200":
+          description: drift alert 리스트
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/DriftAlert" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+                required: [data, meta]
+
+components:
+  parameters:
+    Area:
+      name: area
+      in: query
+      schema: { type: string }
+      description: |
+        자치구 코드 (예: `haeundae`, `gwangalli`, `seomyeon`) 또는 한글명.
+        지원 코드는 `/api/v1/area-list` 참조.
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+
+  responses:
+    BadRequest:
+      description: 잘못된 요청 파라미터
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: 리소스 미존재
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: rate limit 초과
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: 재시도까지 대기 초
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    POISummary:
+      type: object
+      description: 리스트 응답용 요약 모델 (페이로드 절감)
+      required: [id, title, category, lat, lon, popularity_score]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category:
+          type: string
+          enum: [food, cafe, attraction]
+        subtype: { type: [string, "null"] }
+        venue: { type: [string, "null"] }
+        address: { type: string }
+        gugun: { type: [string, "null"], description: 자치구 한글명 }
+        lat: { type: number, format: float }
+        lon: { type: number, format: float }
+        popularity_score: { type: integer, minimum: 0, maximum: 100 }
+        trust_tier:
+          type: string
+          enum: [S, B]
+          description: 'S=공식 출처 검증 / B=보조 출처'
+        rating: { type: [number, "null"], format: float }
+        image: { type: [string, "null"], format: uri }
+        tags:
+          type: array
+          items: { type: string }
+
+    POIDetail:
+      allOf:
+        - $ref: "#/components/schemas/POISummary"
+        - type: object
+          description: 상세 응답용 확장 필드
+          properties:
+            description: { type: [string, "null"] }
+            excerpt: { type: [string, "null"] }
+            url: { type: [string, "null"], format: uri }
+            story_url: { type: [string, "null"], format: uri }
+            hours: { type: [string, "null"] }
+            holiday: { type: [string, "null"] }
+            phone: { type: [string, "null"] }
+            transport: { type: [string, "null"] }
+            tip: { type: [string, "null"] }
+            menu: { type: [string, "null"] }
+            views: { type: integer }
+            reviews: { type: integer }
+            first_seen: { type: string, format: date-time }
+
+    Festival:
+      type: object
+      required: [id, title, category, start, end]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category:
+          type: string
+          enum: [festival, exhibition, performance, blog_post]
+          description: 'festival/exhibition/performance 외에 RSS 공식 블로그 글(blog_post)도 같은 endpoint 노출'
+        venue: { type: [string, "null"] }
+        address: { type: [string, "null"] }
+        gugun: { type: [string, "null"] }
+        lat: { type: [number, "null"], format: float }
+        lon: { type: [number, "null"], format: float }
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+        price: { type: [string, "null"] }
+        booking_required: { type: [integer, "null"], description: '0/1 (legacy) or null' }
+        url: { type: [string, "null"], format: uri }
+        image: { type: [string, "null"], format: uri }
+        excerpt: { type: [string, "null"] }
+        tags:
+          type: array
+          items: { type: string }
+
+    Area:
+      type: object
+      required: [code, name_ko, lat, lon]
+      properties:
+        code:
+          type: string
+          description: slug (예 haeundae)
+        name_ko:
+          type: string
+          description: 한글명 (예 해운대구)
+        lat: { type: number, format: float }
+        lon: { type: number, format: float }
+        poi_count: { type: integer, description: 현재 등록된 POI 수 }
+
+    DriftAlert:
+      type: object
+      required: [source, severity, message, detected_at]
+      properties:
+        source:
+          type: string
+          description: 어댑터 이름 (예 vb_food)
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        message: { type: string }
+        last_seen: { type: [string, "null"], format: date-time }
+        threshold_hours: { type: [integer, "null"] }
+        detected_at: { type: string, format: date-time }
+
+    PageMeta:
+      type: object
+      required: [schema_version, last_updated, total, page, limit]
+      properties:
+        schema_version: { type: string, example: "1.0" }
+        last_updated:
+          type: string
+          format: date-time
+          description: 데이터 export 시각 (manifest.json 의 generated_at)
+        total: { type: integer, description: 필터 후 전체 항목 수 }
+        page: { type: integer }
+        limit: { type: integer }
+
+    ListMeta:
+      type: object
+      required: [schema_version, last_updated, total]
+      properties:
+        schema_version: { type: string, example: "1.0" }
+        last_updated: { type: string, format: date-time }
+        total: { type: integer }
+
+    ItemMeta:
+      type: object
+      required: [schema_version, last_updated]
+      properties:
+        schema_version: { type: string, example: "1.0" }
+        last_updated: { type: string, format: date-time }
+        freshness:
+          type: object
+          properties:
+            score: { type: integer, minimum: 0, maximum: 100 }
+            last_verified: { type: [string, "null"], format: date-time }
+            drift_alerts:
+              type: array
+              items: { $ref: "#/components/schemas/DriftAlert" }
+
+    RankingMeta:
+      allOf:
+        - $ref: "#/components/schemas/ListMeta"
+        - type: object
+          properties:
+            scoring_method:
+              type: string
+              description: 점수 산정 방식 식별자 (예 v3.7-popularity)
+
+    Error:
+      type: object
+      required: [error, meta]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 안정 식별자 (예 INVALID_PARAM, NOT_FOUND, RATE_LIMITED)
+            message: { type: string }
+        meta:
+          type: object
+          required: [schema_version]
+          properties:
+            schema_version: { type: string, example: "1.0" }
