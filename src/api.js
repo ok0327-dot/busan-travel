@@ -395,6 +395,8 @@ function handlerFromPath(path) {
   if (path === "/api/v1/popularity-ranked") return "popularity-ranked";
   if (path === "/api/v1/freshness-alerts") return "freshness-alerts";
   if (path === "/api/v1/_health") return "health";
+  if (path === "/api/v1/content") return "content-list";
+  if (/^\/api\/v1\/content\/[a-z0-9_-]+$/.test(path)) return "content-detail";
   return "unknown";
 }
 
@@ -432,6 +434,16 @@ async function dispatchHandler(request, env, url, path) {
   if (path === "/api/v1/area-list") return await handleAreaList(request, env, url);
   if (path === "/api/v1/popularity-ranked") return await handlePopularityRanked(request, env, url);
   if (path === "/api/v1/freshness-alerts") return await handleFreshnessAlerts(request, env, url);
+  // Step 2 Wave 1 — content endpoints (read)
+  if (path === "/api/v1/content") {
+    const { handleContentList } = await import("./content.js");
+    return await handleContentList(request, env, url);
+  }
+  const cm = path.match(/^\/api\/v1\/content\/([a-z0-9_-]+)$/);
+  if (cm) {
+    const { handleContentGet } = await import("./content.js");
+    return await handleContentGet(request, env, url, cm[1]);
+  }
   return err(404, "NOT_FOUND", `path ${path} not found`);
 }
 

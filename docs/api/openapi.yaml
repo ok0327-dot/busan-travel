@@ -48,6 +48,8 @@ tags:
     description: 데이터 신선도·drift 알림
   - name: meta
     description: API 자체 health·uptime
+  - name: content
+    description: 발행 콘텐츠 (markdown + frontmatter, busan-travel/content/ 디렉토리)
 
 paths:
   /api/v1/poi:
@@ -197,6 +199,70 @@ paths:
                   meta: { $ref: "#/components/schemas/RankingMeta" }
                 required: [data, meta]
         "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/content:
+    get:
+      tags: [content]
+      summary: 발행 콘텐츠 리스트
+      description: |
+        busan-travel/content/{yyyy-mm}/{slug}.md 의 published 상태 글만.
+        빌드 시점(scripts/export_content.py)에 frontmatter parse + markdown→HTML 후 JSON export.
+      parameters:
+        - name: persona
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Area"
+        - name: tag
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Page"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: 콘텐츠 리스트 (요약, html 제외)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ContentSummary" }
+                  meta: { $ref: "#/components/schemas/PageMeta" }
+                required: [data, meta]
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/v1/content/{slug}:
+    get:
+      tags: [content]
+      summary: 콘텐츠 상세 (HTML 본문 포함)
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9_-]{1,80}$"
+      responses:
+        "200":
+          description: 콘텐츠 상세
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ContentDetail" }
+                  meta: { $ref: "#/components/schemas/ItemMeta" }
+                required: [data, meta]
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
   /api/v1/_health:
@@ -448,6 +514,39 @@ components:
             scoring_method:
               type: string
               description: 점수 산정 방식 식별자 (예 v3.7-popularity)
+
+    ContentSummary:
+      type: object
+      required: [slug, title, ai_assisted, published_at, updated_at]
+      properties:
+        slug: { type: string, pattern: "^[a-z0-9_-]{1,80}$" }
+        title: { type: string }
+        persona: { type: [string, "null"] }
+        area_codes:
+          type: array
+          items: { type: string }
+        poi_refs:
+          type: array
+          items: { type: integer }
+        ai_assisted: { type: boolean }
+        ai_disclosure: { type: [string, "null"] }
+        hero_image: { type: [string, "null"], format: uri }
+        excerpt: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        published_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ContentDetail:
+      allOf:
+        - $ref: "#/components/schemas/ContentSummary"
+        - type: object
+          required: [html]
+          properties:
+            html:
+              type: string
+              description: 본문 markdown 을 HTML 로 렌더한 결과 (server-side, 빌드 시점)
 
     Error:
       type: object

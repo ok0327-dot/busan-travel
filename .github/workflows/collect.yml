@@ -160,6 +160,11 @@ jobs:
         if: steps.mode.outputs.mode != 'weather-only'
         run: python scripts/verify_info_flow.py
 
+      # Step 2 Wave 1 — content/ markdown → frontend/public/data/content/ JSON
+      - name: Export content (markdown + frontmatter)
+        if: steps.mode.outputs.mode != 'weather-only'
+        run: python scripts/export_content.py
+
       # GEMINI_API_KEY 누락 시 ai_summary.py 가 exit 1 → step fail → workflow fail.
       # silent skip 으로 어제 picks 가 stale 노출되던 위험 차단.
       - name: AI summary (Gemini 2.5 Flash, 매일만)
