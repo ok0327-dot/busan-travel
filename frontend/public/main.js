@@ -734,7 +734,7 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides, content] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
@@ -743,11 +743,13 @@ async function init() {
     fetchJson("./data/seasonal.json").catch(() => ({ months: {} })),
     fetchJson("./data/my-favorites.json").catch(() => ({ favorites: [] })),  // 구글 별표 import (파일 없으면 빈 배열)
     fetchJson("./data/guides.json").catch(() => ({ guides: [] })),  // visitbusan 매거진 가이드 (지도 마커 X, 읽을거리 카드)
+    fetchJson("./data/content/index.json").catch(() => ({ count: 0, items: [] })),  // Step 2 — 자체 발행 콘텐츠
   ]);
   coursesData = courses;
   window.__seasonal = seasonal;
   window.__favorites = favorites;
   window.__guides = guides?.guides || [];
+  window.__content = content?.items || [];  // Step 2 — 발행 콘텐츠 메타 list
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -1247,9 +1249,26 @@ function activateCourse(uc_seq) {
 // 매거진 chip filter — 전체 / 도보코스 / 향토음식 / 일반
 let _blogFilter = "all";
 
+// Step 2 Wave 2 — 자체 발행 콘텐츠 카드 (read 탭 상단)
+function _contentCard(c) {
+  const aiBadge = c.ai_assisted
+    ? `<span class="ai-badge" title="${escape(c.ai_disclosure || 'AI 보조 작성')}">🤖 AI 보조</span>`
+    : "";
+  const date = (c.published_at || "").slice(0, 10);
+  const tags = (c.tags || []).slice(0, 3)
+    .map(t => `<span class="blog-card-tag">${escape(t)}</span>`).join("");
+  return `<a class="card content-card" href="/content/${escape(c.slug)}" data-content-slug="${escape(c.slug)}">
+    <div class="card-meta">✍️ 발행 · ${escape(date)} ${aiBadge}</div>
+    <div class="card-title">${escape(c.title)}</div>
+    ${c.excerpt ? `<div class="card-excerpt">${escape(c.excerpt)}</div>` : ""}
+    ${tags ? `<div class="blog-card-tags">${tags}</div>` : ""}
+  </a>`;
+}
+
 function renderBlogFeed() {
   const blogs = window.__blogPosts || [];
   const guides = window.__guides || [];
+  const contentItems = window.__content || [];
   // 가이드는 view_count(rating·views) 우선, 블로그는 blog_priority 정렬됨. 합쳐서 가이드 먼저 + 블로그.
   const guideItems = guides.map(g => ({ ...g, _kind: "guide" }));
   const blogItems = blogs.map(b => ({ ...b, _kind: "blog" }));
@@ -1281,6 +1300,14 @@ function renderBlogFeed() {
     { k: "foodie", l: `🥘 향토음식 ${counts.foodie}` },
     { k: "general", l: `📖 매거진 ${counts.general}` },
   ].map(c => `<button class="blog-filter-chip${_blogFilter === c.k ? " active" : ""}" data-filter="${c.k}">${escape(c.l)}</button>`).join("")}</div>`;
+
+  // 자체 발행 콘텐츠 섹션 — chip filter 무관하게 항상 상단 (있을 때만)
+  const contentSectionHTML = contentItems.length
+    ? `<div class="content-section">
+        <div class="section-title">✍️ 주말부산 발행</div>
+        ${contentItems.slice(0, 8).map(_contentCard).join("")}
+      </div>`
+    : "";
 
   // P3 — 중요도 정렬(priority → 이미지 → 날짜). Top 3 은 hero_tags 칩으로 규모 강조
   const cardsHTML = filtered.slice(0, 120).map((p, i) => {
@@ -1327,7 +1354,7 @@ function renderBlogFeed() {
     </article>`;
   }).join("");
 
-  $list.innerHTML = chipsHTML + cardsHTML;
+  $list.innerHTML = chipsHTML + contentSectionHTML + cardsHTML;
   $list.querySelectorAll(".blog-filter-chip").forEach(btn => {
     btn.addEventListener("click", () => {
       _blogFilter = btn.dataset.filter;
@@ -2212,8 +2239,49 @@ function showGenericInstallModal() {
 
 setupInstallButton();
 
+// Step 2 Wave 2 — content detail view (read 탭에서 진입 또는 /content/{slug} deep link)
+async function showContentDetail(slugOrContent) {
+  const slug = typeof slugOrContent === "string" ? slugOrContent : slugOrContent?.slug;
+  if (!slug) return;
+  let detail;
+  try {
+    detail = await fetchJson(`./data/content/${slug}.json`);
+  } catch {
+    $list.innerHTML = _detailHeader() + `<div class="card"><div class="card-meta">콘텐츠를 찾을 수 없습니다 — '${slug}'</div></div>`;
+    _bindDetailBack();
+    return;
+  }
+  const aiPanel = detail.ai_assisted
+    ? `<div class="ai-disclosure-panel" role="note">🤖 <strong>AI 보조 작성</strong> — ${escape(detail.ai_disclosure || "AI 가 다중 출처를 합성해 작성")}. <a href="/ai-disclosure">정책</a></div>`
+    : "";
+  const tagsHTML = (detail.tags || []).map(t => `<span class="content-tag">${escape(t)}</span>`).join(" ");
+  const date = (detail.published_at || "").slice(0, 10);
+  $list.innerHTML = _detailHeader() + `
+    <article class="content-detail">
+      ${aiPanel}
+      <h1 class="content-title">${escape(detail.title)}</h1>
+      <div class="content-meta">📅 ${escape(date)}${tagsHTML ? " · " + tagsHTML : ""}</div>
+      <div class="content-body">${detail.html || ""}</div>
+    </article>`;
+  _bindDetailBack();
+  const sheet = document.getElementById("sheet");
+  if (sheet?.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
+}
+
+// content card 클릭 → SPA navigation (default page reload 차단)
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-content-slug]");
+  if (!a) return;
+  e.preventDefault();
+  const slug = a.dataset.contentSlug;
+  if (location.pathname !== `/content/${slug}`) {
+    history.pushState({ content: slug }, "", `/content/${slug}`);
+  }
+  showContentDetail(slug);
+});
+
 // === Wave 2 — Path-based deep link router (Step 3) ===
-// /poi/{id}, /festival/{id}, /area/{slug} — Worker SPA fallback 로 들어오면 init 후 자동 처리.
+// /poi/{id}, /festival/{id}, /area/{slug}, /content/{slug} — Worker SPA fallback 로 들어오면 init 후 자동 처리.
 const _AREA_TO_CENTER = {
   haeundae: [35.163, 129.163], suyeong: [35.145, 129.114], busanjin: [35.163, 129.053],
   jung: [35.106, 129.032], gijang: [35.245, 129.222], dongnae: [35.205, 129.083],
@@ -2249,6 +2317,12 @@ function routeFromPath() {
       window.__map.setCenter(new kakao.maps.LatLng(center[0], center[1]));
       window.__map.setLevel(5);
     }
+    return;
+  }
+
+  m = p.match(/^\/content\/([a-z0-9_-]+)$/);
+  if (m) {
+    showContentDetail(m[1]);
     return;
   }
 }

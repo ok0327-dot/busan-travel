@@ -88,6 +88,18 @@ export async function handleSitemap(request, env, url) {
     dynamicUrls.push(urlEntry(`${base}/area/${a.code}`, today, "0.6", "weekly"));
   }
 
+  // content posts
+  try {
+    const r = await env.ASSETS.fetch(new Request(`${base}/data/content/index.json`));
+    if (r.ok) {
+      const data = await r.json();
+      for (const c of data.items || []) {
+        const lm = (c.updated_at || c.published_at || "").slice(0, 10) || today;
+        dynamicUrls.push(urlEntry(`${base}/content/${c.slug}`, lm, "0.8", "weekly"));
+      }
+    }
+  } catch { /* skip */ }
+
   const body =
     '<?xml version="1.0" encoding="UTF-8"?>' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
@@ -168,6 +180,40 @@ function buildFestivalMeta(ev, origin) {
   return { title, desc, url, image, schema };
 }
 
+async function getContentMeta(env, slug) {
+  try {
+    const r = await env.ASSETS.fetch(new Request(`https://placeholder/data/content/${slug}.json`));
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+function buildContentMeta(content, origin) {
+  const url = `${origin}/content/${content.slug}`;
+  const title = `${content.title} | 주말부산`;
+  const desc = (content.excerpt || content.title).slice(0, 200);
+  const image = content.hero_image || `${origin}/icon.svg`;
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: content.title,
+    description: desc,
+    image: content.hero_image || undefined,
+    datePublished: content.published_at,
+    dateModified: content.updated_at,
+    author: content.persona
+      ? { "@type": "Person", name: content.persona }
+      : { "@type": "Organization", name: "주말부산" },
+    publisher: {
+      "@type": "Organization",
+      name: "주말부산",
+      url: origin,
+    },
+    keywords: (content.tags || []).join(", ") || undefined,
+  };
+  return { title, desc, url, image, schema };
+}
+
 function buildAreaMeta(area, origin) {
   const url = `${origin}/area/${area.code}`;
   const title = `${area.name_ko} — 부산 자치구 관광 가이드 | 주말부산`;
@@ -208,6 +254,13 @@ export async function handleSpaPage(request, env, ctx, url) {
       if (m) {
         const area = AREAS.find((a) => a.code === m[1]);
         if (area) meta = buildAreaMeta(area, url.origin);
+      }
+    }
+    if (!meta) {
+      m = path.match(/^\/content\/([a-z0-9_-]+)$/);
+      if (m) {
+        const c = await getContentMeta(env, m[1]);
+        if (c) meta = buildContentMeta(c, url.origin);
       }
     }
   } catch { /* meta 못 만들면 fallthrough = 기본 index.html */ }

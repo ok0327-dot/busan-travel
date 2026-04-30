@@ -43,13 +43,13 @@ export default {
       return env.ASSETS.fetch(new Request(url.origin + url.pathname + ".html", request));
     }
 
-    // SPA deep link fallback (Wave 2) — /poi/{id}, /festival/{id}, /area/{slug}
+    // SPA deep link fallback (Wave 2) — /poi/{id}, /festival/{id}, /area/{slug}, /content/{slug}
     // index.html 서빙 + HTMLRewriter 로 path 별 OG/canonical/Schema.org 동적 주입.
-    // /api·/img·/img-proxy·robots·sitemap·정적 SEO 는 위에서 이미 처리 — 영향 X.
     if (
       /^\/poi\/\d+$/.test(url.pathname) ||
       /^\/festival\/\d+$/.test(url.pathname) ||
-      /^\/area\/[a-z]+$/.test(url.pathname)
+      /^\/area\/[a-z]+$/.test(url.pathname) ||
+      /^\/content\/[a-z0-9_-]+$/.test(url.pathname)
     ) {
       return handleSpaPage(request, env, ctx, url);
     }
