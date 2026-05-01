@@ -265,6 +265,64 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
 
+  /api/v1/content/ingest:
+    post:
+      tags: [content]
+      summary: 발행 콘텐츠 ingest (server-to-server)
+      description: |
+        blog-automation → busan-travel/content/{yyyy-mm}/{slug}.md 를 GitHub Contents
+        API 로 commit. 신규는 create, 기존 slug 면 update (sha 자동 조회).
+        commit message prefix: `content: publish {slug}` 또는 `content: update {slug}`.
+        실제 read API 노출은 다음 정적 빌드(scripts/export_content.py 실행) 후.
+
+        **인증**: `X-API-Key` 헤더 필수 (env.INGEST_API_KEY 와 일치).
+        **rate limit**: 60/min/IP — 일반 read 와 공통 적용.
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IngestRequest" }
+      responses:
+        "200":
+          description: 기존 콘텐츠 update
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/IngestResult" }
+                  meta: { $ref: "#/components/schemas/ItemMeta" }
+                required: [data, meta]
+        "201":
+          description: 신규 콘텐츠 create
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/IngestResult" }
+                  meta: { $ref: "#/components/schemas/ItemMeta" }
+                required: [data, meta]
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: X-API-Key 누락 또는 불일치
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "502":
+          description: GitHub API 오류 (upstream)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: secret 미설정 (INGEST_API_KEY / GITHUB_TOKEN_INGEST)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /api/v1/_health:
     get:
       tags: [meta]
@@ -565,3 +623,85 @@ components:
           required: [schema_version]
           properties:
             schema_version: { type: string, example: "1.0" }
+
+    IngestRequest:
+      type: object
+      required: [slug, title, markdown]
+      properties:
+        slug:
+          type: string
+          pattern: "^[a-z0-9_-]{1,80}$"
+          description: 콘텐츠 식별자. URL 경로(`/content/{slug}`)·파일명에 사용
+        title: { type: string, description: 글 제목 (frontmatter title) }
+        markdown:
+          type: string
+          maxLength: 200000
+          description: 본문 markdown (frontmatter 미포함, 서버가 자동 합침)
+        persona:
+          type: string
+          nullable: true
+          description: 작성 페르소나 (예 char_I), 없으면 null
+        area_codes:
+          type: array
+          items: { type: string }
+          description: 자치구 코드 리스트 (예 ["haeundae"])
+        poi_refs:
+          type: array
+          items: { type: integer }
+          description: 참조 POI id 리스트
+        ai_assisted: { type: boolean, default: false }
+        ai_disclosure:
+          type: string
+          nullable: true
+          description: AI 사용 disclosure 문구 (HCU 방어)
+        hero_image:
+          type: string
+          nullable: true
+          format: uri
+        excerpt: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        status:
+          type: string
+          enum: [published, draft, archived]
+          default: published
+        published_at:
+          type: string
+          format: date-time
+          description: ISO8601. yyyy-mm 부분이 디렉토리 분류 키
+        updated_at:
+          type: string
+          format: date-time
+
+    IngestResult:
+      type: object
+      required: [content_id, action, file_path, public_url]
+      properties:
+        content_id: { type: string }
+        action:
+          type: string
+          enum: [create, update]
+        file_path:
+          type: string
+          example: content/2026-05/haeundae-cafe-tour.md
+        github_commit_sha:
+          type: string
+          nullable: true
+        github_html_url:
+          type: string
+          nullable: true
+          format: uri
+        public_url:
+          type: string
+          format: uri
+        note: { type: string }
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        write/ingest 엔드포인트 보호용 shared secret.
+        wrangler secret 으로 등록 (`wrangler secret put INGEST_API_KEY`).

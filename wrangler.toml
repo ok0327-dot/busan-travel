@@ -18,3 +18,10 @@ bucket_name = "busan-travel-images"
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
 id = "0faeb4998cb64538bbf2a73be3aa4dc3"
+
+# Step 2 Wave 2 — content ingest (GitHub Contents API).
+# 시크릿(INGEST_API_KEY, GITHUB_TOKEN_INGEST)은 wrangler secret put 으로 등록.
+[vars]
+GITHUB_OWNER = "ok0327-dot"
+GITHUB_REPO = "busan-travel"
+INGEST_BRANCH = "main"

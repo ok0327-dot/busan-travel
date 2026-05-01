@@ -31,10 +31,10 @@ const AREA_LOOKUP = (() => {
   return m;
 })();
 
-// 백본 = 외부 사이트 가져가는 전제, * 허용. write 도입(Step 2) 시 origin 제한.
+// 백본 = 외부 사이트 가져가는 전제, * 허용. content/ingest (POST) 만 X-API-Key 로 보호.
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, OPTIONS",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
   "access-control-allow-headers": "content-type, x-api-key",
   "access-control-expose-headers": "x-api-schema-version, x-ratelimit-remaining, x-ratelimit-reset",
   "access-control-max-age": "86400",
@@ -396,6 +396,7 @@ function handlerFromPath(path) {
   if (path === "/api/v1/freshness-alerts") return "freshness-alerts";
   if (path === "/api/v1/_health") return "health";
   if (path === "/api/v1/content") return "content-list";
+  if (path === "/api/v1/content/ingest") return "content-ingest";
   if (/^\/api\/v1\/content\/[a-z0-9_-]+$/.test(path)) return "content-detail";
   return "unknown";
 }
@@ -434,7 +435,12 @@ async function dispatchHandler(request, env, url, path) {
   if (path === "/api/v1/area-list") return await handleAreaList(request, env, url);
   if (path === "/api/v1/popularity-ranked") return await handlePopularityRanked(request, env, url);
   if (path === "/api/v1/freshness-alerts") return await handleFreshnessAlerts(request, env, url);
-  // Step 2 Wave 1 — content endpoints (read)
+  // Wave 2 — POST ingest (X-API-Key 보호)
+  if (path === "/api/v1/content/ingest" && request.method === "POST") {
+    const { handleContentIngest } = await import("./content.js");
+    return await handleContentIngest(request, env, url);
+  }
+  // Wave 1 — read endpoints
   if (path === "/api/v1/content") {
     const { handleContentList } = await import("./content.js");
     return await handleContentList(request, env, url);
@@ -451,11 +457,13 @@ export async function handleApi(request, env, ctx, url) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS });
   }
-  if (request.method !== "GET") {
+  // GET 가 기본, /content/ingest 만 POST 허용
+  const path = url.pathname;
+  const isIngestPost = path === "/api/v1/content/ingest" && request.method === "POST";
+  if (request.method !== "GET" && !isIngestPost) {
     return err(405, "METHOD_NOT_ALLOWED", `${request.method} not allowed`);
   }
   const t0 = Date.now();
-  const path = url.pathname;
   const handlerName = handlerFromPath(path);
 
   // _health 는 rate limit 미적용 (모니터링/uptime 핸들러)
