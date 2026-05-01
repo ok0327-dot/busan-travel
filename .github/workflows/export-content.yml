@@ -1,0 +1,65 @@
+name: export-content
+
+# content/{yyyy-mm}/{slug}.md 변경 시 frontend JSON 빌드 + commit + push.
+# Step 2 Wave 2 의 ingest API (POST /api/v1/content/ingest) 가 만든 commit 을
+# 자동으로 라이브에 반영. collect.yml 의 daily cron 에 의존하지 않음.
+#
+# 무한 루프 회피:
+#   - paths 에 frontend/public/data/content/** 미포함
+#   - 이 워크플로가 만드는 commit 은 frontend/public/data/content/ 만 변경
+#   - GitHub Actions 의 GITHUB_TOKEN 으로 push 한 commit 은 다른 workflow 를
+#     trigger 하지 않음 (default behavior) — 이중 안전 장치
+#
+# Cloudflare Workers Builds 는 main 의 모든 push 를 감지해 자동 deploy.
+# ingest commit + 본 워크플로 의 export commit 두 push 모두 deploy 트리거.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "content/**"
+      - "scripts/export_content.py"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: busan-travel-export-content
+  cancel-in-progress: false
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      # markdown + PyYAML 만 필요 — 외부 API 의존 0
+      - name: Install minimal deps
+        run: pip install "markdown>=3.5" "PyYAML>=6.0"
+
+      - name: Export content (markdown + frontmatter → JSON)
+        run: python scripts/export_content.py
+
+      - name: Commit & push
+        run: |
+          git config user.email "claude-bot@users.noreply.github.com"
+          git config user.name "busan-travel-bot"
+          git add frontend/public/data/content/
+          if git diff --staged --quiet; then
+            echo "no content data changes — skip"
+          else
+            TS=$(date -u +'%Y-%m-%dT%H:%MZ')
+            git commit -m "content: export $TS"
+            git push
+          fi

@@ -273,7 +273,11 @@ paths:
         blog-automation → busan-travel/content/{yyyy-mm}/{slug}.md 를 GitHub Contents
         API 로 commit. 신규는 create, 기존 slug 면 update (sha 자동 조회).
         commit message prefix: `content: publish {slug}` 또는 `content: update {slug}`.
-        실제 read API 노출은 다음 정적 빌드(scripts/export_content.py 실행) 후.
+
+        **라이브 반영**: ingest 가 commit 을 생성하면 GitHub Actions 의
+        `export-content` workflow 가 자동 trigger → frontend/public/data/content/
+        JSON 빌드 + commit + push → Cloudflare Workers Builds 자동 deploy.
+        ingest 응답부터 `/content/{slug}` 라이브까지 ~3-5분.
 
         **인증**: `X-API-Key` 헤더 필수 (env.INGEST_API_KEY 와 일치).
         **rate limit**: 60/min/IP — 일반 read 와 공통 적용.

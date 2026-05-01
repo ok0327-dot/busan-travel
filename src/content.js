@@ -287,7 +287,7 @@ export async function handleContentIngest(request, env, url) {
       github_commit_sha: j.commit?.sha || null,
       github_html_url: j.commit?.html_url || null,
       public_url: `https://busan-travel.dk0327.workers.dev/content/${meta.slug}`,
-      note: "정적 빌드 후 노출 — daily cron 또는 다음 push 가 export_content.py 실행 시점에 read API 노출",
+      note: "export-content workflow 가 자동 trigger 되어 ~3-5분 내 라이브 반영 (Cloudflare deploy 포함)",
     },
     meta: {
       schema_version: SCHEMA_VERSION,
