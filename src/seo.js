@@ -265,8 +265,9 @@ export async function handleSpaPage(request, env, ctx, url) {
     }
   } catch { /* meta 못 만들면 fallthrough = 기본 index.html */ }
 
-  // index.html 정적 fetch (with original request 로 그대로)
-  const indexReq = new Request(url.origin + "/index.html", request);
+  // 정적 index 가져오기 — ASSETS 는 /index.html 직접 요청을 / 로 307 하므로
+  // root path 로 요청해야 200 + index.html 본문을 받을 수 있음.
+  const indexReq = new Request(url.origin + "/", request);
   const res = await env.ASSETS.fetch(indexReq);
 
   if (!meta) return res;
