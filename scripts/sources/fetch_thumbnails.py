@@ -39,11 +39,18 @@ UA = "busan-travel-archive-collector/1.0 (+https://busan-travel.dk0327.workers.d
 HEADERS = {"User-Agent": UA}
 
 KTO_BASE = "https://phoko.visitkorea.or.kr"
-KTO_LIST_URL = f"{KTO_BASE}/media/mediaList.kto"
+KTO_LIST_URL = f"{KTO_BASE}/media/mediaList.kto"  # search_count 추출 (1회)
+KTO_AJAX_URL = f"{KTO_BASE}/media/mediaList_ajax.kto"  # 페이지네이션 (POST)
 KTO_CDN = "https://conlab.visitkorea.or.kr"
 KTO_REGN_BUSAN = "23"
+KTO_PER_PAGE = 35  # AJAX response 의 실제 page size (lastRecordIndex 무시되는 듯)
 KTO_RPS = 2.0  # ≤ 2 RPS
 KTO_SLEEP = 1.0 / KTO_RPS  # 0.5s
+KTO_AJAX_HEADERS = {
+    **HEADERS,
+    "X-Requested-With": "XMLHttpRequest",
+    "Referer": f"{KTO_LIST_URL}?allRegnCd={KTO_REGN_BUSAN}",
+}
 
 ARCHIVE_BASE = "https://archive.visitbusan.net"
 ARCHIVE_LIST_URL = f"{ARCHIVE_BASE}/dataSearch/list.nm"
@@ -54,6 +61,8 @@ ARCHIVE_SLEEP = 1.0 / ARCHIVE_RPS  # 1.0s
 UUID_RE = re.compile(r"download-image/([0-9a-f-]{36})")
 DATASID_RE = re.compile(r"dataSid=(METADATA\d+)")
 FN_PAGE_RE = re.compile(r"fn_page\('(\d+)'\)")
+KTO_TOTAL_RE = re.compile(r'class="[^"]*search_count[^"]*">([0-9,]+)</span>')
+ARCHIVE_PER_PAGE = 60
 
 # ───────────────────── DB ─────────────────────
 
@@ -183,36 +192,77 @@ def parse_kto_list_page(html: str) -> list[dict]:
     return items
 
 
+def parse_kto_total_count(html: str) -> int | None:
+    """첫 페이지 raw HTML 에서 '<span class=search_count>4,181</span>' 추출."""
+    m = KTO_TOTAL_RE.search(html)
+    if not m:
+        return None
+    try:
+        return int(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def fetch_kto_ajax(session: requests.Session, first: int) -> str:
+    """POST /media/mediaList_ajax.kto — 페이지네이션 AJAX endpoint."""
+    r = session.post(
+        KTO_AJAX_URL,
+        data={
+            "allRegnCd": KTO_REGN_BUSAN,
+            "firstRecordIndex": str(first),
+            "lastRecordIndex": str(first + KTO_PER_PAGE - 1),
+            "sortingField": "",
+            "searchGbn": "",
+            "photoCd": "",
+            "keyword": "",
+        },
+        headers=KTO_AJAX_HEADERS,
+        timeout=20,
+    )
+    r.raise_for_status()
+    return r.text
+
+
 def run_kto(con: sqlite3.Connection, session: requests.Session, *, limit_pages: int | None = None) -> tuple[int, int]:
+    """KTO 부산 콘텐츠 수집 — AJAX endpoint + firstRecordIndex 35씩 증분."""
     print(f"[kto] start — busan (allRegnCd={KTO_REGN_BUSAN})")
     fetched = 0
     skipped = 0
-    page = 1
-    consecutive_empty = 0
-    while True:
-        if limit_pages is not None and page > limit_pages:
-            print(f"[kto] limit-pages={limit_pages} reached, stop")
-            break
-        url = f"{KTO_LIST_URL}?allRegnCd={KTO_REGN_BUSAN}&page={page}"
+    # 1) 첫 GET 페이지로 total count 추출
+    try:
+        r = session.get(f"{KTO_LIST_URL}?allRegnCd={KTO_REGN_BUSAN}", headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        total = parse_kto_total_count(r.text)
+    except Exception as e:
+        print(f"[kto] initial GET fail: {e}")
+        return 0, 0
+    if total is None:
+        print("[kto] WARNING — total count 추출 실패. fallback total=5000")
+        total = 5000
+    last_page = (total + KTO_PER_PAGE - 1) // KTO_PER_PAGE
+    if limit_pages is not None:
+        last_page = min(last_page, limit_pages)
+    print(f"[kto] total={total} → last_page={last_page} (per_page={KTO_PER_PAGE})")
+    # 2) AJAX 페이지네이션 — 안전망: 이전 page UUID set 과 동일하면 stop
+    prev_uuids: set[str] = set()
+    for page in range(1, last_page + 1):
+        first = (page - 1) * KTO_PER_PAGE
         try:
-            r = session.get(url, headers=HEADERS, timeout=15)
-            r.raise_for_status()
+            html = fetch_kto_ajax(session, first)
         except Exception as e:
-            print(f"[kto] page {page} list fetch fail: {e}")
-            record_failure(con, "kto", f"list-page-{page}", "list", url, str(e))
-            page += 1
+            print(f"[kto] page {page} (first={first}) ajax fail: {e}")
+            record_failure(con, "kto", f"ajax-{first}", "list", KTO_AJAX_URL, str(e))
             time.sleep(KTO_SLEEP)
             continue
-        items = parse_kto_list_page(r.text)
+        items = parse_kto_list_page(html)
         if not items:
-            consecutive_empty += 1
-            print(f"[kto] page {page} empty (consecutive={consecutive_empty})")
-            if consecutive_empty >= 2:
-                print(f"[kto] stop — 2 consecutive empty pages")
-                break
-        else:
-            consecutive_empty = 0
-        # 썸네일 다운로드
+            print(f"[kto] page {page} (first={first}) empty — stop")
+            break
+        cur_uuids = {item["uuid"] for item in items}
+        if prev_uuids and cur_uuids == prev_uuids:
+            print(f"[kto] page {page} same UUID set as prev — stop (page over)")
+            break
+        prev_uuids = cur_uuids
         for item in items:
             if already_fetched(con, "kto", item["uuid"]):
                 skipped += 1
@@ -232,7 +282,7 @@ def run_kto(con: sqlite3.Connection, session: requests.Session, *, limit_pages: 
                 category_l2=None,
                 category_l3=None,
                 gugun="부산광역시",
-                attribution=f"©한국관광공사 포토코리아",
+                attribution="©한국관광공사 포토코리아",
                 thumb_path=str(dest.relative_to(ROOT)),
                 thumb_url=item["thumb_url"],
                 original_url=item["original_url"],
@@ -241,9 +291,8 @@ def run_kto(con: sqlite3.Connection, session: requests.Session, *, limit_pages: 
             )
             fetched += 1
             time.sleep(KTO_SLEEP)
-        if page % 10 == 0 or items:
-            print(f"[kto] page {page} done — got {len(items)} items / total fetched={fetched} skipped={skipped}")
-        page += 1
+        if page % 10 == 0 or page == 1:
+            print(f"[kto] page {page}/{last_page} done (first={first}) — got {len(items)} / fetched={fetched} skipped={skipped}")
     return fetched, skipped
 
 
