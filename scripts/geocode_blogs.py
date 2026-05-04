@@ -34,7 +34,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from config import DB_PATH
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "events.db"
 
 BUSAN_BBOX = (34.9, 35.5, 128.7, 129.4)  # lat_min, lat_max, lon_min, lon_max
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"

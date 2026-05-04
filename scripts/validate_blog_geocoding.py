@@ -25,7 +25,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-from config import DB_PATH
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "events.db"
 
 KAKAO_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 BUSAN_GU = [

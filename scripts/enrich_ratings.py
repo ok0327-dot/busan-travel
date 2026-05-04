@@ -25,9 +25,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(ROOT))
-from config import DB_PATH  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "events.db"
 
 NAVER_BLOG_SEARCH_URL = "https://openapi.naver.com/v1/search/blog"
 ENRICH_STALE_DAYS = 7
