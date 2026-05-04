@@ -54,7 +54,7 @@ KTO_AJAX_HEADERS = {
 
 ARCHIVE_BASE = "https://archive.visitbusan.net"
 ARCHIVE_LIST_URL = f"{ARCHIVE_BASE}/dataSearch/list.nm"
-ARCHIVE_THUMB_BASE = "https://www.visitbusan.net"  # /upload/... 절대 경로
+ARCHIVE_THUMB_BASE = "https://archive.visitbusan.net"  # /upload/... 는 archive 호스트 path. www.visitbusan.net 은 동일 path 에 200+HTML 에러를 반환해 silent fail.
 ARCHIVE_RPS = 1.0
 ARCHIVE_SLEEP = 1.0 / ARCHIVE_RPS  # 1.0s
 
@@ -154,11 +154,26 @@ def download_image(url: str, dest: Path, session: requests.Session) -> tuple[boo
     try:
         r = session.get(url, headers=HEADERS, timeout=30, stream=True)
         r.raise_for_status()
+        ct = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        if not ct.startswith("image/"):
+            # 일부 origin 은 200+HTML 에러를 반환 (www.visitbusan.net silent fail 케이스 등). magic byte 도 함께 거부.
+            return False, f"non-image content-type: {ct!r}"
         dest.parent.mkdir(parents=True, exist_ok=True)
+        first = b""
         with open(dest, "wb") as f:
             for chunk in r.iter_content(chunk_size=64 * 1024):
-                if chunk:
-                    f.write(chunk)
+                if not chunk:
+                    continue
+                if not first:
+                    first = chunk[:8]
+                f.write(chunk)
+        # JPEG/PNG/GIF/WebP magic byte 검증
+        if not (first.startswith(b"\xff\xd8\xff") or first.startswith(b"\x89PNG") or first[:6] in (b"GIF87a", b"GIF89a") or (first[:4] == b"RIFF" and len(first) >= 8)):
+            try:
+                dest.unlink()
+            except FileNotFoundError:
+                pass
+            return False, f"bad magic byte: {first!r}"
         return True, ""
     except Exception as e:
         return False, str(e)
