@@ -33,6 +33,17 @@ jobs:
         with:
           fetch-depth: 1
 
+      # api-vault sister repo — Naver/Kakao/data.go.kr 통합 라우터.
+      # Private repo 라 PAT 필요 (secret API_VAULT_TOKEN, repo:read 권한).
+      # PAT 미설정 시 step fail → workflow fail → Issue 자동 생성 (P0-4 정신).
+      - name: Checkout api-vault
+        uses: actions/checkout@v4
+        with:
+          repository: ok0327-dot/api-vault
+          path: api-vault
+          fetch-depth: 1
+          token: ${{ secrets.API_VAULT_TOKEN }}
+
       - name: Verify vendored gov-api-kr
         run: |
           if [ ! -f vendor/gov-api-kr/snippets/_caller_template.py ]; then
@@ -47,7 +58,10 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Install deps
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          # api-vault editable install — Naver search_local 등 portal 호출 라우터.
+          pip install -e ./api-vault
 
       - name: Lint overrides (audit P1-2 가드 / classification override coverage)
         run: python scripts/lint_overrides.py

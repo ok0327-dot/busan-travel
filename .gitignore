@@ -24,3 +24,7 @@ vendor/gov-api-kr/data/
 .wrangler/
 # Google Takeout 원본 압축 해제 임시폴더 (parser 실행용, 결과는 my-favorites.json 에 반영됨)
 .tmp-google-takeout/
+# api-vault sister repo — collect.yml 에서 actions/checkout 으로 받음 (로컬 작업 시 동일 path 시뮬레이션)
+/api-vault/
+# 썸네일 수집 로그 (Step 5.2a)
+/logs/
