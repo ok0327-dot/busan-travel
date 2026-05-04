@@ -13,7 +13,8 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from config import DB_PATH
+ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = ROOT / "data" / "events.db"
 
 # {post_id: (place_name_or_None, confidence, reason)}
 LABELS: dict[int, tuple[str | None, float, str]] = {
