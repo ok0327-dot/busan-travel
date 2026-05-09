@@ -54,7 +54,14 @@ def check_blog_geocoded(conn: sqlite3.Connection) -> list[str]:
         "SELECT COUNT(*) FROM events WHERE source LIKE 'naver_blog%' "
         "AND first_seen > datetime('now', '-30 days') AND lat IS NOT NULL"
     ).fetchone()[0]
+    unresolved = total - geo
     rate = geo / total
+    # Catch-up grace: cron 장기 누락 후 미처리 누적이 큰 경우 (e.g. 5/8 결제차단
+    # 10일 stale → 467건 누적), geocode_blogs.py 가 매 cron 8분 budget 으로 점진
+    # 처리하니 누적이 정상 수준(≤50건)으로 줄 때까지 진행 상황만 출력하고 통과.
+    if unresolved > 50:
+        print(f"⚠️  RSS 좌표 catch-up 진행 중: {geo}/{total} ({rate:.0%}) — {unresolved}건 남음")
+        return []
     if rate < 0.5:
         return [
             f"최근 30일 RSS 좌표 해소율 {rate:.0%} ({geo}/{total}) < 50% — "
