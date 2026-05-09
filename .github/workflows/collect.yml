@@ -143,16 +143,15 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.weather_kma_short
 
-      - name: KMA mid-range (승인 전 SKIP)
+      # 2026-05-09 활용신청 승인 + 라이브 호출 검증 완료 (15059468/15073877/15073861).
+      - name: KMA mid-range
         if: steps.mode.outputs.mode != 'events-only'
-        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.weather_kma_mid
 
-      - name: Air quality (승인 전 SKIP)
+      - name: Air quality
         if: steps.mode.outputs.mode != 'events-only'
-        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.air_korea
