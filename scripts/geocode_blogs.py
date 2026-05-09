@@ -174,7 +174,7 @@ def kakao_search(rest_key: str, query: str) -> tuple[float | None, float | None]
 # ─────────── 메인 ───────────
 
 
-def main(limit: int = 0, dry_run: bool = False):
+def main(limit: int = 0, dry_run: bool = False, time_budget_min: int = 0):
     load_dotenv()
     gemini_key = os.environ.get("GEMINI_API_KEY", "").strip('"\'')
     kakao_key = os.environ.get("KAKAO_REST_KEY", "").strip('"\'')
@@ -198,10 +198,22 @@ def main(limit: int = 0, dry_run: bool = False):
         rows = rows[:limit]
     print(f"대상: {len(rows)} 포스트", file=sys.stderr)
 
-    stats = {"extracted": 0, "skipped_low_conf": 0, "skipped_no_place": 0, "geocoded": 0, "oob": 0, "awaiting_kakao": 0}
+    stats = {"extracted": 0, "skipped_low_conf": 0, "skipped_no_place": 0, "geocoded": 0, "oob": 0, "awaiting_kakao": 0, "budget_exit": 0}
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+    # Time budget guard — 5/7 사고 (Gemini 429 누적 6h hang) 재발 방지.
+    # 0 = 무제한, >0 = N분 후 graceful exit (남은 row 는 다음 cron 에).
+    deadline = time.monotonic() + time_budget_min * 60 if time_budget_min > 0 else None
+
     for i, r in enumerate(rows):
+        if deadline is not None and time.monotonic() > deadline:
+            stats["budget_exit"] = len(rows) - i
+            print(
+                f"\n[budget] {time_budget_min}min 초과 — row {i}/{len(rows)} 에서 graceful exit "
+                f"({stats['budget_exit']} 건은 다음 cron 에 처리)",
+                file=sys.stderr,
+            )
+            break
         # 캐시 체크: 이미 Gemini 돌렸으면 재추출 건너뜀 (tags_json 에 저장)
         cached = None
         if r["tags_json"]:
@@ -271,5 +283,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--limit", type=int, default=0, help="샘플링 (0=전체)")
     p.add_argument("--dry-run", action="store_true", help="DB 업데이트 안 함")
+    p.add_argument("--time-budget-min", type=int, default=0,
+                   help="시간 예산 (분, 0=무제한). 초과 시 graceful exit 후 남은 row 는 다음 호출에.")
     args = p.parse_args()
-    sys.exit(main(limit=args.limit, dry_run=args.dry_run))
+    sys.exit(main(limit=args.limit, dry_run=args.dry_run, time_budget_min=args.time_budget_min))

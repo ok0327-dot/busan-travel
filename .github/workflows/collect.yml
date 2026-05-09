@@ -116,16 +116,20 @@ jobs:
       # geocode_blogs.py = lat IS NULL 인 row 만 Gemini+Kakao 로 좌표 해소 (idempotent)
       - name: Apply blog labels (정적 수동 라벨 / static labels)
         if: steps.mode.outputs.mode != 'weather-only'
+        timeout-minutes: 5
         run: python scripts/apply_blog_labels.py
 
       # GEMINI_API_KEY 누락 시 exit 1 → step fail (P0-4 silent skip 차단 정신).
       # KAKAO_REST_KEY 누락 시 graceful skip — 좌표 해소만 건너뜀, 장소명 추출은 진행.
+      # 2-layer hang guard: workflow timeout-minutes + script --time-budget-min.
+      # 5/7 22:32 사고: Gemini 429 누적으로 6h hang → max execution timeout → billing 한도 초과.
       - name: Geocode blog posts (Gemini + Kakao, lat IS NULL 만)
         if: steps.mode.outputs.mode != 'weather-only'
+        timeout-minutes: 10
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
-        run: python scripts/geocode_blogs.py
+        run: python scripts/geocode_blogs.py --time-budget-min 8
 
       - name: Seed beach POIs
         if: steps.mode.outputs.mode != 'weather-only'
