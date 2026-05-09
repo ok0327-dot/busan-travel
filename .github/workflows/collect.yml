@@ -182,10 +182,14 @@ jobs:
         if: steps.mode.outputs.mode != 'weather-only'
         run: python scripts/export_content.py
 
-      # GEMINI_API_KEY 누락 시 ai_summary.py 가 exit 1 → step fail → workflow fail.
-      # silent skip 으로 어제 picks 가 stale 노출되던 위험 차단.
+      # GEMINI_API_KEY 누락 시 ai_summary.py 가 exit 1 → step fail.
+      # AI summary 는 nice-to-have (ai-summary.json 갱신만) — 핵심 데이터 push 를
+      # 차단하면 안 됨. Gemini 429 (geocode 와 quota 공유) 빈발 → continue-on-error.
+      # 실패해도 ai-summary.json 만 stale, 다음 cron 자동 회복.
       - name: AI summary (Gemini 2.5 Flash, 매일만)
         if: steps.mode.outputs.mode == 'all'
+        continue-on-error: true
+        timeout-minutes: 5
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/ai_summary.py
