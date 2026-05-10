@@ -138,6 +138,19 @@ jobs:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.gov_beach
 
+      # 인기 맛집·카페 TOP10 카드의 이미지/스토리 보강 (NAVER 이미지+블로그 검색).
+      # naver_local 49건 100% 이미지 누락 + busan_food 35% 누락이 주 타겟.
+      # NAVER quota 25K/일 무료, top-n=50 × 2 calls = 100/일 (0.4%).
+      # continue-on-error: 보강 실패가 데이터 push 차단 안 함.
+      - name: Enrich TOP food/cafe (NAVER 이미지+블로그)
+        if: steps.mode.outputs.mode != 'weather-only'
+        timeout-minutes: 5
+        continue-on-error: true
+        env:
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+        run: python scripts/enrich_top_food.py --time-budget-min 4 --top-n 50
+
       - name: KMA short-range weather
         if: steps.mode.outputs.mode != 'events-only'
         env:
