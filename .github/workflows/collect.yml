@@ -208,7 +208,18 @@ jobs:
             # GitHub Actions 무한 루프 위험 없음. Cloudflare Workers Builds 가
             # 매 commit 자동 deploy 하도록 (기존엔 [skip ci] 때문에 라이브 stale).
             git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }})"
-            git push
+            # Race condition 방지: schedule + manual / 인접 cron 끼리 동시에 push
+            # 시 ! [rejected] main -> main (fetch first) 발생. 최대 3회 rebase + 재시도.
+            # data 파일은 모두 generated 라 conflict 없이 fast-forward 됨.
+            for attempt in 1 2 3; do
+              if git push; then
+                echo "push success (attempt $attempt)"
+                break
+              fi
+              echo "push attempt $attempt 실패 — fetch + rebase 후 재시도"
+              git fetch origin main
+              git rebase origin/main || { echo "rebase conflict — abort"; git rebase --abort; exit 1; }
+            done
           fi
 
       # R2 backup — 어댑터들이 새로 fetch 한 db 영속화. cache 보다 안정.
