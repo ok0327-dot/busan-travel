@@ -21,7 +21,7 @@ MAX_PAGES = 30  # 총 16페이지(159건) 전후, 여유 있게
 session = HTTPSession(SOURCE, rate_limit_s=0.2)
 
 DATE_RANGE_RE = re.compile(r"(\d{4}\.\d{2}\.\d{2})\s*~\s*(\d{4}\.\d{2}\.\d{2})")
-FN_VIEW_RE = re.compile(r"fn_view\('(\d+)'\)")
+FN_VIEW_RE = re.compile(r"fn_view\('(\d+)'")  # 사이트가 2번째 인자(카테고리코드) 추가 → 첫 인자(res_no)만 추출
 IMG_RE = re.compile(r'src="(/images/contents/[^"]+)"')
 LI_RE = re.compile(r"<li[^>]*>.*?</li>", re.DOTALL)
 

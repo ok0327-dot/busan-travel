@@ -82,6 +82,16 @@ def run() -> int:
         )
         return 1
     conn = connect(DB_PATH)
+
+    # Deprecated source cleanup (idempotent) — busan_attraction 은 vb_attraction 과
+    # 100% title overlap (212/212). main SOURCES 에 없어 stale 잔재로 manifest 노이즈.
+    deprecated_sources = ("busan_attraction",)
+    for src in deprecated_sources:
+        cur = conn.execute("DELETE FROM events WHERE source = ?", (src,))
+        if cur.rowcount > 0:
+            print(f"[cleanup] deprecated source '{src}' → {cur.rowcount} rows 제거")
+    conn.commit()
+
     total_new = total_upd = 0
     total_filter = {"keep": 0, "minor": 0, "drop": 0}
     for name, fetch_fn in SOURCES:

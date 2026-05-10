@@ -72,15 +72,25 @@ EXTRACT_PROMPT = """다음 네이버 블로그 포스트에서 **부산 내 방�
 
 
 class Gemini:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, deadline: float | None = None):
         self.api_key = api_key
         self.last_t = 0.0
+        # 5/9 22:05 사고: per-day quota 소진 시 매 row 5번 retry × 60s = 5분/row →
+        # workflow 10분 timeout 에 막혀 강제종료. deadline 을 retry/wait 도중에도
+        # 체크 + PerDay 시그널 즉시 종료 (24h 후 quota reset → 다음 cron 처리).
+        self.deadline = deadline
+
+    def _check_deadline(self) -> None:
+        if self.deadline and time.monotonic() > self.deadline:
+            print("  [budget] retry 도중 deadline 초과 — script 종료", file=sys.stderr)
+            raise SystemExit(0)
 
     def extract_place(self, title: str, description: str | None) -> dict:
         now = time.monotonic()
         dt = now - self.last_t
         if dt < RATE_LIMIT_S:
             time.sleep(RATE_LIMIT_S - dt)
+            self._check_deadline()
         self.last_t = time.monotonic()
 
         prompt = EXTRACT_PROMPT.replace("{title}", title).replace(
@@ -114,16 +124,25 @@ class Gemini:
                     timeout=30,
                 )
                 if r.status_code == 429:
-                    # Google 은 response body 에 "Please retry in Xs" 힌트를 담음
+                    msg = ""
                     try:
                         msg = r.json().get("error", {}).get("message", "")
-                        import re as _re
-                        m = _re.search(r"retry in ([\d.]+)", msg)
-                        wait_s = min(90, float(m.group(1)) + 2) if m else 20 * (attempt + 1)
                     except (ValueError, AttributeError):
-                        wait_s = 20 * (attempt + 1)
-                    print(f"  [gemini 429] wait {wait_s:.0f}s (attempt {attempt+1}/5)", file=sys.stderr)
+                        pass
+                    # Daily quota 소진 시그널 — Google 표준 메시지 'PerDay'.
+                    # 추가 retry 무의미 (24h 까지 회복 안 됨) → 즉시 graceful exit.
+                    if "PerDay" in msg:
+                        print(f"  [gemini] per-day quota 소진 — script 종료, "
+                              "다음 cron 대기 (24h 내 reset)", file=sys.stderr)
+                        raise SystemExit(0)
+                    # Per-minute quota — 짧게 wait 후 retry. retry 도중 deadline 체크.
+                    import re as _re
+                    m = _re.search(r"retry in ([\d.]+)", msg)
+                    wait_s = min(60, float(m.group(1)) + 2) if m else 15 * (attempt + 1)
+                    print(f"  [gemini 429 RPM] wait {wait_s:.0f}s (attempt {attempt+1}/5)",
+                          file=sys.stderr)
                     time.sleep(wait_s)
+                    self._check_deadline()
                     continue
                 r.raise_for_status()
                 data = r.json()
@@ -184,7 +203,11 @@ def main(limit: int = 0, dry_run: bool = False, time_budget_min: int = 0):
     kakao_available = bool(kakao_key)
     if not kakao_available:
         print("WARNING: KAKAO_REST_KEY 미설정 → 장소명만 추출, 좌표 해소는 건너뜀.", file=sys.stderr)
-    gemini = Gemini(gemini_key)
+    # deadline 을 Gemini 클래스에 위임 — retry/wait 도중에도 budget 체크.
+    deadline_for_gemini = (
+        time.monotonic() + time_budget_min * 60 if time_budget_min > 0 else None
+    )
+    gemini = Gemini(gemini_key, deadline=deadline_for_gemini)
 
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -203,7 +226,8 @@ def main(limit: int = 0, dry_run: bool = False, time_budget_min: int = 0):
 
     # Time budget guard — 5/7 사고 (Gemini 429 누적 6h hang) 재발 방지.
     # 0 = 무제한, >0 = N분 후 graceful exit (남은 row 는 다음 cron 에).
-    deadline = time.monotonic() + time_budget_min * 60 if time_budget_min > 0 else None
+    # Gemini 의 deadline 과 동일 기준 (둘 다 monotonic 기준 계산).
+    deadline = deadline_for_gemini
 
     for i, r in enumerate(rows):
         if deadline is not None and time.monotonic() > deadline:
