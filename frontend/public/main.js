@@ -1654,12 +1654,18 @@ function _popularItemHTML(p, idx, kind) {
   const thumb = p.image
     ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
     : `<div class="popular-thumb popular-thumb-empty">${emoji}</div>`;
+  // 스토리/히스토리 — excerpt(story_excerpt) > description, 30자 미만은 카테고리 텍스트라 noise → 생략.
+  const story = (p.excerpt || p.description || "").trim();
+  const storyHTML = story.length >= 30
+    ? `<div class="popular-story">${escape(story.slice(0, 90))}${story.length > 90 ? "…" : ""}</div>`
+    : "";
   return `<button class="popular-card" data-idx="${idx}" data-kind="${kind}">
     ${thumb}
     <div class="popular-rank">${idx + 1}</div>
     <div class="popular-body">
       <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
       <div class="popular-meta">${trailing}${sub ? " · " + sub : ""}</div>
+      ${storyHTML}
     </div>
   </button>`;
 }

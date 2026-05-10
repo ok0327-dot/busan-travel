@@ -1635,6 +1635,17 @@ body.view-course #filter-row { display: none !important; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 인기 TOP10 카드의 스토리/히스토리 — vb_food 의 description(부산족발/북경/신발원 등) */
+.popular-story {
+  font: 400 11px/1.4 Pretendard, sans-serif;
+  color: #cbd5e1;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ───────── 마커 클릭 detail 에서 카드 리스트 복귀 버튼 ───────── */
 .detail-back {
