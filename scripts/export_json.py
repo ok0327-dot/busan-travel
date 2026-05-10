@@ -446,11 +446,14 @@ def export_weather_short(conn: sqlite3.Connection) -> int:
 
 
 def export_weather_mid(conn: sqlite3.Connection) -> int:
+    # KMA 중기예보 응답이 D+3/D+4 일부 항목을 누락 (단기예보 cover 영역).
+    # tmp 가 None 인 row 는 라이브 차트에 빈 칸으로 보이니 export 시 skip.
+    # (단기예보가 D+0~D+3 까지 cover 하므로 weather-short 가 그 영역 보강.)
     rows = [
         {"ts": r[0], "tmp": r[1], "pty": r[2], "sky": r[3], "pop": r[4]}
         for r in conn.execute(
             "SELECT fcst_ts, tmp, pty, sky, pop FROM weather_fcst "
-            "WHERE source='mid' ORDER BY fcst_ts"
+            "WHERE source='mid' AND tmp IS NOT NULL ORDER BY fcst_ts"
         )
     ]
     (OUT_DIR / "weather-mid.json").write_text(
