@@ -34,29 +34,23 @@ def _to_float(v):
 
 
 def seed_stations(conn: sqlite3.Connection) -> int:
-    """부산 측정소 목록 → air_station 테이블. TM(EPSG:5174) → WGS84 는 pyproj 필요.
+    """부산 측정소 목록 → air_station 테이블.
 
-    pyproj 없으면 lat/lon 은 None 으로 두고, 이름으로만 저장.
-    Kakao Geocoder 로 addr 좌표 해소하는 걸 fallback 으로.
+    중요: data.go.kr 환경공단 API 의 dmX/dmY 는 이름과 달리 **이미 WGS84 위경도**.
+    (실측: 광복동 dmX=35.099849 dmY=129.030344 — 부산 위경도와 일치.)
+    이전 코드는 EPSG:5174 TM 좌표로 잘못 가정 → pyproj 변환 후 동중국해 좌표(33.47, 124.85)
+    잘못 노출. 직접 매핑으로 정정 (2026-05-10).
     """
     r = call_api(API_ID_STN, OP_STN, pageNo=1, numOfRows=200, addr="부산")
     if r["result_code"] == "PENDING":
         print(f"[{SOURCE}] station SKIP: {r['result_msg']}", file=sys.stderr)
         return 0
-    try:
-        from pyproj import Transformer
-        tr = Transformer.from_crs("EPSG:5174", "EPSG:4326", always_xy=True)
-    except ImportError:
-        tr = None
-        print(f"[{SOURCE}] pyproj 없음 — TM 변환 스킵", file=sys.stderr)
 
     rows = 0
     for it in r.get("items", []):
-        tm_x = _to_float(it.get("dmX"))
-        tm_y = _to_float(it.get("dmY"))
-        lat = lon = None
-        if tr and tm_x and tm_y:
-            lon, lat = tr.transform(tm_x, tm_y)
+        # dmX = 위도, dmY = 경도 (X/Y 명명과 반대로)
+        lat = _to_float(it.get("dmX"))
+        lon = _to_float(it.get("dmY"))
         conn.execute(
             """INSERT OR REPLACE INTO air_station (code, name, sido, addr, lat, lon, tm_x, tm_y)
                VALUES (?,?,?,?,?,?,?,?)""",
@@ -65,7 +59,7 @@ def seed_stations(conn: sqlite3.Connection) -> int:
                 it.get("stationName") or "",
                 "부산",
                 it.get("addr"),
-                lat, lon, tm_x, tm_y,
+                lat, lon, lat, lon,
             ),
         )
         rows += 1
