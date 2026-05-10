@@ -90,6 +90,17 @@ def run() -> int:
         cur = conn.execute("DELETE FROM events WHERE source = ?", (src,))
         if cur.rowcount > 0:
             print(f"[cleanup] deprecated source '{src}' → {cur.rowcount} rows 제거")
+
+    # 키워드 기반 노이즈 row 직접 삭제 (filter_events 의 NEGATIVE_KEYWORDS 와 동일 정책).
+    # 다음 export 까지 기다리지 않고 DB 자체에서 즉시 정리 → R2 backup 도 깨끗.
+    deprecated_keywords = ("청년내일저축계좌", "저축계좌", "신규 참여자 모집", "신규참여자 모집")
+    for kw in deprecated_keywords:
+        cur = conn.execute(
+            "DELETE FROM events WHERE title LIKE ? OR description LIKE ?",
+            (f"%{kw}%", f"%{kw}%"),
+        )
+        if cur.rowcount > 0:
+            print(f"[cleanup] keyword '{kw}' → {cur.rowcount} rows 제거")
     conn.commit()
 
     total_new = total_upd = 0
