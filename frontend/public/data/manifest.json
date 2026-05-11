@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-11T10:11:07+00:00",
-  "version": "20260511T101107",
+  "generated_at": "2026-05-11T15:48:15+00:00",
+  "version": "20260511T154815",
   "scope": "weather",
   "counts": {
     "places": 664,
@@ -30,7 +30,7 @@
     },
     "weather_short_rows": 20916,
     "weather_mid_rows": 6,
-    "air_quality_rows": 525,
+    "air_quality_rows": 560,
     "beaches": 7
   },
   "adapters": {
