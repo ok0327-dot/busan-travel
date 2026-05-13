@@ -208,32 +208,49 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/ai_summary.py
 
+      # Race-safe commit & push (audit 2026-05-13 P0):
+      # KST 06:23 all-mode cron 이 21m 실행되는 동안 22:37 weather-only cron 이 큐잉되어
+      # 같은 manifest.json 을 다른 scope 으로 동시 갱신 → 기존 rebase 시도가 hunk 충돌로
+      # abort 되며 weather-only 결과 손실(다음 cron 까지 3h stale). 이를 정합성 있게 해결:
+      #   ① push 실패 시 fetch + reset --hard origin/main 으로 원격 fresh 상태 채택
+      #   ② events.db 는 /data/* gitignored → reset 무영향 (어댑터 수집물 안전)
+      #   ③ export_json --scope=<X> 는 기존 manifest 를 머지 base 로 읽어 우리 scope 의
+      #      counts 만 overlay → 원격 all-mode 의 places/courses 그대로 + 우리 weather fresh
+      # rebase 없음 → 충돌 없음. 모든 race 시나리오에서 0건 손실.
       - name: Commit & push data
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
         run: |
+          set -e
           git config user.email "claude-bot@users.noreply.github.com"
           git config user.name "busan-travel-bot"
-          git add frontend/public/data/
-          if git diff --staged --quiet; then
-            echo "no data changes"
-          else
+
+          case "$MODE" in
+            weather-only) SCOPE=weather ;;
+            events-only)  SCOPE=events ;;
+            *)            SCOPE=all ;;
+          esac
+
+          for attempt in 1 2 3; do
+            git add frontend/public/data/
+            if git diff --staged --quiet; then
+              echo "no data changes (attempt $attempt)"
+              exit 0
+            fi
             TS=$(date -u +'%Y-%m-%dT%H:%MZ')
-            # [skip ci] 미부착: collect.yml 자체는 schedule trigger 만이라
-            # GitHub Actions 무한 루프 위험 없음. Cloudflare Workers Builds 가
-            # 매 commit 자동 deploy 하도록 (기존엔 [skip ci] 때문에 라이브 stale).
-            git commit -m "data: auto-update $TS (${{ steps.mode.outputs.mode }})"
-            # Race condition 방지: schedule + manual / 인접 cron 끼리 동시에 push
-            # 시 ! [rejected] main -> main (fetch first) 발생. 최대 3회 rebase + 재시도.
-            # data 파일은 모두 generated 라 conflict 없이 fast-forward 됨.
-            for attempt in 1 2 3; do
-              if git push; then
-                echo "push success (attempt $attempt)"
-                break
-              fi
-              echo "push attempt $attempt 실패 — fetch + rebase 후 재시도"
-              git fetch origin main
-              git rebase origin/main || { echo "rebase conflict — abort"; git rebase --abort; exit 1; }
-            done
-          fi
+            git commit -m "data: auto-update $TS ($MODE)"
+            if git push; then
+              echo "push success (attempt $attempt)"
+              exit 0
+            fi
+            echo "push attempt $attempt 실패 — origin reset + scope=$SCOPE 재export"
+            git fetch origin main
+            git reset --hard origin/main
+            python scripts/export_json.py --scope "$SCOPE"
+          done
+
+          echo "3회 모두 push 실패 — 진짜 영구 이슈"
+          exit 1
 
       # R2 backup — 어댑터들이 새로 fetch 한 db 영속화. cache 보다 안정.
       # P1-5 (audit 2026-04-25): upload 가 latest + db/archive/events-YYYY-MM-DD.db 둘 다 저장.
