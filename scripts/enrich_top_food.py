@@ -75,7 +75,8 @@ def main(time_budget_min: int = 0, dry_run: bool = False, top_n: int = 50) -> in
     conn.row_factory = sqlite3.Row
 
     # popularity_score 는 export_json.py 동적 계산이라 DB 컬럼 X.
-    # 대안: rating DESC, naver_reviews DESC — popularity 와 강한 상관.
+    # 대안: rating DESC, naver_review_count DESC — popularity 와 강한 상관.
+    # (export JSON 의 `naver_reviews` 필드는 DB 컬럼 `naver_review_count` 의 alias)
     rows = conn.execute("""
         SELECT id, source, title, address, gugun, image_url, story_excerpt
         FROM events
@@ -83,7 +84,7 @@ def main(time_budget_min: int = 0, dry_run: bool = False, top_n: int = 50) -> in
           AND (image_url IS NULL OR image_url = ''
                OR story_excerpt IS NULL OR story_excerpt = '')
         ORDER BY COALESCE(rating, 0) DESC,
-                 COALESCE(naver_reviews, 0) DESC,
+                 COALESCE(naver_review_count, 0) DESC,
                  id
         LIMIT ?
     """, (top_n,)).fetchall()
@@ -133,10 +134,14 @@ def main(time_budget_min: int = 0, dry_run: bool = False, top_n: int = 50) -> in
             continue
 
         if not dry_run:
+            # COALESCE 는 NULL 만 다룸 → 빈 문자열 row 는 SELECT 에 잡혀도 UPDATE no-op.
+            # CASE WHEN 으로 NULL · '' 둘 다 새 값으로 교체 (idempotent: 채워진 값은 보존).
             conn.execute(
                 "UPDATE events SET "
-                "image_url = COALESCE(image_url, ?), "
-                "story_excerpt = COALESCE(story_excerpt, ?) "
+                "image_url = CASE WHEN image_url IS NULL OR image_url = '' "
+                "                 THEN ? ELSE image_url END, "
+                "story_excerpt = CASE WHEN story_excerpt IS NULL OR story_excerpt = '' "
+                "                     THEN ? ELSE story_excerpt END "
                 "WHERE id = ?",
                 (new_image, new_story, r["id"]),
             )

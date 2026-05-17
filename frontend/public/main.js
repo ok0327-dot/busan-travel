@@ -1591,7 +1591,13 @@ function _newItemHTML(p, idx) {
   const cat = CATEGORIES[p.category] || {};
   const emoji = cat.emoji || "📌";
   const venue = p.gugun || p.venue || (p.address || "").split(" ").slice(1, 2).join("") || "";
-  const meta = p.description ? p.description.slice(0, 35) : (p.start ? p.start.slice(5) : "");
+  // story_excerpt(p.excerpt) 우선 → description. naver_local 의 raw 카테고리 코드
+  // ("음식점>카페,디저트")는 화면 노이즈라 노출 안 함.
+  const isRawCategory = s => s && s.includes(">") && !/\s/.test(s);
+  let meta = "";
+  if (p.excerpt && p.excerpt.trim()) meta = p.excerpt.trim().slice(0, 35);
+  else if (p.description && !isRawCategory(p.description)) meta = p.description.slice(0, 35);
+  else if (p.start) meta = p.start.slice(5);
   return `<button class="new-card" data-idx="${idx}">
     <span class="new-badge ${p._newKind === "신상" ? "is-naver" : ""}">🆕 ${escape(p._newKind)}</span>
     <div class="new-title">${emoji} ${escape(p.title || "(제목 없음)")}</div>
