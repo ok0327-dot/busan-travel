@@ -1611,12 +1611,82 @@ function _formatK(n) {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toLocaleString();
 }
 
+// ── 날짜 시드 결정적 PRNG (하루 단위 로테이션용) ──
+// xmur3(시드 해시) → mulberry32(PRNG). 같은 날 = 같은 결과(리로드/재방문 안정),
+// 날짜 바뀌면 다른 조합. 백엔드·Math.random() 없이 "매일 새로고침" UX + 테스트 가능.
+// daily-seeded deterministic PRNG: stable within a day, fresh next day.
+function _xmur3(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    h ^= h >>> 16;
+    return h >>> 0;
+  };
+}
+function _mulberry32(a) {
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// 오늘(실제 날짜) 기준 시드 RNG. salt 로 섹션별 독립 시퀀스 분리.
+// seed on real today (not navigated date) → food picks stay coherent as "오늘의" set.
+function _dailyRng(salt = "") {
+  const d = new Date();
+  const key = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}|${salt}`;
+  return _mulberry32(_xmur3(key)());
+}
+// 가중치 비복원 표집 — weight 클수록 자주 뽑히되 매번 다른 조합. weighted sampling w/o replacement.
+function _weightedSampleNoReplace(items, weights, k, rng) {
+  const pool = items.map((it, i) => ({ it, w: Math.max(weights[i] || 0, 1e-4) }));
+  const out = [];
+  k = Math.min(k, pool.length);
+  for (let n = 0; n < k; n++) {
+    let total = 0;
+    for (const p of pool) total += p.w;
+    let r = rng() * total, idx = 0;
+    for (; idx < pool.length; idx++) { r -= pool[idx].w; if (r <= 0) break; }
+    if (idx >= pool.length) idx = pool.length - 1;
+    out.push(pool[idx].it);
+    pool.splice(idx, 1);
+  }
+  return out;
+}
+
+// 🔥 인기 맛집·카페 — 날짜 시드 가중 로테이션 (v3.8)
+// 기존: 점수 상위 10개 고정(매일 동일) → 변경: 품질 풀(상위 ~50) 중 매일 가중 표집해 10개.
+// 점수 높을수록 자주 노출되되 날짜마다 조합이 바뀜 → 같은 화면도 매일 신선.
 function _popularFoodPool(limit = 10) {
   const places = window.__data?.places?.places || [];
-  return places
+  let ranked = places
     .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0)
-    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
-    .slice(0, limit);
+    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0));
+  // 제목+구 중복 제거(높은 점수 유지) — 같은 지점이 두 번 노출되는 것 방지.
+  const seen = new Set();
+  ranked = ranked.filter(p => {
+    const key = `${(p.title || "").trim()}|${p.gugun || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (ranked.length <= limit) return ranked;
+
+  // 회전 대상 = 점수 상위 품질 풀(저품질 노출 차단). 후보 부족 시 자동 축소.
+  const POOL = Math.min(ranked.length, Math.max(limit * 5, 50));
+  const candidates = ranked.slice(0, POOL);
+  const rng = _dailyRng("food");
+  // 점수^1.5 가중: 우수 맛집을 가볍게 우대하되 80~95점대가 고르게 회전.
+  const weights = candidates.map(p => Math.pow(p.popularity_score || 1, 1.5));
+  const picked = _weightedSampleNoReplace(candidates, weights, limit, rng);
+  // 표시는 점수 내림차순 → 랭크 배지(1..N)가 자연스럽게. 클릭 핸들러는 이 배열 idx 그대로 사용.
+  return picked.sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0));
 }
 
 function _popularEventsPool(target, limit = 10) {
@@ -1758,10 +1828,12 @@ function renderTodayHighlights(target) {
 
   // ③ 🔥 인기 맛집 TOP 10 (popularity_score 기반)
   const popularFood = _popularFoodPool(10);
+  const _foodPoolSize = (window.__data?.places?.places || [])
+    .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0).length;
   const popularFoodHTML = popularFood.length >= 3
     ? `<div class="highlight-section popular-section">
-        <div class="hs-title">🔥 인기 맛집·카페 TOP ${popularFood.length}</div>
-        <div class="hs-note">네이버 블로그 언급 수 + 평점 종합</div>
+        <div class="hs-title">🔥 오늘의 인기 맛집·카페 ${popularFood.length}곳</div>
+        <div class="hs-note">🔄 매일 새로 추천 · 부산 전역 ${_foodPoolSize}곳 중 · 네이버 블로그 언급 수 + 평점 기반</div>
         <div class="popular-grid">${popularFood.map((p, i) => _popularItemHTML(p, i, "food")).join("")}</div>
       </div>`
     : "";
