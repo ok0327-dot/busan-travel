@@ -1746,6 +1746,64 @@ function _popularItemHTML(p, idx, kind) {
   </button>`;
 }
 
+// ───────── 제철(음식/꽃/풍경) 클릭 → 관련 장소 + 검색 ─────────
+// 항목 라벨에서 매칭 키워드 추출: 괄호/부가어 제거 후 첫 토큰. "민어 시작"→"민어",
+// "자두·오디"→"자두", "수국 (태종대…)"→"수국", "태종대 수국길"→"태종대".
+function _seasonalKey(label) {
+  return (label || "")
+    .replace(/\([^)]*\)/g, "")
+    .replace(/[·,].*$/, "")
+    .replace(/\s*(시작|끝물|제철|철)\s*$/, "")
+    .trim()
+    .split(/\s+/)[0] || "";
+}
+
+// places 에서 키워드 매칭(title/menu/tags/description/excerpt). popularity 순 상위 8.
+function _seasonalMatches(key) {
+  if (!key || key.length < 2) return [];
+  const places = window.__data?.places?.places || [];
+  return places
+    .filter(p => {
+      const tags = Array.isArray(p.tags) ? p.tags.join(" ") : (p.tags || "");
+      const blob = `${p.title || ""} ${p.menu || ""} ${tags} ${p.description || ""} ${p.excerpt || ""}`;
+      return blob.includes(key);
+    })
+    .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0))
+    .slice(0, 8);
+}
+
+function showSeasonalDetail(label, kind) {
+  const key = _seasonalKey(label);
+  const matches = _seasonalMatches(key);
+  const isFood = kind === "음식";
+  const cleanLabel = label.replace(/\([^)]*\)/g, "").trim();
+  const naverUrl = `https://search.naver.com/search.naver?query=${encodeURIComponent(`${cleanLabel} 부산${isFood ? " 맛집" : ""}`)}`;
+  const emoji = isFood ? "🍽" : (kind === "꽃·봄빛" ? "🌸" : "🏞");
+  const matchHTML = matches.length
+    ? `<div class="card-meta" style="margin-top:10px">${icon("ph-map-pin")} 부산에서 즐기기 · 관련 장소 ${matches.length}곳</div>
+       <div class="popular-grid season-matches">${matches.map((p, i) => _popularItemHTML(p, i, "food")).join("")}</div>`
+    : `<div class="card-excerpt">앱에 등록된 '${escape(key || cleanLabel)}' 관련 장소는 아직 없어요. 아래 검색에서 정보·후기를 확인하세요.</div>`;
+  $list.innerHTML = _detailHeader() + `
+    <div class="card" style="border-left:3px solid #f59e0b">
+      <div class="card-title">${emoji} ${escape(label)}</div>
+      <div class="card-meta">${escape(kind)} · 부산 제철·계절</div>
+      ${matchHTML}
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${naverUrl}" target="_blank" rel="noopener" style="padding:6px 10px;background:#03c75a;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">🔎 네이버에서 '${escape(key || cleanLabel)}' 더 보기 →</a>
+      </div>
+    </div>`;
+  _bindDetailBack();
+  // 관련 장소 카드 클릭 → 상세
+  $list.querySelectorAll(".season-matches .popular-card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.idx);
+      if (matches[idx]) showDetail(matches[idx]);
+    });
+  });
+  const sheet = document.getElementById("sheet");
+  if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
+}
+
 // ───────── Phase E 재배치: 한눈에 들어오는 "오늘/이번주말 뭐할지" ─────────
 // 새 순서: ① AI Pick → ② Hero Top 3 → ③ 🆕 신규 → ④ D-30 사전예약 → ⑤ 제철 → ⑥ 그 외 → ⑦ STORY
 function renderTodayHighlights(target) {
@@ -1898,10 +1956,10 @@ function renderTodayHighlights(target) {
   let seasonHTML = "";
   if (season) {
     const foods = (season.foods || []).map(f =>
-      `<li>${escape(f.name)}${f.where ? ` <span class="sm-where">@ ${escape(f.where)}</span>` : ""}</li>`
+      `<li class="season-item" role="button" tabindex="0" data-kind="음식" data-label="${escape(f.name)}">${escape(f.name)}${f.where ? ` <span class="sm-where">@ ${escape(f.where)}</span>` : ""}</li>`
     ).join("");
-    const blooms = (season.blooms || []).map(b => `<li>${escape(b)}</li>`).join("");
-    const scenes = (season.scenes || []).map(s => `<li>${escape(s)}</li>`).join("");
+    const blooms = (season.blooms || []).map(b => `<li class="season-item" role="button" tabindex="0" data-kind="꽃·봄빛" data-label="${escape(b)}">${escape(b)}</li>`).join("");
+    const scenes = (season.scenes || []).map(s => `<li class="season-item" role="button" tabindex="0" data-kind="풍경" data-label="${escape(s)}">${escape(s)}</li>`).join("");
     seasonHTML = `<div class="highlight-section">
       <div class="hs-title">🍽 ${target.getMonth() + 1}월 부산 제철</div>
       ${foods ? `<ul class="sm-list"><li class="sm-sub">음식</li>${foods}</ul>` : ""}
@@ -1966,6 +2024,15 @@ function renderTodayHighlights(target) {
       const idx = Number(btn.dataset.idx);
       const poi = combined[idx];
       if (poi) showDetail(poi);
+    });
+  });
+
+  // 제철(음식/꽃/풍경) 클릭 → 관련 장소 + 검색
+  $list.querySelectorAll(".season-item").forEach(el => {
+    const open = () => showSeasonalDetail(el.dataset.label, el.dataset.kind);
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
     });
   });
 

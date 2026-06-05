@@ -221,6 +221,25 @@ html, body {
   color: var(--muted); font-size: var(--fs-meta);
   margin-left: 6px;
 }
+/* 제철 항목 — 클릭 가능(관련 장소/검색) */
+.sm-list li.season-item {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--border);
+  transition: color .12s, background .12s;
+}
+.sm-list li.season-item::after {
+  content: "›";
+  color: var(--busan-sea);
+  font-weight: var(--fw-semibold);
+  margin-left: 6px;
+  opacity: .55;
+}
+.sm-list li.season-item:hover,
+.sm-list li.season-item:focus-visible {
+  color: var(--busan-sea);
+  outline: none;
+}
+.season-matches { margin-top: 8px; }
 
 /* 마커 클릭 시 순간 펄스 (Kakao Circle overlay 를 animate via stroke) */
 @keyframes marker-pulse {
