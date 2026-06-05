@@ -70,6 +70,7 @@ BLOG_SOURCE_WEIGHTS = {
     "naver_blog:yeonjegu":     +2,   # 연제구청
     "naver_blog:bsdonggublog": +2,   # 동구청
     "naver_blog:cooolbusan":   +1,   # 부산광역시 공식
+    "naver_blog:cooolbusan_travel": +2,  # 부산시청 '부산여행' 카테고리(여행탭) 전용
 }
 
 

@@ -31,6 +31,7 @@ OFFICIAL_BLOG_SOURCES: frozenset[str] = frozenset({
     "naver_blog:bsjunggu",      # 부산 중구청
     "naver_blog:yeonjegu",      # 부산 연제구청
     "naver_blog:bsdonggublog",  # 부산 동구청
+    "naver_blog:cooolbusan_travel",  # 부산시청 '부산여행' 카테고리(여행탭)만 — naver_blogs 에서 분리 라우팅
 })
 
 # naver_blog:* 전체에서 허용되는 ID — 카테고리 무관 화이트리스트.

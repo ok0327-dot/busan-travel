@@ -20,6 +20,15 @@ from storage.db import Event
 SOURCE_PREFIX = "naver_blog"
 RSS_TEMPLATE = "https://rss.blog.naver.com/{id}.xml"
 
+# 부산시청 블로그(cooolbusan)는 88%가 시정 홍보라 전체 DROP(_tour_filter.DROP_SOURCES).
+# 단 '부산여행' 카테고리(여행탭, categoryNo=42)는 알짜 여행 콘텐츠 → 별도 허용 소스로 라우팅.
+# (모집/공모 등 잔여 노이즈는 NEGATIVE_KEYWORDS 로 이중 차단)
+CITY_BLOG_ID = "cooolbusan"
+TRAVEL_CATEGORY = "부산여행"
+CITY_TRAVEL_SOURCE_ID = "cooolbusan_travel"
+# 여행 카테고리 안에 섞인 모집/공모성 노이즈는 여행 소스로 승격하지 않음(→ DROP 유지).
+_CITY_TRAVEL_NOISE = ("모집", "공모", "설명회", "간담회", "위촉", "채용", "선정 결과", "선정결과")
+
 _TAG_RE = re.compile(r"<[^>]+>")
 _POST_ID_RE = re.compile(r"/(\d+)(?:\?|$)")
 
@@ -63,8 +72,14 @@ def fetch() -> list[Event]:
         for entry in parsed.entries:
             post_id = _post_id(entry.get("link", "")) or entry.get("id") or entry.get("title", "")
             category = entry.get("category")
+            # cooolbusan(시청)은 '부산여행' 카테고리만 허용 소스로 분리, 나머지는 DROP 소스 유지.
+            src_id = blog_id
+            if blog_id == CITY_BLOG_ID and (category or "").strip() == TRAVEL_CATEGORY:
+                _title = entry.get("title", "")
+                if not any(n in _title for n in _CITY_TRAVEL_NOISE):
+                    src_id = CITY_TRAVEL_SOURCE_ID  # 모집/공모 아닌 알짜 여행글만 승격
             events.append(Event(
-                source=f"{SOURCE_PREFIX}:{blog_id}",
+                source=f"{SOURCE_PREFIX}:{src_id}",
                 source_id=str(post_id),
                 category=_classify(category, entry.get("title", "")),
                 title=entry.get("title", "").strip(),

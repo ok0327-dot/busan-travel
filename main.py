@@ -36,6 +36,7 @@ from sources import (
     moca_busan,
     naver_blogs,
     naver_local,
+    naver_neighborhood,
     visitbusan,
     walking_tour,
 )
@@ -63,6 +64,8 @@ SOURCES = [
     ("festivalbusan",          festivalbusan.fetch),  # 부산축제조직위 8개 메인 축제
     # Phase v3.5 — 네이버 동네 신상 식당/카페
     ("naver_local",            naver_local.fetch),    # NAVER local API 신상 키워드
+    # 네이버 '우리동네' 동(洞) 생활권 인기 맛집/카페 (대연동+인근, 체인 제외)
+    ("naver_neighborhood",     naver_neighborhood.fetch),
     # Phase v3.6 — 부산시립미술관 추가 (Sprint 1 / A2)
     ("art_busan",              art_busan.fetch),      # 부산시립미술관 전시
     # Sprint 2 — 부산문화포털 다봄 (부산 전체 공연 통합, 159건)

@@ -42,6 +42,25 @@ KEYWORDS = [
 _TAG_RE = re.compile(r"<[^>]+>")
 _KOREAN_RE = re.compile(r"[가-힣]")
 
+# 비식음 '카페'(보드/키즈/만화/룸/스터디/애견 카페·테마카페)·오락·PC 계열 — cafe 오분류 차단.
+_NON_FOOD_CAT = ("스포츠", "오락", "게임", "pc", "방탈출", "스크린")
+_FAKE_CAFE = ("보드", "키즈", "만화", "룸", "스터디", "애견", "동물", "포토", "테마")
+
+# 프랜차이즈/체인 — '동네 맛집' 발굴 노이즈. 공백 제거·소문자 후 부분일치로 차단.
+_FRANCHISES = (
+    # 카페·디저트 체인
+    "스타벅스", "투썸", "이디야", "빽다방", "메가커피", "메가엠지씨", "컴포즈", "폴바셋",
+    "파스쿠찌", "할리스", "엔제리너스", "커피빈", "탐앤탐스", "요거프레소", "더벤티",
+    "매머드", "공차", "설빙", "던킨", "배스킨라빈스", "베스킨라빈스",
+    "파리바게뜨", "빠리바게뜨", "뚜레쥬르",
+    # 패스트푸드·외식 체인
+    "맥도날드", "롯데리아", "버거킹", "맘스터치", "kfc", "케이에프씨", "써브웨이", "서브웨이",
+    "노브랜드버거", "쿠우쿠우", "아웃백", "빕스", "애슐리", "명륜진사갈비", "새마을식당",
+    "홍콩반점", "본죽", "김밥천국", "한솥",
+    # 치킨 체인
+    "교촌", "bbq", "비비큐", "굽네", "네네치킨", "페리카나", "처갓집", "호식이", "철인7호",
+)
+
 
 def _clean(s: str | None) -> str:
     if not s:
@@ -49,18 +68,33 @@ def _clean(s: str | None) -> str:
     return html.unescape(_TAG_RE.sub("", s)).strip()
 
 
+def _is_franchise(title: str) -> bool:
+    """프랜차이즈/체인 여부 — 동네 맛집 큐레이션에서 제외."""
+    t = (title or "").lower().replace(" ", "")
+    return any(f in t for f in _FRANCHISES)
+
+
 def _classify(category: str) -> str | None:
     """NAVER category path → food/cafe. 음식·카페가 아니면 None (drop).
 
-    "카페,디저트>*" 또는 "음식점>카페,디저트" → cafe
+    "카페,디저트>*" → cafe (단 보드/키즈/스터디카페 등 비식음 제외)
     "음식점>한식/일식/중식/..." → food
-    그 외 (PC방/경영컨설팅/병원/오락 등) → None
+    그 외 (PC방/경영컨설팅/병원/스포츠·오락 등) → None
     """
     c = category or ""
-    if any(k in c for k in ("카페", "디저트", "베이커리", "빵집")):
+    cl = c.lower()
+    # 스포츠·오락·PC·방탈출 계열 — '~카페'여도 음식점 아님
+    if any(k in cl for k in _NON_FOOD_CAT):
+        return None
+    if c.startswith("카페") or any(k in c for k in ("디저트", "베이커리", "빵집")):
+        if any(n in c for n in _FAKE_CAFE):
+            return None  # 보드/키즈/만화/룸/스터디/애견/테마카페 → drop
         return "cafe"
     # 명시적 음식 카테고리만 food (NAVER category 첫 path 가 '음식점' 인 경우)
-    if c.startswith("음식점") or any(k in c for k in ("한식", "일식", "중식", "양식", "분식", "주점", "패스트푸드", "뷔페")):
+    if c.startswith("음식점") or any(k in c for k in (
+        "한식", "일식", "중식", "양식", "분식", "주점", "패스트푸드", "뷔페",
+        "치킨", "피자", "고기", "해물", "해산물", "국밥", "곱창",
+    )):
         return "food"
     return None  # 음식/카페가 아닌 결과 (PC방/오락/서비스 등) → drop
 
@@ -89,6 +123,8 @@ def _to_event(item: dict, query: str) -> Event | None:
     title = _clean(item.get("title"))
     if not title or not _KOREAN_RE.search(title):
         return None
+    if _is_franchise(title):
+        return None  # 프랜차이즈/체인 제외 (동네 신상 발굴 노이즈)
     addr = _clean(item.get("roadAddress")) or _clean(item.get("address"))
     if "부산" not in addr:
         return None  # 부산 외 결과 (다른 도시 체인점) 제외

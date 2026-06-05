@@ -151,6 +151,20 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: python scripts/enrich_top_food.py --time-budget-min 4 --top-n 50
 
+      # 리뷰수(naver_review_count) 보강 — food/cafe popularity_score 의 주 신호.
+      # 신규 동네 맛집(naver_neighborhood 등)은 리뷰수 없으면 score=0 → 화면 미노출.
+      # 이 단계가 NULL/7일초과 row 만 증분 갱신 → 신규 항목 노출 + 전체 신선도 유지.
+      # NAVER quota 25K/일 무료(전체 ~800건도 3%). export 전에 실행되어 점수 반영.
+      # continue-on-error: 보강 실패가 데이터 push 차단 안 함.
+      - name: Enrich review counts (NAVER 블로그 언급 수)
+        if: steps.mode.outputs.mode != 'weather-only'
+        timeout-minutes: 8
+        continue-on-error: true
+        env:
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+        run: python scripts/enrich_ratings.py
+
       - name: KMA short-range weather
         if: steps.mode.outputs.mode != 'events-only'
         env:
