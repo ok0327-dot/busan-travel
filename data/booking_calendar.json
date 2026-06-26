@@ -4,7 +4,11 @@
   "festivals": [
     {
       "name": "부산국제영화제 (BIFF)",
-      "title_keywords": ["부산국제영화제", "BIFF", "부산영화제"],
+      "title_keywords": [
+        "부산국제영화제",
+        "BIFF",
+        "부산영화제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 14,
       "booking_type": "예매 (인터파크/예스24)",
@@ -12,7 +16,10 @@
     },
     {
       "name": "부산불꽃축제 (유료석)",
-      "title_keywords": ["부산불꽃축제", "광안리불꽃축제"],
+      "title_keywords": [
+        "부산불꽃축제",
+        "광안리불꽃축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 60,
       "booking_type": "유료 관람석",
@@ -20,7 +27,10 @@
     },
     {
       "name": "부산국제연극제 (BIPF)",
-      "title_keywords": ["부산국제연극제", "BIPF"],
+      "title_keywords": [
+        "부산국제연극제",
+        "BIPF"
+      ],
       "annual_month": 5,
       "booking_offset_days": 21,
       "booking_type": "공연 예매",
@@ -28,7 +38,9 @@
     },
     {
       "name": "부산바다축제",
-      "title_keywords": ["부산바다축제"],
+      "title_keywords": [
+        "부산바다축제"
+      ],
       "annual_month": 8,
       "booking_offset_days": 30,
       "booking_type": "체험 신청",
@@ -36,7 +48,10 @@
     },
     {
       "name": "해운대 모래축제",
-      "title_keywords": ["해운대모래축제", "해운대 모래축제"],
+      "title_keywords": [
+        "해운대모래축제",
+        "해운대 모래축제"
+      ],
       "annual_month": 5,
       "booking_offset_days": 14,
       "booking_type": "체험 신청",
@@ -44,7 +59,11 @@
     },
     {
       "name": "부산국제록페스티벌",
-      "title_keywords": ["부산국제록페스티벌", "부산락페", "부산 락페"],
+      "title_keywords": [
+        "부산국제록페스티벌",
+        "부산락페",
+        "부산 락페"
+      ],
       "annual_month": 10,
       "booking_offset_days": 30,
       "booking_type": "예매 (티켓)",
@@ -52,7 +71,9 @@
     },
     {
       "name": "부산비엔날레",
-      "title_keywords": ["부산비엔날레"],
+      "title_keywords": [
+        "부산비엔날레"
+      ],
       "annual_month": 9,
       "booking_offset_days": 14,
       "booking_type": "도슨트 예약",
@@ -60,7 +81,10 @@
     },
     {
       "name": "동래읍성역사축제",
-      "title_keywords": ["동래읍성", "동래읍성역사축제"],
+      "title_keywords": [
+        "동래읍성",
+        "동래읍성역사축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 14,
       "booking_type": "체험 신청",
@@ -68,7 +92,9 @@
     },
     {
       "name": "센텀맥주축제",
-      "title_keywords": ["센텀맥주축제"],
+      "title_keywords": [
+        "센텀맥주축제"
+      ],
       "annual_month": 5,
       "booking_offset_days": 21,
       "booking_type": "예매 (티켓)",
@@ -76,7 +102,11 @@
     },
     {
       "name": "조선통신사 축제",
-      "title_keywords": ["조선통신사축제", "조선통신사 축제", "조선통신사"],
+      "title_keywords": [
+        "조선통신사축제",
+        "조선통신사 축제",
+        "조선통신사"
+      ],
       "annual_month": 5,
       "booking_offset_days": 21,
       "booking_type": "체험 모집",
@@ -84,7 +114,9 @@
     },
     {
       "name": "부산항축제",
-      "title_keywords": ["부산항축제"],
+      "title_keywords": [
+        "부산항축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 30,
       "booking_type": "체험 신청",
@@ -92,7 +124,10 @@
     },
     {
       "name": "부산스텝업댄스페스티벌",
-      "title_keywords": ["부산스텝업댄스", "스텝업댄스페스티벌"],
+      "title_keywords": [
+        "부산스텝업댄스",
+        "스텝업댄스페스티벌"
+      ],
       "annual_month": 5,
       "booking_offset_days": 14,
       "booking_type": "공연 예매",
@@ -100,7 +135,11 @@
     },
     {
       "name": "광안리 M 드론라이트쇼 (월별)",
-      "title_keywords": ["광안리 M 드론", "광안리 드론라이트쇼", "M 드론라이트쇼"],
+      "title_keywords": [
+        "광안리 M 드론",
+        "광안리 드론라이트쇼",
+        "M 드론라이트쇼"
+      ],
       "annual_month": null,
       "booking_offset_days": 14,
       "booking_type": "관람 예약",
@@ -108,7 +147,9 @@
     },
     {
       "name": "부산국제건축제",
-      "title_keywords": ["부산국제건축제"],
+      "title_keywords": [
+        "부산국제건축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 14,
       "booking_type": "투어 신청",
@@ -116,7 +157,9 @@
     },
     {
       "name": "시민뜨락축제",
-      "title_keywords": ["시민뜨락축제"],
+      "title_keywords": [
+        "시민뜨락축제"
+      ],
       "annual_month": 4,
       "booking_offset_days": 14,
       "booking_type": "참여 신청",
@@ -124,7 +167,10 @@
     },
     {
       "name": "부산원도심활성화축제 (택슐랭)",
-      "title_keywords": ["부산원도심활성화축제", "택슐랭"],
+      "title_keywords": [
+        "부산원도심활성화축제",
+        "택슐랭"
+      ],
       "annual_month": 5,
       "booking_offset_days": 14,
       "booking_type": "체험 신청",
@@ -132,7 +178,10 @@
     },
     {
       "name": "부산밀페스티벌",
-      "title_keywords": ["부산밀페스티벌", "부산 밀 페스티벌"],
+      "title_keywords": [
+        "부산밀페스티벌",
+        "부산 밀 페스티벌"
+      ],
       "annual_month": 5,
       "booking_offset_days": 21,
       "booking_type": "예매",
@@ -140,7 +189,11 @@
     },
     {
       "name": "부산국제광고제",
-      "title_keywords": ["부산국제광고제", "AD STARS", "MAD STARS"],
+      "title_keywords": [
+        "부산국제광고제",
+        "AD STARS",
+        "MAD STARS"
+      ],
       "annual_month": 8,
       "booking_offset_days": 30,
       "booking_type": "참가 등록",
@@ -148,7 +201,10 @@
     },
     {
       "name": "부산자갈치축제",
-      "title_keywords": ["부산자갈치축제", "자갈치축제"],
+      "title_keywords": [
+        "부산자갈치축제",
+        "자갈치축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 14,
       "booking_type": "현장 행사",
@@ -156,7 +212,10 @@
     },
     {
       "name": "광안리어방축제",
-      "title_keywords": ["광안리어방축제", "어방축제"],
+      "title_keywords": [
+        "광안리어방축제",
+        "어방축제"
+      ],
       "annual_month": 4,
       "booking_offset_days": 14,
       "booking_type": "현장 행사",
@@ -164,7 +223,10 @@
     },
     {
       "name": "부산국제어린이청소년영화제",
-      "title_keywords": ["부산국제어린이청소년영화제", "BIKY"],
+      "title_keywords": [
+        "부산국제어린이청소년영화제",
+        "BIKY"
+      ],
       "annual_month": 7,
       "booking_offset_days": 14,
       "booking_type": "상영 예매",
@@ -172,7 +234,11 @@
     },
     {
       "name": "태종대 수국축제",
-      "title_keywords": ["태종대", "수국축제", "수국"],
+      "title_keywords": [
+        "태종대",
+        "수국축제",
+        "수국"
+      ],
       "annual_month": 6,
       "booking_offset_days": 7,
       "booking_type": "현장 관람",
@@ -180,7 +246,11 @@
     },
     {
       "name": "낙동강 정원 벚꽃축제",
-      "title_keywords": ["낙동강 정원 벚꽃", "벚꽃축제", "대저생태공원 벚꽃"],
+      "title_keywords": [
+        "낙동강 정원 벚꽃",
+        "벚꽃축제",
+        "대저생태공원 벚꽃"
+      ],
       "annual_month": 4,
       "booking_offset_days": 7,
       "booking_type": "현장 행사",
@@ -188,7 +258,10 @@
     },
     {
       "name": "대저토마토축제",
-      "title_keywords": ["대저토마토축제", "대저 토마토"],
+      "title_keywords": [
+        "대저토마토축제",
+        "대저 토마토"
+      ],
       "annual_month": 5,
       "booking_offset_days": 7,
       "booking_type": "현장 행사",
@@ -196,7 +269,10 @@
     },
     {
       "name": "기장멸치축제",
-      "title_keywords": ["기장멸치축제", "멸치축제"],
+      "title_keywords": [
+        "기장멸치축제",
+        "멸치축제"
+      ],
       "annual_month": 4,
       "booking_offset_days": 7,
       "booking_type": "현장 행사",
@@ -204,7 +280,9 @@
     },
     {
       "name": "금정산성축제",
-      "title_keywords": ["금정산성축제"],
+      "title_keywords": [
+        "금정산성축제"
+      ],
       "annual_month": 10,
       "booking_offset_days": 14,
       "booking_type": "현장 행사",
@@ -212,7 +290,10 @@
     },
     {
       "name": "삼광사 연등축제",
-      "title_keywords": ["삼광사 연등", "삼광사연등축제"],
+      "title_keywords": [
+        "삼광사 연등",
+        "삼광사연등축제"
+      ],
       "annual_month": 5,
       "booking_offset_days": 7,
       "booking_type": "현장 관람",
@@ -220,7 +301,10 @@
     },
     {
       "name": "해운대 빛축제",
-      "title_keywords": ["해운대빛축제", "해운대 빛축제"],
+      "title_keywords": [
+        "해운대빛축제",
+        "해운대 빛축제"
+      ],
       "annual_month": 12,
       "booking_offset_days": 14,
       "booking_type": "현장 관람",
@@ -228,7 +312,11 @@
     },
     {
       "name": "광복로 겨울빛 트리축제",
-      "title_keywords": ["광복로 겨울빛", "트리축제", "겨울빛 트리"],
+      "title_keywords": [
+        "광복로 겨울빛",
+        "트리축제",
+        "겨울빛 트리"
+      ],
       "annual_month": 12,
       "booking_offset_days": 14,
       "booking_type": "현장 관람",
@@ -236,11 +324,65 @@
     },
     {
       "name": "해운대 북극곰축제",
-      "title_keywords": ["해운대북극곰축제", "북극곰축제"],
+      "title_keywords": [
+        "해운대북극곰축제",
+        "북극곰축제"
+      ],
       "annual_month": 1,
       "booking_offset_days": 14,
       "booking_type": "참가 신청",
       "note": "1월 해운대해수욕장 겨울 수영 축제."
+    },
+    {
+      "name": "부산푸드필름페스타",
+      "title_keywords": [
+        "부산푸드필름페스타",
+        "푸드필름페스타",
+        "푸드 필름 페스타"
+      ],
+      "annual_month": 6,
+      "exact_dates": {
+        "2026": [
+          "2026-06-26",
+          "2026-06-28"
+        ]
+      },
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "6월 영화의전당·수영강변. 음식+영화 축제(올해 10주년).",
+      "venue": "영화의전당·수영강변 일원"
+    },
+    {
+      "name": "부산모빌리티쇼 (부산국제모터쇼)",
+      "title_keywords": [
+        "부산모빌리티쇼",
+        "부산국제모터쇼",
+        "모빌리티쇼",
+        "부산모터쇼"
+      ],
+      "annual_month": 6,
+      "exact_dates": {
+        "2026": [
+          "2026-06-27",
+          "2026-07-05"
+        ]
+      },
+      "booking_offset_days": 14,
+      "booking_type": "전시 관람",
+      "note": "벡스코. 격년 개최 모빌리티(모터)쇼.",
+      "venue": "벡스코 (BEXCO)"
+    },
+    {
+      "name": "부산국제보트쇼",
+      "title_keywords": [
+        "부산국제보트쇼",
+        "보트쇼"
+      ],
+      "annual_month": 4,
+      "booking_offset_days": 14,
+      "booking_type": "전시 관람",
+      "note": "4월 벡스코·수영강. 해양레저 보트쇼.",
+      "venue": "벡스코 (BEXCO)·수영강"
     }
   ]
 }

@@ -25,10 +25,12 @@ REQUIRED_SECRETS = (
 )
 from sources import (
     art_busan,
+    bexco,
     busan_festival,
     busan_food,
     dabom,
     dureraum,
+    dureraum_film,
     festivalbusan,
     foodie_tour,
     galmaet,
@@ -60,7 +62,8 @@ SOURCES = [
     ("vb_schedule_board",      visitbusan.fetch_schedule_board),
     # Phase v3.4 — 메인 venue + 부산축제조직위 직접 스크래핑
     ("moca_busan",             moca_busan.fetch),     # 부산현대미술관 전시
-    ("dureraum",               dureraum.fetch),       # 영화의전당 공연
+    ("dureraum",               dureraum.fetch),       # 영화의전당 공연 (rbsIdx=39)
+    ("dureraum_film",          dureraum_film.fetch),  # 영화의전당 영화/기획전·특별전 (rbsIdx=26)
     ("festivalbusan",          festivalbusan.fetch),  # 부산축제조직위 8개 메인 축제
     # Phase v3.5 — 네이버 동네 신상 식당/카페
     ("naver_local",            naver_local.fetch),    # NAVER local API 신상 키워드
@@ -72,6 +75,8 @@ SOURCES = [
     ("dabom",                  dabom.fetch),
     # Phase v3.10 — 부산 푸디투어 향토음식 매거진 (92건, vb_* 매칭 0%, 완전 새 콘텐츠)
     ("foodie_tour",            foodie_tour.fetch),
+    # 벡스코 전시·박람회 (모터쇼/보트쇼/엑스포 등 — 타 소스 미커버 카테고리)
+    ("bexco",                  bexco.fetch),
 ]
 
 
