@@ -28,3 +28,5 @@ vendor/gov-api-kr/data/
 /api-vault/
 # 썸네일 수집 로그 (Step 5.2a)
 /logs/
+# Claude Code worktree/세션 artifact — 커밋 대상 아님
+.claude/
