@@ -81,11 +81,18 @@ def _fetch_curated(
             "like_count": d.get("like_count"),
         }
 
+        # 축제·행사: 상세 페이지에서 파싱한 일정(올해 이상만 신뢰)을 날짜로.
+        # 미파싱이면 None → main.py 의 apply_calendar 가 연례 캘린더로 잠정 날짜 보강.
+        f_start = d.get("period_start") if category == "festival" else None
+        f_end = d.get("period_end") if category == "festival" else None
+
         ev = Event(
             source=source,
             source_id=str(uc),
             category=category,
             title=title,
+            start_date=f_start,
+            end_date=f_end,
             venue=d.get("address"),  # 명소/맛집은 주소 그대로 venue
             address=d.get("address"),
             url=d.get("homepage") or d.get("story_url"),

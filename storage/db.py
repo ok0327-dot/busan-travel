@@ -237,8 +237,15 @@ def _migrate(conn: sqlite3.Connection) -> None:
 
 def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
+    # timeout=30 + busy_timeout: CI 에서 enrich/weather 스텝이 동시/연속 write 할 때
+    # "database is locked" 로 즉시 죽지 않고 최대 30s 재시도. (2026-06 사고: enrich_ratings
+    # 가 8분 timeout 으로 트랜잭션 연 채 강제 종료 → 다음 weather upsert 가 lock 으로 exit 1
+    # → export/commit/R2 백업 skip → 15일간 이벤트 데이터 정체. WAL 로 reader/writer 비차단.
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.executescript(TABLE_SQL)
     _migrate(conn)
     conn.executescript(INDEX_SQL)

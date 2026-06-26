@@ -36,6 +36,19 @@ RANGE_RE = re.compile(
 SUSPICIOUS_TITLE = re.compile(r"팝업|알림|오류|404|에러|로딩|준비|업데이트")
 
 
+def _iso(y, m, d) -> str | None:
+    """(y,m,d) → 'YYYY-MM-DD'. 월 1-12·일 1-31 검증 실패 시 None.
+
+    시각(12:54)·잘못된 매칭(일=54 등)이 깨진 날짜 문자열로 저장되는 것 방지.
+    """
+    try:
+        from datetime import date as _date
+
+        return _date(int(y), int(m), int(d)).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse_detail(url: str) -> dict:
     soup = session.soup(url)
     if not soup:
@@ -63,19 +76,19 @@ def _parse_detail(url: str) -> dict:
     # 1. 범위 매칭 — 미래 시작일 우선
     for rm in RANGE_RE.finditer(head):
         y1, m1, d1, y2, m2, d2 = rm.groups()
-        s = f"{int(y1):04d}-{int(m1):02d}-{int(d1):02d}"
-        if s >= today_iso:
-            y2_eff = y2 or y1
+        s = _iso(y1, m1, d1)  # 월/일 범위 검증 (시각 12:54 등 오인식 → None)
+        if s and s >= today_iso:
+            e = _iso(y2 or y1, m2, d2)
             start = s
-            end = f"{int(y2_eff):04d}-{int(m2):02d}-{int(d2):02d}"
+            end = e if (e and e >= s) else None
             break
 
     # 2. 단일 날짜 (range 매칭 실패 시) — 미래 첫 매칭
     if not start:
         for dm in DATE_RE.finditer(head):
             y, m, d = dm.groups()
-            s = f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
-            if s >= today_iso:
+            s = _iso(y, m, d)
+            if s and s >= today_iso:
                 start = s
                 break
 

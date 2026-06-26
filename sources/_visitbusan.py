@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import re
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -219,6 +220,58 @@ def _extract_info_block(text: str) -> dict[str, str | None]:
     return result
 
 
+_PERIOD_LABEL_RE = re.compile(
+    r"(행사\s*기간|축제\s*기간|개최\s*기간|운영\s*기간|전시\s*기간|행사\s*일정|행사\s*일시|행사\s*일자|행사일|일시|기간|일자)\s*[:：]"
+)
+# 날짜 토큰: 연도(옵션) + 월 + 일. "2025. 5. 16" / "6.8" / "5월 16일"
+_DATE_TOKEN_RE = re.compile(
+    r"(?:(\d{4})\s*[.\-/]?\s*)?(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*[.일]?"
+)
+_TIME_RE = re.compile(r"\d{1,2}\s*:\s*\d{2}")
+
+
+def _parse_date_token(m: re.Match, default_year: int) -> date | None:
+    y = int(m.group(1)) if m.group(1) else default_year
+    mo, d = int(m.group(2)), int(m.group(3))
+    if not (1 <= mo <= 12 and 1 <= d <= 31):
+        return None
+    try:
+        return date(y, mo, d)
+    except ValueError:
+        return None
+
+
+def _extract_festival_period(
+    text: str, *, current_year: int | None = None
+) -> tuple[str | None, str | None]:
+    """본문 첫 '행사기간/일시' 라벨 줄에서 날짜(범위) 추출.
+
+    visitbusan 축제 상세는 종종 작년 인스턴스 일정을 그대로 보여줌 → 연도가 올해보다
+    과거면 (None, None) 반환해 stale 날짜 오염을 막는다. 연도 생략 시 올해로 간주.
+    Returns (start_iso, end_iso).
+    """
+    current_year = current_year or date.today().year
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        lm = _PERIOD_LABEL_RE.search(line)
+        if not lm:
+            continue
+        rest = _TIME_RE.sub(" ", line[lm.end():])  # 시각(00:00) 오인식 제거
+        dates = list(_DATE_TOKEN_RE.finditer(rest))
+        if not dates:
+            continue
+        start = _parse_date_token(dates[0], current_year)
+        if not start:
+            continue
+        if start.year < current_year:
+            return None, None  # 작년(이하) 일정 — 신뢰 불가
+        end = _parse_date_token(dates[1], start.year) if len(dates) >= 2 else None
+        if end and end < start:
+            end = None
+        return start.isoformat(), (end.isoformat() if end else None)
+    return None, None
+
+
 def _extract_content_tags(text: str) -> list[str]:
     """본문 말미 '연관태그' 블록의 태그만 추출 (사이드바 전역 태그 배제)."""
     m = re.search(r"연관태그\s*(.+?)(?:추천여행지|관련여행지|\Z)", text, re.DOTALL)
@@ -311,6 +364,9 @@ def parse_detail_page(soup: BeautifulSoup, uc_seq: int, menu_cd: str) -> dict[st
     full_text = soup.get_text("\n", strip=False)
     info = _extract_info_block(full_text)
 
+    # 축제·행사 일정 (행사기간/일시) — 호출자가 category=='festival' 일 때만 사용
+    period_start, period_end = _extract_festival_period(full_text)
+
     # 태그
     tags = _extract_content_tags(full_text)
 
@@ -368,6 +424,8 @@ def parse_detail_page(soup: BeautifulSoup, uc_seq: int, menu_cd: str) -> dict[st
         "story_url": story_url,
         "story_excerpt": excerpt,
         "tags": tags,
+        "period_start": period_start,
+        "period_end": period_end,
         **info,
     }
 

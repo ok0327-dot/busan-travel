@@ -156,6 +156,9 @@ jobs:
       # 이 단계가 NULL/7일초과 row 만 증분 갱신 → 신규 항목 노출 + 전체 신선도 유지.
       # NAVER quota 25K/일 무료(전체 ~800건도 3%). export 전에 실행되어 점수 반영.
       # continue-on-error: 보강 실패가 데이터 push 차단 안 함.
+      # --time-budget-min 6: CI timeout-minutes(8) 보다 작게 줘서 스크립트가 스스로
+      #   커밋+종료. 강제 kill 로 SQLite 트랜잭션이 열린 채 죽어 다음 weather 스텝이
+      #   "database is locked" 로 실패 → export/commit/R2 skip 되던 2026-06 정체 사고 방지.
       - name: Enrich review counts (NAVER 블로그 언급 수)
         if: steps.mode.outputs.mode != 'weather-only'
         timeout-minutes: 8
@@ -163,7 +166,7 @@ jobs:
         env:
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
-        run: python scripts/enrich_ratings.py
+        run: python scripts/enrich_ratings.py --time-budget-min 6
 
       - name: KMA short-range weather
         if: steps.mode.outputs.mode != 'events-only'

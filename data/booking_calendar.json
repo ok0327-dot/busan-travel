@@ -140,11 +140,107 @@
     },
     {
       "name": "부산국제광고제",
-      "title_keywords": ["부산국제광고제", "AD STARS"],
+      "title_keywords": ["부산국제광고제", "AD STARS", "MAD STARS"],
       "annual_month": 8,
       "booking_offset_days": 30,
       "booking_type": "참가 등록",
       "note": "8월 말. 7월 말 참가 등록."
+    },
+    {
+      "name": "부산자갈치축제",
+      "title_keywords": ["부산자갈치축제", "자갈치축제"],
+      "annual_month": 10,
+      "booking_offset_days": 14,
+      "booking_type": "현장 행사",
+      "note": "10월 자갈치시장 일원. 부산 대표 수산물 축제."
+    },
+    {
+      "name": "광안리어방축제",
+      "title_keywords": ["광안리어방축제", "어방축제"],
+      "annual_month": 4,
+      "booking_offset_days": 14,
+      "booking_type": "현장 행사",
+      "note": "4월 광안리해수욕장. 전통 어업 문화 축제."
+    },
+    {
+      "name": "부산국제어린이청소년영화제",
+      "title_keywords": ["부산국제어린이청소년영화제", "BIKY"],
+      "annual_month": 7,
+      "booking_offset_days": 14,
+      "booking_type": "상영 예매",
+      "note": "7월 개최. 가족 단위 영화제."
+    },
+    {
+      "name": "태종대 수국축제",
+      "title_keywords": ["태종대", "수국축제", "수국"],
+      "annual_month": 6,
+      "booking_offset_days": 7,
+      "booking_type": "현장 관람",
+      "note": "6월 태종대 수국 만개 시기."
+    },
+    {
+      "name": "낙동강 정원 벚꽃축제",
+      "title_keywords": ["낙동강 정원 벚꽃", "벚꽃축제", "대저생태공원 벚꽃"],
+      "annual_month": 4,
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "4월 초 대저생태공원 벚꽃."
+    },
+    {
+      "name": "대저토마토축제",
+      "title_keywords": ["대저토마토축제", "대저 토마토"],
+      "annual_month": 5,
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "5월 강서구 대저. 토마토 수확 축제."
+    },
+    {
+      "name": "기장멸치축제",
+      "title_keywords": ["기장멸치축제", "멸치축제"],
+      "annual_month": 4,
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "4월 대변항. 기장 멸치 축제."
+    },
+    {
+      "name": "금정산성축제",
+      "title_keywords": ["금정산성축제"],
+      "annual_month": 10,
+      "booking_offset_days": 14,
+      "booking_type": "현장 행사",
+      "note": "10월 금정산성 일원."
+    },
+    {
+      "name": "삼광사 연등축제",
+      "title_keywords": ["삼광사 연등", "삼광사연등축제"],
+      "annual_month": 5,
+      "booking_offset_days": 7,
+      "booking_type": "현장 관람",
+      "note": "부처님오신날 전후(5월) 삼광사 연등."
+    },
+    {
+      "name": "해운대 빛축제",
+      "title_keywords": ["해운대빛축제", "해운대 빛축제"],
+      "annual_month": 12,
+      "booking_offset_days": 14,
+      "booking_type": "현장 관람",
+      "note": "12월~익년 1월 해운대 일원 조명 축제."
+    },
+    {
+      "name": "광복로 겨울빛 트리축제",
+      "title_keywords": ["광복로 겨울빛", "트리축제", "겨울빛 트리"],
+      "annual_month": 12,
+      "booking_offset_days": 14,
+      "booking_type": "현장 관람",
+      "note": "12월 광복로 트리 점등."
+    },
+    {
+      "name": "해운대 북극곰축제",
+      "title_keywords": ["해운대북극곰축제", "북극곰축제"],
+      "annual_month": 1,
+      "booking_offset_days": 14,
+      "booking_type": "참가 신청",
+      "note": "1월 해운대해수욕장 겨울 수영 축제."
     }
   ]
 }

@@ -60,7 +60,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true", help="이미 enrich 된 것도 전체 재수집")
     parser.add_argument("--limit", type=int, default=0, help="N개만 처리 (테스트용)")
+    parser.add_argument(
+        "--time-budget-min",
+        type=float,
+        default=0.0,
+        help="N분 경과 시 커밋 후 정상 종료 (0=무제한). CI 의 timeout-minutes 보다 작게 줘서 "
+        "트랜잭션 연 채 강제 종료(→다음 스텝 DB lock)되는 사고 방지.",
+    )
     args = parser.parse_args()
+    deadline = (
+        time.monotonic() + args.time_budget_min * 60 if args.time_budget_min > 0 else None
+    )
 
     load_dotenv()
     naver_id = os.getenv("NAVER_CLIENT_ID")
@@ -69,8 +79,10 @@ def main() -> int:
         print("ERR: NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 미설정", file=sys.stderr)
         return 2
 
-    conn = sqlite3.connect(DB_PATH)
+    # busy_timeout: main.py 와 동일 DB 를 연속/동시 접근할 때 lock 즉시 실패 방지.
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=30000")
 
     cutoff = (datetime.now(timezone.utc) - timedelta(days=ENRICH_STALE_DAYS)).isoformat()
     where = "category IN ('food','cafe') AND lat IS NOT NULL"
@@ -87,8 +99,19 @@ def main() -> int:
         return 0
 
     ok = 0
+    processed = 0
+    stopped_early = False
     now_iso = datetime.now(timezone.utc).isoformat()
     for i, r in enumerate(rows, 1):
+        # 시간 예산 초과 시 커밋 후 정상 종료 — 강제 kill 로 트랜잭션이 열린 채 죽는 것 방지.
+        if deadline is not None and time.monotonic() >= deadline:
+            conn.commit()
+            stopped_early = True
+            print(
+                f"  ⏱ 시간 예산({args.time_budget_min}분) 초과 — {i-1}/{len(rows)} 까지 처리 후 종료",
+                file=sys.stderr,
+            )
+            break
         name = r["title"]
         if not name:
             continue
@@ -99,13 +122,16 @@ def main() -> int:
                 (total, now_iso, r["id"]),
             )
             ok += 1
+        processed = i
         time.sleep(0.1)  # 10 RPS 보수적
         if i % 50 == 0:
             conn.commit()
             print(f"  진행 {i}/{len(rows)} · ok={ok}")
 
     conn.commit()
-    print(f"\n완료: {len(rows)}건 중 {ok}건 수집")
+    conn.close()
+    suffix = " (시간 예산으로 일부만)" if stopped_early else ""
+    print(f"\n완료: {processed}/{len(rows)}건 처리 · {ok}건 수집{suffix}")
     return 0
 
 
