@@ -16,7 +16,7 @@ from storage.db import Event
 LIST_URL = "https://www.busan.go.kr/moca/exhibition01"
 BASE = "https://www.busan.go.kr"
 SOURCE = "moca_busan"
-session = HTTPSession(SOURCE, rate_limit_s=0.3)
+session = HTTPSession(SOURCE, rate_limit_s=0.3, timeout=25, retries=3)
 
 LAT, LON = 35.1021, 128.9991
 VENUE_NAME = "부산현대미술관"

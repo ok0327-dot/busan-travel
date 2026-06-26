@@ -28,7 +28,7 @@ ADDRESS = "부산광역시 해운대구 APEC로 58"
 # 날짜 범위 형식: "2025-04-15 – 2025-06-29" (em-dash) 또는 "2025-04-15 ~ 2025-06-29"
 RANGE_RE = re.compile(r"(\d{4})-(\d{1,2})-(\d{1,2})\s*[–~\-]\s*(\d{4})-(\d{1,2})-(\d{1,2})")
 
-session = HTTPSession(SOURCE, rate_limit_s=0.3)
+session = HTTPSession(SOURCE, rate_limit_s=0.3, timeout=25, retries=3)
 
 
 def _parse_detail(detail_url: str) -> dict:

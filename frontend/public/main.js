@@ -470,7 +470,7 @@ function showDetail(poi) {
 
   // 별표는 카테고리 색 유지하면서 골드 kicker 로 "내가 별표한 곳" 표시
   const favKicker = isFavorite
-    ? `<div class="favorite-kicker">${icon("ph-star-fill")} 내가 별표한 곳${poi.subtype ? " · " + escape(poi.subtype) : ""}</div>`
+    ? `<div class="favorite-kicker">${icon("ph-star-fill")} 내가 별표한 곳${poi.subtype && poi.subtype !== "tentative_date" ? " · " + escape(poi.subtype) : ""}</div>`
     : "";
   const favNote = isFavorite && poi.note
     ? `<div class="favorite-note">💬 ${escape(poi.note)}</div>`
@@ -481,8 +481,12 @@ function showDetail(poi) {
   const weatherLine = f
     ? `<div class="card-meta">${weatherBadge(f)} ${f.tmp ? f.tmp + "°C " : ""}${f.pop ? "POP " + f.pop + "%" : ""}</div>`
     : "";
+  const _tentative = poi.subtype === "tentative_date";
+  const _tentBadge = _tentative
+    ? ` <span style="background:#fde68a;color:#92400e;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:600">예정·잠정</span>`
+    : "";
   const dateLine = poi.start
-    ? `<div class="card-meta">${icon("ph-calendar-blank")} ${poi.start}${poi.end && poi.end !== poi.start ? " ~ " + poi.end : ""}</div>`
+    ? `<div class="card-meta">${icon("ph-calendar-blank")} ${_tentative ? poi.start.slice(0, 7) + " 중 (추정)" : poi.start + (poi.end && poi.end !== poi.start ? " ~ " + poi.end : "")}${_tentBadge}</div>`
     : "";
   const beachLine = poi.latest_water?.comment
     ? `<div class="card-meta">${icon("ph-waves")} ${escape(poi.latest_water.comment)}</div>`
@@ -501,7 +505,7 @@ function showDetail(poi) {
       ${imageTag(poi.image)}
       <div class="card-title">${catDef.icon ? icon(catDef.icon) : (catDef.emoji || "")} ${escape(poi.title)}</div>
       ${favNote}
-      <div class="card-meta">${catDef.label || poi.category}${poi.subtype ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
+      <div class="card-meta">${catDef.label || poi.category}${poi.subtype && poi.subtype !== "tentative_date" ? " · " + escape(poi.subtype) : ""}${poi.address ? " · " + escape(poi.address) : ""}</div>
       ${ratingLine}
       ${externalRatingLine}
       ${dateLine}
