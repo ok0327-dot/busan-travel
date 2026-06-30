@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-06-30T23:10:18+00:00",
-  "version": "20260630T231018",
-  "scope": "all",
+  "generated_at": "2026-06-30T23:13:24+00:00",
+  "version": "20260630T231324",
+  "scope": "weather",
   "counts": {
     "places": 701,
     "courses": 48,
@@ -33,7 +33,7 @@
       "2027-05": 8,
       "2027-06": 2
     },
-    "weather_short_rows": 64044,
+    "weather_short_rows": 64092,
     "weather_mid_rows": 7,
     "air_quality_rows": 840,
     "beaches": 7
