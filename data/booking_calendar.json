@@ -10,6 +10,9 @@
         "부산영화제"
       ],
       "annual_month": 10,
+      "exact_dates": {
+        "2026": ["2026-10-06", "2026-10-15"]
+      },
       "booking_offset_days": 14,
       "booking_type": "예매 (인터파크/예스24)",
       "note": "10월 초 개막. 9월 중순 예매 시작."
@@ -21,9 +24,12 @@
         "광안리불꽃축제"
       ],
       "annual_month": 10,
+      "exact_dates": {
+        "2026": ["2026-11-07"]
+      },
       "booking_offset_days": 60,
       "booking_type": "유료 관람석",
-      "note": "10월 말 개최. 8월 말 유료석 발매."
+      "note": "10월 말~11월 초 개최. 8월 말 유료석 발매."
     },
     {
       "name": "부산국제연극제 (BIPF)",
@@ -42,6 +48,9 @@
         "부산바다축제"
       ],
       "annual_month": 8,
+      "exact_dates": {
+        "2026": ["2026-08-01", "2026-08-03"]
+      },
       "booking_offset_days": 30,
       "booking_type": "체험 신청",
       "note": "8월 초 개최. 7월 초 체험 부스 신청."
@@ -75,9 +84,13 @@
         "부산비엔날레"
       ],
       "annual_month": 9,
+      "exact_dates": {
+        "2026": ["2026-08-29", "2026-11-01"]
+      },
       "booking_offset_days": 14,
       "booking_type": "도슨트 예약",
-      "note": "격년 9월 ~ 11월. 도슨트는 사전 예약 권장."
+      "note": "2026: 8월 29일 ~ 11월 1일 (65일). 주제 '불협하는 합창'. 부산현대미술관·영도.",
+      "venue": "부산현대미술관"
     },
     {
       "name": "동래읍성역사축제",
@@ -195,9 +208,13 @@
         "MAD STARS"
       ],
       "annual_month": 8,
+      "exact_dates": {
+        "2026": ["2026-08-26", "2026-08-28"]
+      },
       "booking_offset_days": 30,
       "booking_type": "참가 등록",
-      "note": "8월 말. 7월 말 참가 등록."
+      "note": "8월 말 개최. 7월 말 참가 등록. 테마: AMPLIFY.",
+      "venue": "시그니엘 부산·해운대 일원"
     },
     {
       "name": "부산자갈치축제",
@@ -383,6 +400,22 @@
       "booking_type": "전시 관람",
       "note": "4월 벡스코·수영강. 해양레저 보트쇼.",
       "venue": "벡스코 (BEXCO)·수영강"
+    },
+    {
+      "name": "나이트레이스 인 부산",
+      "title_keywords": [
+        "나이트레이스 인 부산",
+        "나이트레이스인부산",
+        "Night Race in Busan"
+      ],
+      "annual_month": 8,
+      "exact_dates": {
+        "2026": ["2026-08-01"]
+      },
+      "booking_offset_days": 30,
+      "booking_type": "참가 신청",
+      "note": "8월 초 광안리 해수욕장. 광안대교 야간 마라톤. 레이스 후 DJ파티+워터 콘서트.",
+      "venue": "광안리해수욕장"
     }
   ]
 }
