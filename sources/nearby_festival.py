@@ -110,11 +110,13 @@ def _fetch_region(label: str, area_code: str, sigungu: str | None,
     return out
 
 
-def fetch(max_pages: int = 10, page_size: int = 100, lookback_days: int = 30) -> list[dict]:
+def fetch(max_pages: int = 10, page_size: int = 100, lookback_days: int = 365) -> list[dict]:
     """진행 중 + 다가오는 경남·경주 축제.
 
-    eventStartDate 를 lookback_days 전으로 잡아 '진행 중'(start<=today<=end) 축제도 포함하고,
-    최종적으로 end_date >= today 인 것만 남긴다(이미 끝난 축제 제거).
+    TourAPI searchFestival2 의 eventStartDate 는 '시작일 >= param' 필터라, 값을 오늘로 잡으면
+    이미 시작해 진행 중인 축제가 통째로 빠진다. 그래서 gov_tour.py(부산, 검증됨)와 동일하게
+    lookback_days=365 로 1년 전부터 받아 온 뒤, 아래에서 end_date >= today 로 직접 필터링해
+    '진행 중 + 다가오는' 만 남긴다(이미 끝난 축제 제거).
     반환은 프론트가 바로 쓰는 dict(JSON) 리스트, 시작일 오름차순 정렬.
     """
     start_ymd = (date.today() - timedelta(days=lookback_days)).strftime("%Y%m%d")
