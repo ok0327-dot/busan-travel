@@ -1638,6 +1638,36 @@ body.view-course #filter-row { display: none !important; }
   text-align: center;
 }
 .popular-events .popular-rank { color: #a855f7; }
+/* ── 🎡 부산 근교 축제 (경남·경주) ── */
+.popular-section.nearby-section { border-left-color: #14b8a6; }
+.nearby-section .popular-card {
+  background: rgba(20, 184, 166, 0.05);
+  border-color: rgba(20, 184, 166, 0.2);
+}
+.nearby-section .popular-card:hover {
+  background: rgba(20, 184, 166, 0.12);
+  border-color: rgba(20, 184, 166, 0.45);
+}
+.nearby-region {
+  font: 700 10px/1.15 Pretendard, sans-serif;
+  color: #14b8a6;
+  text-align: center;
+  word-break: keep-all;
+}
+.nearby-more {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font-size: var(--fs-meta);
+  font-family: var(--font-body);
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, color 0.15s;
+}
+.nearby-more:hover { background: rgba(255,255,255,0.04); color: var(--fg); }
 .popular-body { min-width: 0; overflow: hidden; }
 .popular-title {
   font: 600 13px/1.3 Pretendard, sans-serif;

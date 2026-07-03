@@ -738,7 +738,7 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides, content] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides, content, nearby] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
@@ -748,12 +748,14 @@ async function init() {
     fetchJson("./data/my-favorites.json").catch(() => ({ favorites: [] })),  // 구글 별표 import (파일 없으면 빈 배열)
     fetchJson("./data/guides.json").catch(() => ({ guides: [] })),  // visitbusan 매거진 가이드 (지도 마커 X, 읽을거리 카드)
     fetchJson("./data/content/index.json").catch(() => ({ count: 0, items: [] })),  // Step 2 — 자체 발행 콘텐츠
+    fetchJson("./data/nearby-festivals.json").catch(() => ({ festivals: [] })),  // 부산 근교(경남·경주) 축제 — 별도 파이프라인
   ]);
   coursesData = courses;
   window.__seasonal = seasonal;
   window.__favorites = favorites;
   window.__guides = guides?.guides || [];
   window.__content = content?.items || [];  // Step 2 — 발행 콘텐츠 메타 list
+  window.__nearby = nearby?.festivals || [];  // 부산 근교(경남·경주) 축제
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -1810,6 +1812,25 @@ function showSeasonalDetail(label, kind) {
 
 // ───────── Phase E 재배치: 한눈에 들어오는 "오늘/이번주말 뭐할지" ─────────
 // 새 순서: ① AI Pick → ② Hero Top 3 → ③ 🆕 신규 → ④ D-30 사전예약 → ⑤ 제철 → ⑥ 그 외 → ⑦ STORY
+// 근교(경남·경주) 축제 카드 — popular-card 스타일 재사용, 랭크 자리에 지역 배지
+function _nearbyItemHTML(p, idx) {
+  const thumb = p.image
+    ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
+    : `<div class="popular-thumb popular-thumb-empty">🎪</div>`;
+  const dateStr = p.start
+    ? `${(p.start || "").slice(5)}${p.end && p.end !== p.start ? "~" + (p.end || "").slice(5) : ""}`
+    : "";
+  const place = p.venue ? escape(p.venue) : (p.address ? escape(p.address) : "");
+  return `<button class="popular-card nearby-card" data-idx="${idx}" data-kind="nearby">
+    ${thumb}
+    <div class="nearby-region">${escape(p.region || "근교")}</div>
+    <div class="popular-body">
+      <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
+      <div class="popular-meta">${dateStr}${place ? " · " + place : ""}</div>
+    </div>
+  </button>`;
+}
+
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
@@ -1972,6 +1993,25 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
+  // 🎡 부산 근교 축제 (경남·경주) — 별도 파이프라인(window.__nearby)
+  const nearbyItems = (window.__nearby || []).slice(0, 12);
+  let nearbyFestivalHTML = "";
+  if (nearbyItems.length) {
+    const initial = 6;
+    const head = nearbyItems.slice(0, initial);
+    const extra = nearbyItems.slice(initial);
+    const extraHTML = extra.length
+      ? `<div class="nearby-extra" hidden>${extra.map((p, i) => _nearbyItemHTML(p, i + initial)).join("")}</div>
+         <button class="nearby-more" type="button">+${extra.length}건 더 보기</button>`
+      : "";
+    nearbyFestivalHTML = `<div class="highlight-section popular-section nearby-section">
+      <div class="hs-title">🎡 부산 근교 축제 · 경남·경주 ${nearbyItems.length}곳</div>
+      <div class="hs-note">📍 당일치기 여행 · 한국관광공사 축제 정보 · 진행 중·다가오는 순</div>
+      <div class="popular-grid">${head.map((p, i) => _nearbyItemHTML(p, i)).join("")}</div>
+      ${extraHTML}
+    </div>`;
+  }
+
   // ⑤ 그 외 행사
   let tailHTML = "";
   if (tail.length) {
@@ -1992,14 +2032,14 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + tailHTML + storyHero;
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + nearbyFestivalHTML + tailHTML + storyHero;
 
   // 🔥/🎭 인기 카드 클릭 → showDetail
   $list.querySelectorAll(".popular-card").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const kind = btn.dataset.kind;
-      const item = kind === "food" ? popularFood[idx] : popularEvents[idx];
+      const item = kind === "food" ? popularFood[idx] : kind === "nearby" ? nearbyItems[idx] : popularEvents[idx];
       if (item) showDetail(item);
     });
   });
@@ -2021,6 +2061,16 @@ function renderTodayHighlights(target) {
       newMoreBtn.remove();
     });
   }
+  // 근교 축제 더보기
+  const nearbyMoreBtn = $list.querySelector(".nearby-more");
+  if (nearbyMoreBtn) {
+    nearbyMoreBtn.addEventListener("click", () => {
+      const ext = $list.querySelector(".nearby-extra");
+      if (ext) ext.hidden = false;
+      nearbyMoreBtn.remove();
+    });
+  }
+
 
   // Hero + chip 클릭 → POI 상세
   $list.querySelectorAll(".hero-card, .chip").forEach(btn => {

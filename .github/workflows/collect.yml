@@ -203,6 +203,17 @@ jobs:
           echo "-> scope=$SCOPE"
           python scripts/export_json.py --scope "$SCOPE"
 
+      # 부산 근교(경남 areaCode=36 + 경주 35/sigungu=2) 축제 → nearby-festivals.json.
+      # 부산 이벤트 DB 와 독립 (TourAPI searchFestival2 직접 호출). weather-only 는 스킵.
+      # continue-on-error: 근교 수집 실패가 부산 핵심 데이터 push 를 막지 않음 (nice-to-have).
+      - name: Nearby festivals (경남·경주)
+        if: steps.mode.outputs.mode != 'weather-only'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: python scripts/build_nearby.py
+
       # 회귀 테스트 — audit 2026-04-25 P0/P1 정합성 자동 검증
       - name: Verify info flow (audit 회귀 테스트)
         if: steps.mode.outputs.mode != 'weather-only'
