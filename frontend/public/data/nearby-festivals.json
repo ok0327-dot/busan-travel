@@ -1,0 +1,24 @@
+{
+  "generated_at": "2026-07-03T11:09Z",
+  "count": 1,
+  "regions": [
+    "경남",
+    "경주"
+  ],
+  "festivals": [
+    {
+      "id": "nearby-234232",
+      "category": "festival",
+      "region": "사천",
+      "title": "사천에어쇼",
+      "start": "2026-10-22",
+      "end": "2026-10-25",
+      "venue": null,
+      "address": "경상남도 사천시 사천읍 정의리",
+      "image": "http://tong.visitkorea.or.kr/cms/resource/49/3566649_image2_1.png",
+      "tel": "055-831-2061",
+      "lat": 35.0911816485,
+      "lon": 128.0699132182
+    }
+  ]
+}
