@@ -28,10 +28,13 @@ OUT = ROOT / "frontend" / "public" / "data" / "nearby-festivals.json"
 def main() -> int:
     load_dotenv()
     festivals = nearby_festival.fetch()
+    n_est = sum(1 for f in festivals if f.get("estimated"))
     payload = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%MZ"),
         "count": len(festivals),
-        "regions": ["경남", "경주"],
+        "confirmed_count": len(festivals) - n_est,
+        "estimated_count": n_est,
+        "regions": ["경남", "울산", "경주"],
         "festivals": festivals,
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
@@ -39,7 +42,8 @@ def main() -> int:
     by_region: dict[str, int] = {}
     for f in festivals:
         by_region[f["region"]] = by_region.get(f["region"], 0) + 1
-    print(f"[build_nearby] {len(festivals)}건 → {OUT.relative_to(ROOT)} · {by_region}")
+    print(f"[build_nearby] {len(festivals)}건(확정 {len(festivals)-n_est}·추정 {n_est}) "
+          f"→ {OUT.relative_to(ROOT)} · {by_region}")
     return 0
 
 
