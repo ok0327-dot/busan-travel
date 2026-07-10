@@ -1733,6 +1733,29 @@ body.view-course #filter-row { display: none !important; }
   vertical-align: 1px;
 }
 .nearby-card.nearby-estimated { border-style: dashed; }
+/* 선택 위치 핀 — 카드 클릭 시 우리 지도에 표시(기존 펄스와 동일 블루) */
+.sel-pin { display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.sel-pin-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 11px/1.3 var(--font-body, Pretendard), sans-serif;
+  color: #fff;
+  background: #2563eb;
+  padding: 3px 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  margin-bottom: 3px;
+}
+.sel-pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.35);
+}
 .popular-body { min-width: 0; overflow: hidden; }
 .popular-title {
   font: 600 13px/1.3 Pretendard, sans-serif;
