@@ -29,8 +29,9 @@ OK_CODES = {"00", "0000"}
 
 # (라벨, areaCode, sigunguCode) — sigunguCode=None 이면 도(道) 전역
 REGIONS = [
-    ("경남", "36", None),   # 경상남도 전역
-    ("경주", "35", "2"),    # 경상북도 경주시
+    ("경남", "36", None),   # 경상남도 전역 (김해·양산·창원·거제·통영 등)
+    ("울산", "7", None),    # 울산광역시 전역 (부산 바로 인접)
+    ("경주", "35", "2"),    # 경상북도 경주시 (경북은 그 외 당일치기 밖이라 제외)
 ]
 
 
@@ -110,17 +111,28 @@ def _fetch_region(label: str, area_code: str, sigungu: str | None,
     return out
 
 
-def fetch(max_pages: int = 10, page_size: int = 100, lookback_days: int = 365) -> list[dict]:
-    """진행 중 + 다가오는 경남·경주 축제.
+def _shift_years(d: date, n: int) -> date:
+    """연 단위 이월 (2/29 → 2/28 안전 처리)."""
+    try:
+        return d.replace(year=d.year + n)
+    except ValueError:
+        return d.replace(year=d.year + n, month=2, day=28)
 
-    TourAPI searchFestival2 의 eventStartDate 는 '시작일 >= param' 필터라, 값을 오늘로 잡으면
-    이미 시작해 진행 중인 축제가 통째로 빠진다. 그래서 gov_tour.py(부산, 검증됨)와 동일하게
-    lookback_days=365 로 1년 전부터 받아 온 뒤, 아래에서 end_date >= today 로 직접 필터링해
-    '진행 중 + 다가오는' 만 남긴다(이미 끝난 축제 제거).
+
+def fetch(max_pages: int = 10, page_size: int = 100, lookback_days: int = 365) -> list[dict]:
+    """진행 중 + 다가오는 + (연례축제 추정 이월) 경남·울산·경주 축제.
+
+    ▶ 배경: TourAPI searchFestival2 의 eventStartDate 는 '시작일 >= param' 필터다. 값을
+      오늘로 잡으면 진행 중 축제가 빠지므로 lookback_days=365 로 1년 전부터 받는다.
+    ▶ 문제(2026-07 실측): 경남·울산·경주는 대부분 **작년(2025) 일정 그대로** 남은 연례축제라
+      end_date >= today 필터만 쓰면 거의 다 잘려 1건만 남는다(TourAPI 갱신 지연).
+    ▶ 해법: 이미 끝난 축제는 '연례'로 보고 다음 발생연도로 **추정 이월**(estimated=True)해
+      살린다. 실제 미래 일정이 등록된 축제는 estimated=False(확정)로 그대로 둔다.
+      추정분은 프론트에서 '예상/예년 기준' 라벨로 정직하게 표시한다.
     반환은 프론트가 바로 쓰는 dict(JSON) 리스트, 시작일 오름차순 정렬.
     """
     start_ymd = (date.today() - timedelta(days=lookback_days)).strftime("%Y%m%d")
-    today = date.today().isoformat()
+    today_d = date.today()
 
     merged: dict[str, dict] = {}
     for label, area, sigungu in REGIONS:
@@ -128,11 +140,46 @@ def fetch(max_pages: int = 10, page_size: int = 100, lookback_days: int = 365) -
             if ev["id"] not in merged:
                 merged[ev["id"]] = ev
 
-    # 이미 종료된 축제 제거 (end 없으면 start 기준으로 판단, 둘 다 없으면 유지)
-    def _alive(ev: dict) -> bool:
-        end = ev.get("end") or ev.get("start")
-        return (end is None) or (end >= today)
+    festivals: list[dict] = []
+    n_confirmed = n_estimated = n_nodate = 0
+    for ev in merged.values():
+        if not ev["title"]:
+            continue
+        s, e = ev.get("start"), ev.get("end")
+        if not s:
+            ev["estimated"] = False          # 날짜 없음: 판단 불가 → 유지
+            festivals.append(ev); n_nodate += 1
+            continue
+        try:
+            sd = date.fromisoformat(s)
+            ed = date.fromisoformat(e) if e else sd
+        except ValueError:
+            ev["estimated"] = False
+            festivals.append(ev)
+            continue
+        if ed >= today_d:                     # 진행 중 + 다가오는 = 확정
+            ev["estimated"] = False
+            festivals.append(ev); n_confirmed += 1
+            continue
+        # 이미 끝남 → 연례축제로 보고 다음 발생연도로 추정 이월
+        yr = today_d.year - sd.year
+        ns, ne = _shift_years(sd, yr), _shift_years(ed, yr)
+        if ne < today_d:                      # 올해분도 이미 지남 → 내년
+            ns, ne = _shift_years(sd, yr + 1), _shift_years(ed, yr + 1)
+        rolled = dict(ev)
+        rolled["orig_start"], rolled["orig_end"] = s, e
+        rolled["start"], rolled["end"] = ns.isoformat(), ne.isoformat()
+        rolled["estimated"] = True
+        rolled["excerpt"] = (
+            f"※ 예년({sd.year}년) 일정 기준 추정입니다. {ns.year}년 정확한 개최일은 "
+            f"주최 측 공지를 확인하세요."
+        )
+        festivals.append(rolled); n_estimated += 1
 
-    festivals = [ev for ev in merged.values() if ev["title"] and _alive(ev)]
     festivals.sort(key=lambda e: (e.get("start") or "9999-99-99", e.get("title") or ""))
+    print(
+        f"[nearby_festival] raw={len(merged)} → 확정={n_confirmed} "
+        f"추정이월={n_estimated} 날짜없음={n_nodate} 총={len(festivals)}",
+        file=sys.stderr,
+    )
     return festivals
