@@ -497,7 +497,12 @@ function showDetail(poi) {
   const externalRatingLine = renderExternalRatings(poi);
   const excerpt = poi.excerpt || poi.description;
 
-  const mapLink = `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`;
+  // 좌표 있으면 길찾기, 없으면(미식 가이드 등 좌표 미수록) 상호+구 키워드 검색으로 폴백 → 'undefined' 좌표 깨진 링크 방지
+  const hasCoord = poi.lat != null && poi.lon != null;
+  const mapLink = hasCoord
+    ? `https://map.kakao.com/link/to/${encodeURIComponent(poi.title)},${poi.lat},${poi.lon}`
+    : `https://map.kakao.com/link/search/${encodeURIComponent(`${poi.gugun ? poi.gugun + " " : ""}${poi.title}`)}`;
+  const mapLinkLabel = hasCoord ? "카카오맵 길찾기" : "카카오맵에서 찾기";
 
   $list.innerHTML = _detailHeader() + `
     <div class="card${isFavorite ? " favorite-detail" : ""}" style="border-left:3px solid ${catDef.color || "#888"}">
@@ -524,7 +529,7 @@ function showDetail(poi) {
       ${infoRow(icon("ph-lightbulb") + " 팁", poi.tip)}
       ${infoRow(icon("ph-phone") + " 전화", poi.phone)}
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-map-pin")} 카카오맵 길찾기</a>
+        <a href="${mapLink}" target="_blank" style="padding:6px 10px;background:#fee500;color:#000;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-map-pin")} ${mapLinkLabel}</a>
         ${poi.story_url ? `<a href="${escape(poi.story_url)}" target="_blank" style="padding:6px 10px;background:#0ea5e9;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-book-open")} 비짓부산</a>` : ""}
         ${poi.url && poi.url !== poi.story_url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#374151;color:#fff;border-radius:6px;text-decoration:none;font-size:12px">${icon("ph-globe")} 홈페이지</a>` : ""}
         ${_bookingRequired(poi) && poi.url ? `<a href="${escape(poi.url)}" target="_blank" style="padding:6px 10px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600">${icon("ph-ticket")} 예매하기 →</a>` : ""}
@@ -738,7 +743,7 @@ async function init() {
   window.__map = map;
 
   $status.textContent = "데이터 로딩 중…";
-  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides, content, nearby] = await Promise.all([
+  const [manifest, places, weatherShort, beaches, courses, seasonal, favorites, guides, content, nearby, mishik] = await Promise.all([
     fetchJson("./data/manifest.json"),
     fetchJson("./data/places.json"),
     fetchJson("./data/weather-short.json"),
@@ -749,6 +754,7 @@ async function init() {
     fetchJson("./data/guides.json").catch(() => ({ guides: [] })),  // visitbusan 매거진 가이드 (지도 마커 X, 읽을거리 카드)
     fetchJson("./data/content/index.json").catch(() => ({ count: 0, items: [] })),  // Step 2 — 자체 발행 콘텐츠
     fetchJson("./data/nearby-festivals.json").catch(() => ({ festivals: [] })),  // 부산 근교(경남·경주) 축제 — 별도 파이프라인
+    fetchJson("./data/mishik-guide.json").catch(() => ({ restaurants: [] })),  // 부산 미식 가이드 — 정적 큐레이션 JSON (없으면 섹션 숨김)
   ]);
   coursesData = courses;
   window.__seasonal = seasonal;
@@ -756,6 +762,7 @@ async function init() {
   window.__guides = guides?.guides || [];
   window.__content = content?.items || [];  // Step 2 — 발행 콘텐츠 메타 list
   window.__nearby = nearby?.festivals || [];  // 부산 근교(경남·경주) 축제
+  window.__mishik = mishik?.restaurants || [];  // 부산 미식 가이드 (2026 부산의 맛·미쉐린 2026)
 
   // 현재 월 ± 인접 월 축제 이벤트 로드 (manifest.events_by_month 기반)
   const monthsByCount = Object.entries(manifest.counts?.events_by_month || {})
@@ -1831,6 +1838,26 @@ function _nearbyItemHTML(p, idx) {
   </button>`;
 }
 
+// 🍜 부산 미식 가이드 카드 — popular-card 재사용, 배지 자리에 구·군(또는 '미쉐린 2026')
+function _mishikItemHTML(p, idx) {
+  const thumb = p.image
+    ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
+    : `<div class="popular-thumb popular-thumb-empty">🍜</div>`;
+  const genre = p.genre ? escape(p.genre) : (p.menu ? escape(p.menu) : "");
+  const badge = p.badge || p.gugun || "미식";
+  // 배지가 구·군을 이미 보여주면 meta엔 장르만, 아니면(동네·미쉐린 배지) 구를 덧붙임
+  const gu = p.gugun && p.gugun !== badge ? escape(p.gugun) : "";
+  const meta = [genre, gu].filter(Boolean).join(" · ");
+  return `<button class="popular-card mishik-card" data-idx="${idx}" data-kind="mishik">
+    ${thumb}
+    <div class="nearby-region mishik-region">${escape(badge)}</div>
+    <div class="popular-body">
+      <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
+      <div class="popular-meta">${meta}</div>
+    </div>
+  </button>`;
+}
+
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
@@ -2012,6 +2039,26 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
+  // 🍜 부산 미식 가이드 (2026 부산의 맛·미쉐린 2026) — 별도 정적 JSON(window.__mishik)
+  const mishikItems = (window.__mishik || []).slice(0, 12);
+  let mishikGuideHTML = "";
+  if (mishikItems.length) {
+    const initial = 6;
+    const head = mishikItems.slice(0, initial);
+    const extra = mishikItems.slice(initial);
+    const extraHTML = extra.length
+      ? `<div class="mishik-extra" hidden>${extra.map((p, i) => _mishikItemHTML(p, i + initial)).join("")}</div>
+         <button class="mishik-more" type="button">+${extra.length}곳 더 보기</button>`
+      : "";
+    const guideUrl = "https://www.visitbusan.net/board/list.do?boardId=BBS_0000007&menuCd=DOM_000000203001000000&contentsSid=61";
+    mishikGuideHTML = `<div class="highlight-section popular-section mishik-section">
+      <div class="hs-title">🍜 부산 미식 가이드 · 검증 맛집 ${mishikItems.length}곳</div>
+      <div class="hs-note">📖 부산시 '2026 부산의 맛'(146곳)·미쉐린 2026·택슐랭 2025 선정 — 7/9부터 무료 배포 · <a href="${guideUrl}" target="_blank" rel="noopener">비짓부산 전체 보기 →</a></div>
+      <div class="popular-grid">${head.map((p, i) => _mishikItemHTML(p, i)).join("")}</div>
+      ${extraHTML}
+    </div>`;
+  }
+
   // ⑤ 그 외 행사
   let tailHTML = "";
   if (tail.length) {
@@ -2032,14 +2079,14 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + nearbyFestivalHTML + tailHTML + storyHero;
+  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + nearbyFestivalHTML + mishikGuideHTML + tailHTML + storyHero;
 
   // 🔥/🎭 인기 카드 클릭 → showDetail
   $list.querySelectorAll(".popular-card").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const kind = btn.dataset.kind;
-      const item = kind === "food" ? popularFood[idx] : kind === "nearby" ? nearbyItems[idx] : popularEvents[idx];
+      const item = kind === "food" ? popularFood[idx] : kind === "nearby" ? nearbyItems[idx] : kind === "mishik" ? mishikItems[idx] : popularEvents[idx];
       if (item) showDetail(item);
     });
   });
@@ -2068,6 +2115,15 @@ function renderTodayHighlights(target) {
       const ext = $list.querySelector(".nearby-extra");
       if (ext) ext.hidden = false;
       nearbyMoreBtn.remove();
+    });
+  }
+  // 미식 가이드 더보기
+  const mishikMoreBtn = $list.querySelector(".mishik-more");
+  if (mishikMoreBtn) {
+    mishikMoreBtn.addEventListener("click", () => {
+      const ext = $list.querySelector(".mishik-extra");
+      if (ext) ext.hidden = false;
+      mishikMoreBtn.remove();
     });
   }
 

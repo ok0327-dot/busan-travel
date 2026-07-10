@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-07-10",
+  "source": "2026 부산 미식 가이드 (부산시 무료 배포 · 2026-07-09~) — 원본: '2026 부산의 맛'(146곳) + 미쉐린 가이드 2026 + 택슐랭 2025",
+  "guide_url": "https://www.visitbusan.net/board/list.do?boardId=BBS_0000007&menuCd=DOM_000000203001000000&contentsSid=61",
+  "note": "언론(위키트리·여행픽 등)이 '2026 부산의 맛'·미쉐린 2026에서 교차확인한 실명 식당만 수동 큐레이션. 부분 목록이며 좌표 미수록(발명 금지). seasonal.json 과 동일한 정적 큐레이션 방식.",
+  "count": 12,
+  "restaurants": [
+    {
+      "id": "mishik-haeundae-amso",
+      "category": "food",
+      "title": "해운대암소갈비집",
+      "gugun": "해운대구",
+      "genre": "암소갈비",
+      "menu": "숯불 암소갈비",
+      "badge": "해운대구",
+      "excerpt": "'2026 부산의 맛' 수록 + 비짓부산 추천. 미쉐린 빕구르망 단골로 꼽히는 해운대 대표 숯불 소갈비 노포."
+    },
+    {
+      "id": "mishik-dongnae-pajeon",
+      "category": "food",
+      "title": "동래할매파전",
+      "gugun": "동래구",
+      "genre": "동래파전",
+      "menu": "동래파전",
+      "badge": "동래구",
+      "excerpt": "'2026 부산의 맛' 동래구 수록. 부산 향토음식 동래파전을 대표하는 노포."
+    },
+    {
+      "id": "mishik-dong-halmae-gukbap",
+      "category": "food",
+      "title": "60년 전통 할매국밥",
+      "gugun": "동구",
+      "genre": "돼지국밥",
+      "menu": "돼지국밥",
+      "badge": "동구",
+      "excerpt": "'2026 부산의 맛' 동구 수록. 부산 대표 향토음식 돼지국밥 노포."
+    },
+    {
+      "id": "mishik-dong-shinbalwon",
+      "category": "food",
+      "title": "신발원",
+      "gugun": "동구",
+      "genre": "만두·중식",
+      "menu": "손만두 · 중식",
+      "badge": "초량 차이나타운",
+      "excerpt": "'2026 부산의 맛' 동구 수록. 초량 화교가 이어온 만두 노포."
+    },
+    {
+      "id": "mishik-jin-samsung-milmyeon",
+      "category": "food",
+      "title": "삼성밀면",
+      "gugun": "부산진구",
+      "genre": "밀면",
+      "menu": "밀면",
+      "badge": "부산진구",
+      "excerpt": "'2026 부산의 맛' 부산진구 수록. 부산 향토음식 밀면 대표 가게."
+    },
+    {
+      "id": "mishik-yeonje-gukje-milmyeon",
+      "category": "food",
+      "title": "국제밀면 본점",
+      "gugun": "연제구",
+      "genre": "밀면",
+      "menu": "밀면",
+      "badge": "연제구",
+      "excerpt": "'2026 부산의 맛' 연제구 수록. 부산 밀면 명가."
+    },
+    {
+      "id": "mishik-nam-ssangdungi",
+      "category": "food",
+      "title": "쌍둥이돼지국밥",
+      "gugun": "남구",
+      "genre": "돼지국밥",
+      "menu": "돼지국밥",
+      "badge": "남구",
+      "excerpt": "'2026 부산의 맛' 남구 수록. 부산 대표 돼지국밥."
+    },
+    {
+      "id": "mishik-suyeong-jamae",
+      "category": "food",
+      "title": "자매국밥",
+      "gugun": "수영구",
+      "genre": "돼지국밥",
+      "menu": "돼지국밥",
+      "badge": "수영구",
+      "excerpt": "'2026 부산의 맛' 수영구 수록 + 비짓부산 추천에도 동시 등재."
+    },
+    {
+      "id": "mishik-gijang-jipbul",
+      "category": "food",
+      "title": "기장해변짚불곰장어",
+      "gugun": "기장군",
+      "genre": "짚불곰장어",
+      "menu": "짚불곰장어 구이",
+      "badge": "기장군",
+      "excerpt": "'2026 부산의 맛' 기장군 수록. 기장 향토 짚불 곰장어."
+    },
+    {
+      "id": "mishik-michelin-pyongyangjip",
+      "category": "food",
+      "title": "평양집",
+      "gugun": "",
+      "genre": "이북식 만두·녹두전",
+      "menu": "이북식 만두 · 녹두전",
+      "badge": "미쉐린 2026",
+      "excerpt": "미쉐린 가이드 2026 신규 선정. 이북식 만두와 녹두전으로 알려진 부산 노포."
+    },
+    {
+      "id": "mishik-michelin-1969",
+      "category": "food",
+      "title": "1969부원동칼국수",
+      "gugun": "중구",
+      "genre": "칼국수",
+      "menu": "칼국수",
+      "badge": "미쉐린 2026",
+      "excerpt": "미쉐린 가이드 2026 신규 선정. 남포·부원동 일대 칼국수 노포."
+    },
+    {
+      "id": "mishik-dongnae-samgyetang",
+      "category": "food",
+      "title": "배종관동래삼계탕",
+      "gugun": "동래구",
+      "genre": "삼계탕",
+      "menu": "삼계탕",
+      "badge": "동래구",
+      "excerpt": "'2026 부산의 맛' 동래구 수록."
+    }
+  ]
+}
