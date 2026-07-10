@@ -431,6 +431,7 @@ function _detailHeader() {
 function _bindDetailBack() {
   const btn = $list.querySelector(".detail-back");
   if (btn) btn.addEventListener("click", () => {
+    clearSelectedOnMap();   // 목록으로 돌아가면 선택 위치 핀 제거
     const view = document.body.dataset.view || "map";
     if (view === "course") renderCourseList();
     else if (view === "read") renderBlogFeed();
@@ -461,10 +462,7 @@ function showDetail(poi) {
     _bindDetailBack();
     const sheet = document.getElementById("sheet");
     if (sheet.classList.contains("sheet-peek")) sheet.classList.replace("sheet-peek", "sheet-half");
-    if (poi.lat && poi.lon) {
-      pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
-      panToWithSheetOffset(poi.lat, poi.lon);
-    }
+    markSelectedOnMap(poi.lat, poi.lon, poi.title);
     return;
   }
 
@@ -544,11 +542,8 @@ function showDetail(poi) {
     sheet.classList.replace("sheet-peek", "sheet-half");
   }
 
-  // Phase 2: 펄스 오버레이로 클릭 시각 피드백 + 시트가 가리지 않도록 offset pan
-  if (poi.lat && poi.lon) {
-    pulseMarker(new kakao.maps.LatLng(poi.lat, poi.lon));
-    panToWithSheetOffset(poi.lat, poi.lon);
-  }
+  // Phase 2: 클릭 시 우리 지도에 선택 위치 핀 표시 + 시트 가림 방지 offset pan
+  markSelectedOnMap(poi.lat, poi.lon, poi.title);
 }
 
 // ───────── 전시/공연 venue 그룹 상세 — 현재 열리는 행사 목록 ─────────
@@ -693,6 +688,28 @@ function pulseMarker(latlng) {
   });
   circle.setMap(map);
   setTimeout(() => circle.setMap(null), 650);
+}
+
+// ───────── 선택 위치 핀 — 카드 클릭 시 우리 지도에 "여기" 라벨 핀 지속 표시 ─────────
+let _selOverlay = null;
+function markSelectedOnMap(lat, lon, title) {
+  if (lat == null || lon == null || typeof kakao === "undefined" || !map) return;
+  if (_selOverlay) _selOverlay.setMap(null);
+  const el = document.createElement("div");
+  el.className = "sel-pin";
+  el.innerHTML = `<div class="sel-pin-label">${escape(title || "여기")}</div><div class="sel-pin-dot"></div>`;
+  _selOverlay = new kakao.maps.CustomOverlay({
+    position: new kakao.maps.LatLng(lat, lon),
+    content: el,
+    yAnchor: 1,
+    zIndex: 200,
+  });
+  _selOverlay.setMap(map);
+  pulseMarker(new kakao.maps.LatLng(lat, lon));   // 진입 시 시선 유도 펄스
+  panToWithSheetOffset(lat, lon);
+}
+function clearSelectedOnMap() {
+  if (_selOverlay) { _selOverlay.setMap(null); _selOverlay = null; }
 }
 
 // ───────── Phase 2: 시트 가림 방지 offset pan ─────────
@@ -1971,7 +1988,7 @@ function renderTodayHighlights(target) {
     const extra = newItems.slice(initial);
     const extraHTML = extra.length
       ? `<div class="new-extra" hidden>${extra.map((p, i) => _newItemHTML(p, i + initial)).join("")}</div>
-         <button class="new-more chip-more" type="button">+${extra.length}건 더 보기</button>`
+         <button class="new-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
     newHTML = `<div class="highlight-section new-section">
       <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 공연·전시·식당·카페</div>
@@ -2079,10 +2096,10 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ⑤ 그 외 행사
+  // ⑤ 그 외 행사 — 기본 4건만, 나머지는 접기(더보기)
   let tailHTML = "";
   if (tail.length) {
-    const initial = 6;
+    const initial = 4;
     const firstBatch = tail.slice(0, initial);
     const extra = tail.slice(initial);
     const extraHTML = extra.length
