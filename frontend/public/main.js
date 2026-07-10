@@ -1817,16 +1817,19 @@ function _nearbyItemHTML(p, idx) {
   const thumb = p.image
     ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
     : `<div class="popular-thumb popular-thumb-empty">🎪</div>`;
+  const est = p.estimated === true;   // 연례축제 추정 이월분(예년 일정 기준)
+  const yr = est && p.start ? (p.start || "").slice(0, 4) + ". " : "";  // 추정은 연도 표기
   const dateStr = p.start
-    ? `${(p.start || "").slice(5)}${p.end && p.end !== p.start ? "~" + (p.end || "").slice(5) : ""}`
+    ? `${yr}${(p.start || "").slice(5)}${p.end && p.end !== p.start ? "~" + (p.end || "").slice(5) : ""}`
     : "";
+  const estTag = est ? `<span class="nearby-est">예상</span>` : "";
   const place = p.venue ? escape(p.venue) : (p.address ? escape(p.address) : "");
-  return `<button class="popular-card nearby-card" data-idx="${idx}" data-kind="nearby">
+  return `<button class="popular-card nearby-card${est ? " nearby-estimated" : ""}" data-idx="${idx}" data-kind="nearby">
     ${thumb}
     <div class="nearby-region">${escape(p.region || "근교")}</div>
     <div class="popular-body">
       <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
-      <div class="popular-meta">${dateStr}${place ? " · " + place : ""}</div>
+      <div class="popular-meta">${estTag}${dateStr}${place ? " · " + place : ""}</div>
     </div>
   </button>`;
 }
@@ -2005,8 +2008,8 @@ function renderTodayHighlights(target) {
          <button class="nearby-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
     nearbyFestivalHTML = `<div class="highlight-section popular-section nearby-section">
-      <div class="hs-title">🎡 부산 근교 축제 · 경남·경주 ${nearbyItems.length}곳</div>
-      <div class="hs-note">📍 당일치기 여행 · 한국관광공사 축제 정보 · 진행 중·다가오는 순</div>
+      <div class="hs-title">🎡 부산 근교 축제 · 경남·울산·경주 ${nearbyItems.length}곳</div>
+      <div class="hs-note">📍 당일치기 여행 · 한국관광공사 · 진행/예정 + <span class="nearby-est">예상</span>은 예년 일정 기준 추정</div>
       <div class="popular-grid">${head.map((p, i) => _nearbyItemHTML(p, i)).join("")}</div>
       ${extraHTML}
     </div>`;
