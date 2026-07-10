@@ -355,6 +355,8 @@ html, body {
   flex-direction: column;
   gap: 4px;
 }
+/* hidden 속성이 위 display:flex 에 덮이지 않도록 강제 (new-extra 와 동일 패턴) */
+.chip-extra[hidden] { display: none; }
 .chip {
   display: flex;
   align-items: center;

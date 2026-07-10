@@ -2096,10 +2096,10 @@ function renderTodayHighlights(target) {
     </div>`;
   }
 
-  // ⑤ 그 외 행사 — 기본 4건만, 나머지는 접기(더보기)
+  // ⑤ 그 외 행사 — 기본 3건만, 나머지는 접기(더보기)
   let tailHTML = "";
   if (tail.length) {
-    const initial = 4;
+    const initial = 3;
     const firstBatch = tail.slice(0, initial);
     const extra = tail.slice(initial);
     const extraHTML = extra.length
