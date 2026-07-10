@@ -2040,7 +2040,7 @@ function renderTodayHighlights(target) {
   }
 
   // 🍜 부산 미식 가이드 (2026 부산의 맛·미쉐린 2026) — 별도 정적 JSON(window.__mishik)
-  const mishikItems = (window.__mishik || []).slice(0, 12);
+  const mishikItems = (window.__mishik || []).slice(0, 18);
   let mishikGuideHTML = "";
   if (mishikItems.length) {
     const initial = 6;
