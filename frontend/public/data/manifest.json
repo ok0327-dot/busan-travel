@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-07-17T22:36:41+00:00",
-  "version": "20260717T223641",
-  "scope": "all",
+  "generated_at": "2026-07-17T22:39:35+00:00",
+  "version": "20260717T223935",
+  "scope": "weather",
   "counts": {
     "places": 702,
     "courses": 49,
