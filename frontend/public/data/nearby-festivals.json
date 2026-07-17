@@ -1,50 +1,14 @@
 {
-  "generated_at": "2026-07-15T22:42Z",
-  "count": 27,
+  "generated_at": "2026-07-17T22:36Z",
+  "count": 25,
   "confirmed_count": 1,
-  "estimated_count": 26,
+  "estimated_count": 24,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-1916715",
-      "category": "festival",
-      "region": "합천",
-      "title": "합천 호러 축제 고스트파크",
-      "start": "2026-08-01",
-      "end": "2026-08-17",
-      "venue": null,
-      "address": "경상남도 합천군 용주면 합천호수로 757",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/92/3507592_image2_1.jpg",
-      "tel": "055-931-9303",
-      "lat": 35.5484940723,
-      "lon": 128.0730785888,
-      "orig_start": "2025-08-01",
-      "orig_end": "2025-08-17",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-2993474",
-      "category": "festival",
-      "region": "울산",
-      "title": "2025 울산서머페스티벌",
-      "start": "2026-08-02",
-      "end": "2026-08-07",
-      "venue": null,
-      "address": "울산광역시 중구 염포로 55 (남외동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/38/3507638_image2_1.jpg",
-      "tel": "052-290-1140",
-      "lat": 35.5609133351,
-      "lon": 129.3480525802,
-      "orig_start": "2025-08-02",
-      "orig_end": "2025-08-07",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3340207",
       "category": "festival",
