@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-26T23:02Z",
-  "count": 25,
+  "generated_at": "2026-07-27T22:50Z",
+  "count": 24,
   "confirmed_count": 1,
-  "estimated_count": 24,
+  "estimated_count": 23,
   "regions": [
     "경남",
     "울산",
@@ -150,24 +150,6 @@
       "lon": 128.4030015382,
       "orig_start": "2025-09-26",
       "orig_end": "2025-09-28",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-2555932",
-      "category": "festival",
-      "region": "울산",
-      "title": "제10회 울산울주세계산악영화제",
-      "start": "2026-09-26",
-      "end": "2026-09-30",
-      "venue": null,
-      "address": "울산광역시 울주군 상북면 알프스온천5길 103-8",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/88/3513688_image2_1.jpg",
-      "tel": "055-248-6451",
-      "lat": 35.5565058027,
-      "lon": 129.0680049403,
-      "orig_start": "2025-09-26",
-      "orig_end": "2025-09-30",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
