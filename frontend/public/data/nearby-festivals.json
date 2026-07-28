@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-27T22:50Z",
-  "count": 24,
+  "generated_at": "2026-07-28T22:49Z",
+  "count": 23,
   "confirmed_count": 1,
-  "estimated_count": 23,
+  "estimated_count": 22,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 129.2176480199,
       "orig_start": "2025-08-22",
       "orig_end": "2025-08-31",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3523341",
-      "category": "festival",
-      "region": "진주",
-      "title": "프로젝트 유어사이드 in 진주",
-      "start": "2026-09-05",
-      "end": "2026-09-07",
-      "venue": null,
-      "address": "경상남도 진주시 강남동",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/40/3523340_image2_1.png",
-      "tel": "055-795-3246",
-      "lat": 35.1779388961,
-      "lon": 128.0886204093,
-      "orig_start": "2025-09-05",
-      "orig_end": "2025-09-07",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
