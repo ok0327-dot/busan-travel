@@ -74,9 +74,13 @@
         "부산 락페"
       ],
       "annual_month": 10,
+      "exact_dates": {
+        "2026": ["2026-10-02", "2026-10-04"]
+      },
       "booking_offset_days": 30,
       "booking_type": "예매 (티켓)",
-      "note": "10월 초 ~ 중순. 9월 초 예매."
+      "note": "10월 초 ~ 중순. 9월 초 예매. 2026: 10/2~4 확정 (busanrockfestival.com).",
+      "venue": "을숙도 문화회관 일원"
     },
     {
       "name": "부산비엔날레",
