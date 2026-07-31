@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-07-30T22:49Z",
-  "count": 23,
+  "generated_at": "2026-07-31T22:52Z",
+  "count": 22,
   "confirmed_count": 1,
-  "estimated_count": 22,
+  "estimated_count": 21,
   "regions": [
     "경남",
     "울산",
@@ -42,24 +42,6 @@
       "lon": 129.3074591955,
       "orig_start": "2025-09-06",
       "orig_end": "2025-09-06",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-2746930",
-      "category": "festival",
-      "region": "거창",
-      "title": "감악산 꽃별 여행",
-      "start": "2026-09-19",
-      "end": "2026-10-12",
-      "venue": null,
-      "address": "경상남도 거창군 신원면 연수사길 452",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/19/3539719_image2_1.jpg",
-      "tel": "055-940-8227",
-      "lat": 35.5896644164,
-      "lon": 127.9175273118,
-      "orig_start": "2025-09-19",
-      "orig_end": "2025-10-12",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
