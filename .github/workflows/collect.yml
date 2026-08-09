@@ -1,12 +1,16 @@
 name: busan-travel collector
 
 # 데이터 수집 + 프론트엔드 JSON export + self-commit.
-# KST 06:23 매일 전체 수집, 3시간마다 단기예보 갱신.
+# KST 06:23 매일 1회 전체 수집.
+#
+# 2026-08-09: 3시간마다 돌던 weather-only cron 제거 (하루 9런 → 1런).
+# 이유 = Actions 무료 한도(2,000분/월) 초과로 2026-08-08 계정 차단.
+# 8/1~8/9 9일간 69런 소진. 주말 여행 정보에 3시간 갱신은 과했다.
+# weather-only 모드 자체는 workflow_dispatch 로 언제든 수동 실행 가능.
 
 on:
   schedule:
-    - cron: '23 21 * * *'     # 매일 KST 06:23 — 전체 수집
-    - cron: '37 */3 * * *'    # 3시간마다 — 날씨만
+    - cron: '23 21 * * *'     # 매일 KST 06:23 — 전체 수집 (유일한 정기 실행)
   workflow_dispatch:
     inputs:
       mode:
@@ -27,6 +31,13 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    # job 전체 상한 / whole-job cap.
+    # step-level timeout 만으로는 hang 을 못 막는다 — 미지정 시 GitHub 기본값이 360분이라
+    # 멈춘 런 하나가 무료 한도(2,000분/월)를 통째로 먹는다.
+    # 실측(2026-08): 정상 weather-only 2~4분, 정상 전체수집 9~28분, hang 런 99·101분.
+    # 정기 실행은 이제 전체수집 1일 1회뿐이므로 상한은 전체수집 기준으로 잡는다.
+    # 45분 = 관측된 최장 정상런(28분)보다 넉넉하고 hang(99분+)은 확실히 자른다.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -96,8 +107,6 @@ jobs:
             MODE="${INPUT:-all}"
           elif [ "$CRON" = "23 21 * * *" ]; then
             MODE="all"
-          elif [ "$CRON" = "37 */3 * * *" ]; then
-            MODE="weather-only"
           else
             MODE="all"
           fi
@@ -237,9 +246,10 @@ jobs:
         run: python scripts/ai_summary.py
 
       # Race-safe commit & push (audit 2026-05-13 P0):
-      # KST 06:23 all-mode cron 이 21m 실행되는 동안 22:37 weather-only cron 이 큐잉되어
-      # 같은 manifest.json 을 다른 scope 으로 동시 갱신 → 기존 rebase 시도가 hunk 충돌로
-      # abort 되며 weather-only 결과 손실(다음 cron 까지 3h stale). 이를 정합성 있게 해결:
+      # 원래 시나리오 = KST 06:23 all-mode cron 이 21m 실행되는 동안 22:37 weather-only cron 이
+      # 큐잉되어 같은 manifest.json 을 다른 scope 으로 동시 갱신 → rebase 가 hunk 충돌로 abort.
+      # 2026-08-09 에 3시간 cron 을 제거해 이 특정 race 는 사라졌으나, workflow_dispatch 수동
+      # 실행이 정기 런과 겹칠 수 있으므로 아래 방어는 그대로 유지한다. 해결 방식:
       #   ① push 실패 시 fetch + reset --hard origin/main 으로 원격 fresh 상태 채택
       #   ② events.db 는 /data/* gitignored → reset 무영향 (어댑터 수집물 안전)
       #   ③ export_json --scope=<X> 는 기존 manifest 를 머지 base 로 읽어 우리 scope 의
