@@ -27,6 +27,12 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    # job 전체 상한 / whole-job cap.
+    # step-level timeout 만으로는 hang 을 못 막는다 — 미지정 시 GitHub 기본값이 360분이라
+    # 멈춘 런 하나가 무료 한도(2,000분/월)를 통째로 먹는다.
+    # 실측(2026-08): 정상 weather-only 2~4분, 정상 전체수집 9~28분, hang 런 99·101분.
+    # 45분 = 관측된 최장 정상런(28분)보다 넉넉하고 hang(99분+)은 확실히 자른다.
+    timeout-minutes: 45
 
     steps:
       - name: Checkout

@@ -31,6 +31,8 @@ concurrency:
 jobs:
   export:
     runs-on: ubuntu-latest
+    # job 전체 상한 — collect.yml 과 동일 취지(hang 이 무료 한도를 먹는 것 방지).
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
