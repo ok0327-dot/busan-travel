@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-17T22:01Z",
-  "count": 20,
+  "generated_at": "2026-08-18T21:56Z",
+  "count": 19,
   "confirmed_count": 1,
-  "estimated_count": 19,
+  "estimated_count": 18,
   "regions": [
     "경남",
     "울산",
@@ -237,24 +237,6 @@
       "lon": 129.2911192494,
       "orig_start": "2025-10-27",
       "orig_end": "2025-11-30",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-506470",
-      "category": "festival",
-      "region": "김해",
-      "title": "김해분청도자기축제",
-      "start": "2026-11-04",
-      "end": "2026-11-09",
-      "venue": null,
-      "address": "경상남도 김해시 진례면 분청로 17",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/49/3546549_image2_1.jpg",
-      "tel": "055-330-3244",
-      "lat": 35.2517674455,
-      "lon": 128.7459053654,
-      "orig_start": "2025-11-04",
-      "orig_end": "2025-11-09",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
