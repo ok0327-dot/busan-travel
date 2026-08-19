@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-08-18T21:56Z",
-  "count": 19,
+  "generated_at": "2026-08-19T22:06Z",
+  "count": 18,
   "confirmed_count": 1,
-  "estimated_count": 18,
+  "estimated_count": 17,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3340207",
-      "category": "festival",
-      "region": "경주",
-      "title": "2025 교촌버스킹",
-      "start": "2026-08-22",
-      "end": "2026-08-31",
-      "venue": null,
-      "address": "경상북도 경주시 교촌안길 31 (교동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/48/3524048_image2_1.jpg",
-      "tel": "054-777-6781",
-      "lat": 35.8300277808,
-      "lon": 129.2176480199,
-      "orig_start": "2025-08-22",
-      "orig_end": "2025-08-31",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3395127",
       "category": "festival",
