@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-25T22:12Z",
-  "count": 18,
+  "generated_at": "2026-08-29T03:32Z",
+  "count": 17,
   "confirmed_count": 1,
-  "estimated_count": 17,
+  "estimated_count": 16,
   "regions": [
     "경남",
     "울산",
@@ -42,24 +42,6 @@
       "lon": 129.2895443842,
       "orig_start": "2025-09-26",
       "orig_end": "2025-10-26",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-2614760",
-      "category": "festival",
-      "region": "경주",
-      "title": "경주국가유산야행",
-      "start": "2026-09-26",
-      "end": "2026-09-28",
-      "venue": null,
-      "address": "경상북도 경주시 교동",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/05/3529605_image2_1.JPG",
-      "tel": "054-743-7182",
-      "lat": 35.8313803696,
-      "lon": 129.2157425929,
-      "orig_start": "2025-09-26",
-      "orig_end": "2025-09-28",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
