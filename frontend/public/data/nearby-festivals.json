@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-08-29T03:32Z",
-  "count": 17,
+  "generated_at": "2026-09-01T01:13Z",
+  "count": 16,
   "confirmed_count": 1,
-  "estimated_count": 16,
+  "estimated_count": 15,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3395127",
-      "category": "festival",
-      "region": "울산",
-      "title": "태화강 빛축제",
-      "start": "2026-09-06",
-      "end": "2026-09-06",
-      "venue": null,
-      "address": "울산광역시 남구 신정동",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/48/3525548_image2_1.jpg",
-      "tel": "052-220-0613",
-      "lat": 35.5504331935,
-      "lon": 129.3074591955,
-      "orig_start": "2025-09-06",
-      "orig_end": "2025-09-06",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3536325",
       "category": "festival",
