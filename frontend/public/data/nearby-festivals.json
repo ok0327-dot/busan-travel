@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-01T01:13Z",
-  "count": 16,
+  "generated_at": "2026-09-03T23:54Z",
+  "count": 15,
   "confirmed_count": 1,
-  "estimated_count": 15,
+  "estimated_count": 14,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 129.2895443842,
       "orig_start": "2025-09-26",
       "orig_end": "2025-10-26",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3377089",
-      "category": "festival",
-      "region": "함안",
-      "title": "아라가야문화제",
-      "start": "2026-09-26",
-      "end": "2026-09-28",
-      "venue": null,
-      "address": "경상남도 함안군 가야읍 고분길 153-31",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/03/3530803_image2_1.jpg",
-      "tel": "055-585-9400",
-      "lat": 35.269512004,
-      "lon": 128.4030015382,
-      "orig_start": "2025-09-26",
-      "orig_end": "2025-09-28",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
