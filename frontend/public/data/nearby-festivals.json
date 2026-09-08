@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-06T23:11Z",
-  "count": 15,
+  "generated_at": "2026-09-08T23:50Z",
+  "count": 14,
   "confirmed_count": 1,
-  "estimated_count": 14,
+  "estimated_count": 13,
   "regions": [
     "경남",
     "울산",
@@ -147,24 +147,6 @@
       "lon": 128.1601289425,
       "orig_start": "2025-10-24",
       "orig_end": "2025-10-26",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3553947",
-      "category": "festival",
-      "region": "경주",
-      "title": "2025 한국공예전 <미래유산_우리가 남기고자 하는 것들에 관하여>",
-      "start": "2026-10-27",
-      "end": "2026-11-30",
-      "venue": null,
-      "address": "경상북도 경주시 경감로 627 (천군동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/40/3553940_image2_1.jpg",
-      "tel": "02-398-7936",
-      "lat": 35.8339676142,
-      "lon": 129.2911192494,
-      "orig_start": "2025-10-27",
-      "orig_end": "2025-11-30",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
