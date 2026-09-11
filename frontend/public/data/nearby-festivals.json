@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-09-09T23:44Z",
-  "count": 14,
+  "generated_at": "2026-09-11T23:49Z",
+  "count": 13,
   "confirmed_count": 1,
-  "estimated_count": 13,
+  "estimated_count": 12,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3536325",
-      "category": "festival",
-      "region": "경주",
-      "title": "EX-펌킨나잇 : 매직킹덤",
-      "start": "2026-09-26",
-      "end": "2026-10-26",
-      "venue": null,
-      "address": "경상북도 경주시 경감로 614 (천군동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/24/3536324_image2_1.png",
-      "tel": "054-740-3950",
-      "lat": 35.8340564631,
-      "lon": 129.2895443842,
-      "orig_start": "2025-09-26",
-      "orig_end": "2025-10-26",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3037482",
       "category": "festival",
