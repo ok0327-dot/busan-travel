@@ -1,6 +1,6 @@
 {
   "_doc": "부산 주요 연례 축제 사전 예약 캘린더. title_keywords 매칭 시 booking_opens_at 추정. annual_month 는 본행사 월 (UTC 기준 한국 시즌). booking_offset_days = 본행사 N일 전 발매 시작.",
-  "_updated_at": "2026-04-26",
+  "_updated_at": "2026-09-11",
   "festivals": [
     {
       "name": "부산국제영화제 (BIFF)",
@@ -563,6 +563,46 @@
       "booking_offset_days": 0,
       "booking_type": "현장 관람",
       "note": "매년 10~11월 개막, 이듬해 2월까지 부산진구 서면 일원 조명·빛 축제. 입장 무료."
+    },
+    {
+      "name": "기장미역다시마축제",
+      "title_keywords": [
+        "기장미역다시마축제",
+        "기장 미역다시마",
+        "기장미역축제"
+      ],
+      "annual_month": 5,
+      "venue": "부산광역시 기장군 일광읍 이동항 일원",
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "매년 5월 기장군 일광읍 이동항 일원 개최. 미역·다시마 시식·체험."
+    },
+    {
+      "name": "해운대달맞이온천축제",
+      "title_keywords": [
+        "해운대달맞이온천축제",
+        "달맞이온천축제"
+      ],
+      "annual_month": 3,
+      "exact_dates": {
+        "2026": ["2026-03-03"]
+      },
+      "venue": "해운대해수욕장",
+      "booking_offset_days": 7,
+      "booking_type": "현장 행사",
+      "note": "정월대보름(음력 1월 15일) 해운대해수욕장. 달집태우기·소망쓰기 등 야간 행사 (2026: 3월 3일)."
+    },
+    {
+      "name": "부산연등회",
+      "title_keywords": [
+        "부산연등회",
+        "부산 연등회"
+      ],
+      "annual_month": 4,
+      "venue": "송상현광장·부산시민공원 일대",
+      "booking_offset_days": 7,
+      "booking_type": "현장 관람",
+      "note": "석가탄신일(음력 4월 8일) 전후 부산 전역. 연등 행렬·전시."
     }
   ]
 }
