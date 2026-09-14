@@ -24,6 +24,7 @@ FESTIVALS: list[tuple[str, str, str, str, float, float]] = [
     ("rockfest",    "https://busanrockfestival.com/",           "부산국제록페스티벌",    "삼락생태공원",       35.1859, 128.9617),
     ("fireworks",   "https://busanfireworks.com/",              "부산불꽃축제",         "광안리해수욕장",     35.1531, 129.1187),
     ("7bridges",    "https://busan7bridges.com/",               "세븐브릿지 투어",      "부산 전역",         35.1796, 129.0756),
+    ("biennale",    "https://busanbiennale2026.com/",           "2026 부산비엔날레",    "부산현대미술관 · 영도",  35.1021, 128.9991),
 ]
 
 DATE_RE = re.compile(r"(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})")
