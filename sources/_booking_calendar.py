@@ -88,6 +88,18 @@ def apply_calendar(ev: Any, *, anchor: date | None = None) -> bool:
             opens = (sd - timedelta(days=offset)).isoformat()
         except ValueError:
             pass
+        # end_date 보강: 소스가 end_date 를 주지 않았을 때 exact_dates 로 보완.
+        # start_date 기준 ±7일 이내에 exact_dates 일치 → end_date 확정 채움.
+        if not getattr(ev, "end_date", None) and entry.get("exact_dates"):
+            exact_for_end = _resolve_exact_dates(entry["exact_dates"], anchor)
+            if exact_for_end and exact_for_end[1]:
+                try:
+                    exact_sd = date.fromisoformat(exact_for_end[0])
+                    event_sd = date.fromisoformat(start_date[:10])
+                    if abs((event_sd - exact_sd).days) <= 7:
+                        ev.end_date = exact_for_end[1]
+                except ValueError:
+                    pass
     else:
         # (1) 올해 정확 일정 — visitbusan 이 작년판이어도 정확한 날짜로 노출
         exact = _resolve_exact_dates(entry.get("exact_dates"), anchor)
