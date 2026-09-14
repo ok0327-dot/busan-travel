@@ -42,7 +42,7 @@ from sources import (
     visitbusan,
     walking_tour,
 )
-from sources._booking_calendar import apply_calendar
+from sources._booking_calendar import apply_calendar, backfill_calendar_dates
 from sources._booking_extractor import enrich_booking
 from sources._tour_filter import filter_events
 from storage.db import Event, connect, upsert_events
@@ -137,6 +137,14 @@ def run() -> int:
             f"[{name}] fetched={pre_count} keep={fstats['keep']} "
             f"minor={fstats['minor']} drop={fstats['drop']} new={ins} updated={upd}"
         )
+
+    # 소스가 반환 중단한 festival 이벤트의 null start_date 를 booking_calendar 로 직접 보강
+    try:
+        repaired = backfill_calendar_dates(conn)
+        if repaired:
+            print(f"[calendar_backfill] repaired={repaired}")
+    except Exception as exc:
+        print(f"[calendar_backfill] FAILED: {exc}", file=sys.stderr)
 
     # 일정여행 코스 — 별도 vb_courses 테이블 사용
     try:
