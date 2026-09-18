@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-17T23:51Z",
-  "count": 13,
+  "generated_at": "2026-09-18T23:39Z",
+  "count": 12,
   "confirmed_count": 1,
-  "estimated_count": 12,
+  "estimated_count": 11,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 128.0892925564,
       "orig_start": "2025-10-01",
       "orig_end": "2025-11-16",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-780198",
-      "category": "festival",
-      "region": "하동",
-      "title": "하동 북천 코스모스 메밀꽃 축제",
-      "start": "2026-10-02",
-      "end": "2026-10-19",
-      "venue": null,
-      "address": "경상남도 하동군 북천면 경서대로 2253-9",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/60/3540960_image2_1.jpg",
-      "tel": "055-884-7416",
-      "lat": 35.109365039,
-      "lon": 127.8741465725,
-      "orig_start": "2025-10-02",
-      "orig_end": "2025-10-19",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
