@@ -14,11 +14,38 @@ Replays recorded responses on 127.0.0.1 so an adapter's *real* HTTP stack
 """
 from __future__ import annotations
 
+import contextlib
 import os
+import socket
 import threading
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
+
+
+@contextlib.contextmanager
+def local_no_proxy():
+    """이 블록 동안 127.0.0.1 을 프록시 예외로 / bypass HTTP_PROXY for 127.0.0.1 inside the block."""
+    saved = {k: os.environ.get(k) for k in ("NO_PROXY", "no_proxy")}
+    for k in saved:
+        os.environ[k] = ",".join(filter(None, ["127.0.0.1", os.environ.get(k)]))
+    try:
+        yield
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
+def dead_local_url(path: str = "/") -> str:
+    """아무도 듣지 않는 127.0.0.1 포트 — 연결이 즉시 거부된다(ConnectionError), 네트워크 0.
+    / a closed local port: connections are refused immediately."""
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    return f"http://127.0.0.1:{port}{path}"
 
 
 class FixtureServer:
@@ -48,17 +75,12 @@ class FixtureServer:
         return f"http://127.0.0.1:{self._httpd.server_address[1]}{path}"
 
     def __enter__(self) -> "FixtureServer":
-        self._saved_env = {k: os.environ.get(k) for k in ("NO_PROXY", "no_proxy")}
-        for k in self._saved_env:
-            os.environ[k] = ",".join(filter(None, ["127.0.0.1", os.environ.get(k)]))
+        self._no_proxy = local_no_proxy()
+        self._no_proxy.__enter__()
         self._thread.start()
         return self
 
     def __exit__(self, *exc) -> None:
         self._httpd.shutdown()
         self._httpd.server_close()
-        for k, v in self._saved_env.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
+        self._no_proxy.__exit__(None, None, None)

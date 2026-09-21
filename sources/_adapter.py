@@ -32,6 +32,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 
+from sources._circuit import BREAKER, CONNECT_TIMEOUT_S
 from sources._http import DEFAULT_HEADERS
 
 # 오류 로그의 쿼리스트링 비밀값 가리기 / mask secret query values in error logs.
@@ -53,6 +54,10 @@ class HTTPSession:
 
     요청 간 최소 간격(rate_limit_s) 보장 + 일시 실패 시 지수 백오프 retry.
     실패 시 None 반환 (어댑터는 None 체크만 하면 됨, try/except 불필요).
+
+    timeout 은 응답 대기(read) 상한이고, 연결(connect)은 connect_timeout(기본 10s)으로 따로 짧게 건다.
+    연결이 연달아 안 되는 호스트는 sources._circuit.BREAKER 가 이번 실행 동안 막는다.
+    / `timeout` bounds the read; connect is capped separately; unreachable hosts are circuit-broken.
     """
 
     def __init__(
@@ -62,9 +67,11 @@ class HTTPSession:
         timeout: float = 15,
         rate_limit_s: float = 0.3,
         retries: int = 2,
+        connect_timeout: float = CONNECT_TIMEOUT_S,
     ) -> None:
         self.source = source
         self.timeout = timeout
+        self.connect_timeout = connect_timeout
         self.rate_limit_s = rate_limit_s
         self.retries = retries
         self.s = requests.Session()
@@ -89,20 +96,33 @@ class HTTPSession:
 
         retry 횟수만큼 지수 백오프 후 None 리턴. 에러는 stderr 로그.
         """
+        if not BREAKER.allow(url):
+            print(f"[{self.source}] SKIP {redact(url)}: 회로 차단 — 이번 실행에서 이 서버는 연결이 "
+                  f"연달아 실패했다 / circuit open", file=sys.stderr)
+            return None
+        read_timeout = timeout or self.timeout
         last_exc: Exception | None = None
+        answered = False  # 한 번이라도 HTTP 응답을 받았나 / did the host ever answer
         for attempt in range(self.retries + 1):
             self._throttle()
             try:
-                r = self.s.get(url, params=params, timeout=timeout or self.timeout)
+                r = self.s.get(url, params=params,
+                               timeout=(min(self.connect_timeout, read_timeout), read_timeout))
                 r.raise_for_status()
                 self._last_call = time.time()
+                BREAKER.record_reachable(url)
                 return r
             except requests.RequestException as exc:
                 last_exc = exc
+                answered = answered or getattr(exc, "response", None) is not None
                 if attempt < self.retries:
                     time.sleep(1.0 * (attempt + 1))  # 1s, 2s, ...
                     continue
         print(f"[{self.source}] GET {redact(url)}: {redact(str(last_exc))}", file=sys.stderr)
+        if answered:
+            BREAKER.record_reachable(url)  # 4xx/5xx 여도 서버는 살아 있다 / alive, just erroring
+        elif isinstance(last_exc, requests.ConnectionError):
+            BREAKER.record_unreachable(url)
         return None
 
     def soup(

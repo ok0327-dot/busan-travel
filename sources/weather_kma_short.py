@@ -6,11 +6,13 @@
 """
 from __future__ import annotations
 
+import argparse
 import sqlite3
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
-from sources._gov_api import call_api
+from sources._gov_api import CircuitOpenError, call_api
 
 SOURCE = "weather_kma_short"
 API_ID = "15084084"
@@ -93,15 +95,31 @@ def _to_float(v):
         return None
 
 
-def upsert_forecasts(conn: sqlite3.Connection) -> tuple[int, int]:
-    """모든 격자 순회 → weather_fcst 적재. Returns (cells_ok, rows_written)."""
+def upsert_forecasts(conn: sqlite3.Connection, time_budget_s: float | None = None) -> tuple[int, int]:
+    """모든 격자 순회 → weather_fcst 적재. Returns (cells_ok, rows_written).
+
+    time_budget_s: 넘기면 남은 격자를 건너뛰고 **받은 만큼 커밋**하고 끝낸다. CI 스텝 timeout 보다 작게 준다 —
+    강제 kill 은 SQLite 트랜잭션을 연 채 죽여 다음 스텝을 "database is locked" 로 막는다(2026-06 사고,
+    enrich_ratings 와 같은 패턴). / stop early and commit what we have, before the step timeout kills us.
+    """
     base_date, base_time = _latest_base()
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     grids = _distinct_grids(conn)
+    deadline = time.monotonic() + time_budget_s if time_budget_s else None
     ok = rows = 0
-    for nx, ny in grids:
+    for i, (nx, ny) in enumerate(grids):
+        if deadline is not None and time.monotonic() > deadline:
+            print(f"[{SOURCE}] 시간 예산 소진 → 남은 격자 {len(grids) - i}개 건너뜀 / time budget spent",
+                  file=sys.stderr)
+            break
         try:
             fcs = fetch_grid(nx, ny, base_date, base_time)
+        except CircuitOpenError as exc:
+            # 서버에 연결이 안 되는 날 격자마다 수십 초씩 버리지 않는다(2026-09-20: 격자당 93s → job 45분 초과).
+            # / don't spend a full retry cycle on every remaining grid once the host is known down.
+            print(f"[{SOURCE}] {exc} → 남은 격자 {len(grids) - i}개 건너뜀 / skipping the rest",
+                  file=sys.stderr)
+            break
         except Exception as exc:
             print(f"[{SOURCE}] grid ({nx},{ny}) failed: {exc}", file=sys.stderr)
             continue
@@ -129,15 +147,30 @@ def upsert_forecasts(conn: sqlite3.Connection) -> tuple[int, int]:
     return ok, rows
 
 
-def fetch() -> list:
-    """main.py SOURCES 호환 stub. 실제 적재는 upsert_forecasts()."""
+def _run(time_budget_s: float | None = None) -> tuple[int, int]:
+    """적재 후 (격자 수, 성공 격자 수) / returns (grids, grids_ok)."""
     from storage.db import connect
     from config import DB_PATH
     conn = connect(DB_PATH)
-    ok, rows = upsert_forecasts(conn)
-    print(f"[{SOURCE}] grids_ok={ok} rows_written={rows}", file=sys.stderr)
+    total = len(_distinct_grids(conn))
+    ok, rows = upsert_forecasts(conn, time_budget_s)
+    print(f"[{SOURCE}] grids_ok={ok}/{total} rows_written={rows}", file=sys.stderr)
+    return total, ok
+
+
+def fetch() -> list:
+    """main.py SOURCES 호환 stub. 실제 적재는 upsert_forecasts()."""
+    _run()
     return []
 
 
 if __name__ == "__main__":
-    fetch()
+    # 격자가 있는데 하나도 못 받았으면 exit 1 — 예전엔 전부 실패해도 0 이라 날씨가 통째로 비어도 초록불이었다.
+    # CI 스텝은 continue-on-error 라 나머지(내보내기·커밋·백업)는 계속 돌고, 실패 알림 이슈가 열린다.
+    # / exit 1 when every grid failed (used to exit 0); CI continues and the failure issue opens.
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--time-budget-min", type=float, default=None,
+                    help="이 시간이 지나면 남은 격자를 건너뛰고 커밋 후 종료 / stop, commit and exit after this")
+    args = ap.parse_args()
+    grids_total, grids_ok = _run(args.time_budget_min * 60 if args.time_budget_min else None)
+    sys.exit(1 if grids_total and not grids_ok else 0)

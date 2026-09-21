@@ -141,8 +141,15 @@ jobs:
           KAKAO_REST_KEY: ${{ secrets.KAKAO_REST_KEY }}
         run: python scripts/geocode_blogs.py --time-budget-min 8
 
+      # data.go.kr 의존 선택 단계(해수욕장·기상 3종)는 실패해도 내보내기·커밋·R2 백업을 막지 않는다.
+      # 2026-09-20: 해외 러너에서 apis.data.go.kr 연결 불가 → KMA 단기가 격자마다 93s 를 쓰다 job 45분 상한에
+      # 잘려 그날 수집·백업 전부 유실(최근 15일 중 5일). 이제 ① sources/_circuit.py 가 연결 10s·연속 실패 차단,
+      # ② 스텝 timeout + continue-on-error, ③ 실패는 아래 "Collect degraded optional steps" → 실패 이슈로 알린다.
       - name: Seed beach POIs
+        id: beach
         if: steps.mode.outputs.mode != 'weather-only'
+        timeout-minutes: 5
+        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.gov_beach
@@ -177,21 +184,33 @@ jobs:
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: python scripts/enrich_ratings.py --time-budget-min 6
 
+      # --time-budget-min 6 < timeout-minutes 8: 스크립트가 스스로 받은 만큼 커밋하고 끝낸다
+      # (강제 kill → SQLite 잠금 → 다음 스텝 실패, 위 enrich_ratings 와 같은 이유). 정상 1~1.5분.
+      # 격자를 하나도 못 받으면 exit 1 → continue-on-error 로 계속 + 실패 이슈.
       - name: KMA short-range weather
+        id: kma_short
         if: steps.mode.outputs.mode != 'events-only'
+        timeout-minutes: 8
+        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
-        run: python -m sources.weather_kma_short
+        run: python -m sources.weather_kma_short --time-budget-min 6
 
       # 2026-05-09 활용신청 승인 + 라이브 호출 검증 완료 (15059468/15073877/15073861).
       - name: KMA mid-range
+        id: kma_mid
         if: steps.mode.outputs.mode != 'events-only'
+        timeout-minutes: 5
+        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.weather_kma_mid
 
       - name: Air quality
+        id: air
         if: steps.mode.outputs.mode != 'events-only'
+        timeout-minutes: 5
+        continue-on-error: true
         env:
           DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
         run: python -m sources.air_korea
@@ -310,16 +329,34 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: python scripts/db_sync.py setup-lifecycle
 
+      # continue-on-error 선택 단계 중 실패·시간초과한 것을 모은다. 그런 스텝은 실패해도 failure() 가
+      # false 라, 이게 없으면 날씨가 통째로 비어도 조용히 묻힌다 / otherwise continue-on-error hides them.
+      - name: Collect degraded optional steps
+        id: degraded
+        if: always()
+        run: |
+          D=""
+          for pair in "beach=${{ steps.beach.outcome }}" "kma_short=${{ steps.kma_short.outcome }}" \
+                      "kma_mid=${{ steps.kma_mid.outcome }}" "air=${{ steps.air.outcome }}"; do
+            case "${pair#*=}" in failure|cancelled) D="$D $pair" ;; esac
+          done
+          D="${D# }"
+          echo "list=$D" >> "$GITHUB_OUTPUT"
+          if [ -n "$D" ]; then echo "::warning::선택 단계 실패·시간초과 (수집·내보내기·백업은 계속됨): $D"; fi
+
       # P1 — cron 실패 시 GitHub Issue 자동 생성 (사용자 알림용)
       # 같은 날 동일 모드 실패가 이미 열려있으면 새 issue 생성 안 함 (중복 방지)
+      # 선택 단계만 실패한 날은 job 은 성공이지만 "[cron 일부 실패]" 로 연다 — 예전엔 그 스텝 실패가 곧 job 실패였다.
+      # 45분 job 상한 cancelled 는 이 스텝이 못 돈다 → 아래 notify-cancelled job.
       - name: Notify on failure (open GitHub Issue)
-        if: failure() && github.event_name == 'schedule'
+        if: (failure() || steps.degraded.outputs.list != '') && github.event_name == 'schedule'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           MODE="${{ steps.mode.outputs.mode }}"
           DAY=$(date -u +'%Y-%m-%d')
-          TITLE="[cron 실패] $DAY · $MODE 모드"
+          if [ "${{ job.status }}" = "success" ]; then KIND="일부 실패"; else KIND="실패"; fi
+          TITLE="[cron $KIND] $DAY · $MODE 모드"
           # 동일 제목 open issue 가 있으면 skip
           EXISTING=$(gh issue list --state open --search "in:title \"$DAY\" \"$MODE\"" --json number --jq 'length')
           if [ "$EXISTING" -gt 0 ]; then
@@ -332,11 +369,45 @@ jobs:
           - 워크플로 run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
           - 트리거: \`${{ github.event_name }}\`
           - 시각: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          - 실패·시간초과한 선택 단계: \`${{ steps.degraded.outputs.list || '없음' }}\`
 
           ## 점검 체크리스트
           - [ ] Run log 에서 어떤 step 이 실패했는지
           - [ ] 외부 API (data.go.kr, visitbusan, 다봄, naver) 다운/스키마 변경 여부
+          - [ ] 로그에 \`[circuit] ... 차단\` 이 있으면 해외 러너에서 그 서버 연결 불가였던 날 (코드 결함 아님)
           - [ ] DATA_GO_KR_KEY / NAVER_CLIENT_ID/SECRET / GEMINI_API_KEY 만료 여부
           - [ ] 수정 후 \`workflow_dispatch\` 로 재실행"
           # cron-failure label 미존재 시 issue create 가 fail 했던 사고 (4/30~5/3) 회피.
+          gh issue create --title "$TITLE" --body "$BODY"
+
+  # collect 가 job 상한(45분)에 걸려 cancelled 되면 collect 안의 알림 스텝은 실행되지 못한다
+  # (2026-09-20 등 최근 15일 중 5일 무알림). 별도 job 이 결과만 보고 이슈를 연다.
+  # 강제 종료된 job 의 결과값은 'cancelled' (Actions API 실측, run 35544297101).
+  notify-cancelled:
+    needs: collect
+    if: always() && needs.collect.result == 'cancelled' && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Open GitHub Issue (collect cancelled / timed out)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          DAY=$(date -u +'%Y-%m-%d')
+          TITLE="[cron 시간초과] $DAY · collect job cancelled"
+          EXISTING=$(gh issue list --state open --search "in:title \"$DAY\"" --json number --jq 'length')
+          if [ "$EXISTING" -gt 0 ]; then
+            echo "same-day issue exists ($EXISTING). skip"
+            exit 0
+          fi
+          BODY="busan-travel collector 가 job 상한(45분)에 걸려 강제 종료됐다. 내보내기·커밋·R2 백업이 실행되지 않았다.
+
+          - 워크플로 run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - 시각: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+          ## 점검 체크리스트
+          - [ ] run 의 스텝별 소요시간에서 어느 스텝이 오래 걸렸는지
+          - [ ] 로그에 \`[circuit] ... 차단\` 이 있는지 (해외 러너 연결 불가 날)
+          - [ ] 필요하면 \`workflow_dispatch\` 로 재실행 (어제 R2 DB 는 그대로 남아 있다)"
           gh issue create --title "$TITLE" --body "$BODY"
