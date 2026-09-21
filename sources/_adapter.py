@@ -24,6 +24,7 @@
 """
 from __future__ import annotations
 
+import re
 import sys
 import time
 from typing import Any
@@ -32,6 +33,17 @@ import requests
 from bs4 import BeautifulSoup
 
 from sources._http import DEFAULT_HEADERS
+
+# 오류 로그의 쿼리스트링 비밀값 가리기 / mask secret query values in error logs.
+# requests 예외 문구는 "...for url: <전체 URL>" 로 ServiceKey 를 그대로 담는다. 저장소가 public 이라
+# Actions 로그도 공개이고, GitHub 시크릿 마스킹은 URL 인코딩된 형태(%2B·%2F·%3D)를 못 잡는다.
+# 이름이 key/token/secret 으로 끝나는 쿼리 파라미터 전부(ServiceKey·crtfc_key·access_token…).
+_SECRET_QS = re.compile(r"(?i)([?&][^=&\s]*(?:key|token|secret)=)[^&\s#'\"]+")
+
+
+def redact(text: str) -> str:
+    """쿼리스트링 비밀값 → *** / e.g. ?ServiceKey=abc%2B&pageNo=1 → ?ServiceKey=***&pageNo=1"""
+    return _SECRET_QS.sub(r"\1***", text)
 
 
 class HTTPSession:
@@ -88,7 +100,7 @@ class HTTPSession:
                 if attempt < self.retries:
                     time.sleep(1.0 * (attempt + 1))  # 1s, 2s, ...
                     continue
-        print(f"[{self.source}] GET {url}: {last_exc}", file=sys.stderr)
+        print(f"[{self.source}] GET {redact(url)}: {redact(str(last_exc))}", file=sys.stderr)
         return None
 
     def soup(

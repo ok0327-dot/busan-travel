@@ -1,0 +1,62 @@
+{
+ "rss_cooolbusan": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_bscf2009": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_hudpr": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_moca_busan": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_bsbukgusns": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_bsjunggu": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_yeonjegu": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "rss_bsdonggublog": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/xml;charset=UTF-8"
+  }
+ },
+ "foodie_tour": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/plain;charset=UTF-8"
+  }
+ },
+ "walking_tour": {
+  "status": 200,
+  "headers": {
+   "content-type": "text/plain;charset=UTF-8"
+  }
+ }
+}

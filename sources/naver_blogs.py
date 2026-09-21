@@ -15,10 +15,17 @@ from email.utils import parsedate_to_datetime
 import feedparser
 
 from config import NAVER_OFFICIAL_BLOGS
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
+SOURCE = "naver_blogs"
 SOURCE_PREFIX = "naver_blog"
 RSS_TEMPLATE = "https://rss.blog.naver.com/{id}.xml"
+
+# v3.9 계약 (audit 2026-04-25 P1-3). 예전엔 feedparser.parse(URL) 이 직접 받아서 재시도가 없었고,
+# 피드가 죽으면 bozo 로 조용히 0건이 됐다 → 이제 재시도 + stderr 로그.
+# / previously feedparser fetched the URL itself: no retry, and a dead feed silently became 0 rows.
+session = HTTPSession(SOURCE)
 
 # 부산시청 블로그(cooolbusan)는 88%가 시정 홍보라 전체 DROP(_tour_filter.DROP_SOURCES).
 # 단 '부산여행' 카테고리(여행탭, categoryNo=42)는 알짜 여행 콘텐츠 → 별도 허용 소스로 라우팅.
@@ -65,10 +72,25 @@ def _iso(pubdate: str | None) -> str | None:
         return None
 
 
+def _parse_feed(url: str) -> feedparser.FeedParserDict | None:
+    r = session.get(url)
+    if not r:
+        return None
+    # feedparser 는 응답 헤더를 **소문자 키**로만 읽는다('content-type' → 인코딩 판정).
+    # requests 헤더를 그대로 넘기면 charset 을 놓친다. content-location 은 URL 로 받던 때의
+    # baseuri(상대 링크 해석 기준)를 그대로 재현한다. 바이트(r.content)를 넘겨 인코딩 추정도 feedparser 몫.
+    # / feedparser looks headers up lowercase-only; content-location reproduces the old baseuri.
+    headers = {k.lower(): v for k, v in r.headers.items()}
+    headers["content-location"] = r.url
+    return feedparser.parse(r.content, response_headers=headers)
+
+
 def fetch() -> list[Event]:
     events: list[Event] = []
     for blog_id, label in NAVER_OFFICIAL_BLOGS:
-        parsed = feedparser.parse(RSS_TEMPLATE.format(id=blog_id))
+        parsed = _parse_feed(RSS_TEMPLATE.format(id=blog_id))
+        if parsed is None:
+            continue  # HTTPSession 이 이미 stderr 에 남겼다 / already logged
         for entry in parsed.entries:
             post_id = _post_id(entry.get("link", "")) or entry.get("id") or entry.get("title", "")
             category = entry.get("category")
@@ -89,4 +111,8 @@ def fetch() -> list[Event]:
                 description=_strip_html(entry.get("summary") or entry.get("description")),
                 raw={"blog": blog_id, "category": category, "published": entry.get("published")},
             ))
-    return events
+    return report(SOURCE, events)
+
+
+if __name__ == "__main__":  # python -m sources.naver_blogs → "[naver_blogs] fetched=N"
+    fetch()
