@@ -7,8 +7,8 @@ adapter's real HTTP stack runs end-to-end.
 1) 출력 불변 / output unchanged — expected.json 은 **교체 전 코드**가 같은 녹화본에서 낸 출력이다.
    교체 후 코드가 한 필드라도 다르게 내면 빨간불.
 2) 계약 동작 / contract behaviour — 일시 실패 재시도, 실패를 stderr 로 알림, API 키 비노출.
-   저장소가 public 이라 Actions 로그도 공개다. requests 예외 문구는 쿼리스트링(ServiceKey 포함)을
-   그대로 담고, GitHub 시크릿 마스킹은 URL 인코딩된 키(%2B·%2F·%3D)를 못 잡는다.
+   requests 예외 문구는 쿼리스트링(ServiceKey 포함)을 그대로 담는다. Actions 로그는 러너가 가려
+   주지만(원문·URL 인코딩형 모두) 로컬 실행 등 러너 밖은 아니다 → 원문·인코딩형 둘 다 없어야 통과.
 
     python -m unittest discover -s tests -t .
 """
