@@ -65,8 +65,55 @@ from _caller_template import (  # noqa: E402
     GovApiTransportError,
 )
 
+import _caller_template as _vendor  # noqa: E402  (위 from-import 와 같은 모듈 객체 / same module object)
+import requests  # noqa: E402
+
+from sources._circuit import BREAKER, CONNECT_TIMEOUT_S  # noqa: E402
+
+
+class CircuitOpenError(GovApiTransportError):
+    """이번 실행에서 연결이 연달아 실패한 호스트 — 네트워크를 타지 않고 즉시 실패.
+
+    GovApiTransportError 하위 클래스라 기존 except 는 그대로 잡는다. 반복 호출하는 쪽
+    (예: 격자 순회)은 이걸 따로 잡아 순회를 끊으면 된다 / catch it to stop a loop early.
+    """
+
+
+# vendor 의 실제 네트워크 호출 한 곳(_call_with_retry)을 감싼다. call_api 는 이 이름을 호출 시점에
+# 모듈 전역에서 찾으므로 속성 교체로 적용된다. vendor 파일은 건드리지 않는다.
+# / Wrap vendor's single network call site; call_api resolves it at call time. Vendor file untouched.
+#   ① 연결 대기 30s → 10s (응답 대기는 30s 유지) — 해외 러너에서 막히는 날 호출당 93s → 33s
+#   ② 연결 실패가 연달아 나면 그 호스트는 이번 실행 동안 즉시 CircuitOpenError
+_vendor_call_with_retry = _vendor._call_with_retry
+
+
+def _guarded_call_with_retry(url: str, params: dict, timeout=30):
+    if not BREAKER.allow(url):
+        raise CircuitOpenError(
+            f"회로 차단 — {BREAKER.host(url)} 는 이번 실행에서 연결이 연달아 실패했다 / circuit open"
+        )
+    if isinstance(timeout, (int, float)):
+        timeout = (min(CONNECT_TIMEOUT_S, timeout), timeout)
+    try:
+        resp = _vendor_call_with_retry(url, params, timeout=timeout)
+    except GovApiTransportError as exc:
+        if isinstance(exc.__cause__, requests.ConnectionError):
+            BREAKER.record_unreachable(url)
+        else:
+            BREAKER.record_reachable(url)  # 5xx·응답지연 — 연결은 됐다 / connected, just failing
+        raise
+    except (GovApiAuthError, GovApiRateLimitError):
+        BREAKER.record_reachable(url)
+        raise
+    BREAKER.record_reachable(url)
+    return resp
+
+
+_vendor._call_with_retry = _guarded_call_with_retry
+
 __all__ = [
     "call_api",
+    "CircuitOpenError",
     "GovApiAuthError",
     "GovApiError",
     "GovApiParseError",
