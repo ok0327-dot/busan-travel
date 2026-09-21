@@ -1,5 +1,9 @@
 """KOPIS 공연예술통합전산망 — 부산(signgucode=28) 공연 목록.
 
+⚠️ 미사용(보존) / UNUSED, kept for reference — main.py SOURCES·워크플로 어디서도 안 부른다.
+KOPIS 는 공연시설/기획제작사만 가입 가능해 키 발급 불가(main.py 주석). HTTP 계약 마이그레이션
+대상이 아니다 / not a migration target.
+
 data.go.kr 15097805 는 LINK 타입이라 실제 호출은 kopis.or.kr 로 가고
 키도 kopis.or.kr 에서 별도 발급 → gov-api-kr 통합 키 모델과 별개.
 KOPIS_API_KEY 환경변수로 읽는다.

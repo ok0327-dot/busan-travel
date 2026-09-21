@@ -1,5 +1,8 @@
 """Busan city attraction API (data.go.kr 15063481) — via gov-api-kr.
 
+⚠️ 폐기됨 / DEPRECATED — vb_attraction 과 제목 100% 중복(212/212)이라 SOURCES 에서 뺐고,
+main.py `deprecated_sources` 가 매 실행 DB 잔재를 지운다. 다시 연결하지 말 것 / do not re-wire.
+
 부산 명소 정보. POI 성격(start_date=None).
 """
 from __future__ import annotations

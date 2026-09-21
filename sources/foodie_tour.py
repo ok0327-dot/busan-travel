@@ -18,8 +18,7 @@ import os
 import re
 import sys
 
-import requests
-
+from sources._adapter import HTTPSession, report
 from storage.db import Event
 
 # 다국어 표기 접미사 제거 — 예: "M543 Cafe(한,영,중간,중번,일)" → "M543 Cafe"
@@ -34,6 +33,9 @@ def _clean_title(title: str) -> str:
 SOURCE = "foodie_tour"
 BASE_URL = "http://apis.data.go.kr/6260000/FoodieService/getFoodieKr"
 PAGE_SIZE = 100
+
+# v3.9 계약 — 재시도 + 실패 로그의 ServiceKey 가림 / retry + ServiceKey masked in failure logs
+session = HTTPSession(SOURCE, timeout=20)
 
 
 def _parse_item(raw: dict) -> Event | None:
@@ -64,21 +66,17 @@ def fetch() -> list[Event]:
     if not key:
         print(f"[{SOURCE}] FAIL: DATA_GO_KR_KEY 미설정", file=sys.stderr)
         return []
-    try:
-        r = requests.get(
-            BASE_URL,
-            params={
-                "ServiceKey": key,
-                "pageNo": 1,
-                "numOfRows": PAGE_SIZE,
-                "resultType": "json",
-            },
-            timeout=20,
-        )
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] FAILED: {exc}", file=sys.stderr)
-        return []
+    r = session.get(
+        BASE_URL,
+        params={
+            "ServiceKey": key,
+            "pageNo": 1,
+            "numOfRows": PAGE_SIZE,
+            "resultType": "json",
+        },
+    )
+    if not r:
+        return []  # HTTPSession 이 키를 가린 채 stderr 에 남겼다 / logged with the key masked
     payload = r.json()
     body = payload.get("getFoodieKr", {})
     if (body.get("header") or {}).get("code") != "00":
@@ -92,5 +90,8 @@ def fetch() -> list[Event]:
         ev = _parse_item(raw)
         if ev is not None:
             events.append(ev)
-    print(f"[{SOURCE}] fetched {len(events)} foodie tour stories", file=sys.stderr)
-    return events
+    return report(SOURCE, events)
+
+
+if __name__ == "__main__":  # python -m sources.foodie_tour (DATA_GO_KR_KEY 필요 / needs the key)
+    fetch()

@@ -20,8 +20,7 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 
-import requests
-
+from sources._adapter import HTTPSession, report
 from sources._parsers import busan_latlon
 from storage.db import Event, upsert_events
 
@@ -29,27 +28,26 @@ SOURCE = "walking_tour"
 BASE_URL = "http://apis.data.go.kr/6260000/WalkingService/getWalkingKr"
 PAGE_SIZE = 100
 
+# v3.9 계약 — 재시도 + 실패 로그의 ServiceKey 가림 / retry + ServiceKey masked in failure logs
+session = HTTPSession(SOURCE, timeout=20)
+
 
 def _fetch_raw() -> list[dict]:
     key = os.environ.get("DATA_GO_KR_KEY")
     if not key:
         print(f"[{SOURCE}] FAIL: DATA_GO_KR_KEY 미설정", file=sys.stderr)
         return []
-    try:
-        r = requests.get(
-            BASE_URL,
-            params={
-                "ServiceKey": key,
-                "pageNo": 1,
-                "numOfRows": PAGE_SIZE,
-                "resultType": "json",
-            },
-            timeout=20,
-        )
-        r.raise_for_status()
-    except Exception as exc:
-        print(f"[{SOURCE}] FAILED: {exc}", file=sys.stderr)
-        return []
+    r = session.get(
+        BASE_URL,
+        params={
+            "ServiceKey": key,
+            "pageNo": 1,
+            "numOfRows": PAGE_SIZE,
+            "resultType": "json",
+        },
+    )
+    if not r:
+        return []  # HTTPSession 이 키를 가린 채 stderr 에 남겼다 / logged with the key masked
     payload = r.json()
     body = payload.get("getWalkingKr", {})
     if (body.get("header") or {}).get("code") != "00":
@@ -58,7 +56,7 @@ def _fetch_raw() -> list[dict]:
     items = body.get("item") or []
     if isinstance(items, dict):
         items = [items]
-    return items
+    return report(SOURCE, items)
 
 
 def _parse_standalone(raw: dict) -> Event | None:
@@ -136,3 +134,7 @@ def enrich_and_upsert(conn: sqlite3.Connection) -> tuple[int, int]:
         file=sys.stderr,
     )
     return enriched, new_ins
+
+
+if __name__ == "__main__":  # python -m sources.walking_tour — 수집 건수만, DB 는 안 건드린다 / fetch only, no DB write
+    _fetch_raw()
