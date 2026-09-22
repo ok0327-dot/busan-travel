@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-19T23:35Z",
-  "count": 12,
+  "generated_at": "2026-09-22T00:24Z",
+  "count": 11,
   "confirmed_count": 1,
-  "estimated_count": 11,
+  "estimated_count": 10,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 128.0892925564,
       "orig_start": "2025-10-01",
       "orig_end": "2025-11-16",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-142204",
-      "category": "festival",
-      "region": "진주",
-      "title": "2025 코리아드라마페스티벌",
-      "start": "2026-10-04",
-      "end": "2026-10-19",
-      "venue": null,
-      "address": "경상남도 진주시 논개길 103 (옥봉동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/72/3536872_image2_1.jpg",
-      "tel": "홈페이지 참조",
-      "lat": 35.1899681714,
-      "lon": 128.0926947349,
-      "orig_start": "2025-10-04",
-      "orig_end": "2025-10-19",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
