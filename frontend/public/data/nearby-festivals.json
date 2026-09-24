@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-23T00:02Z",
-  "count": 11,
+  "generated_at": "2026-09-24T00:05Z",
+  "count": 10,
   "confirmed_count": 1,
-  "estimated_count": 10,
+  "estimated_count": 9,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 128.0892925564,
       "orig_start": "2025-10-01",
       "orig_end": "2025-11-16",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3551127",
-      "category": "festival",
-      "region": "김해",
-      "title": "김해뮤직페스티벌 연어",
-      "start": "2026-10-18",
-      "end": "2026-10-18",
-      "venue": null,
-      "address": "경상남도 김해시 가야테마길 161 (어방동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/06/3551006_image2_1.JPG",
-      "tel": "055-340-7900~01",
-      "lat": 35.2522311829,
-      "lon": 128.8920398207,
-      "orig_start": "2025-10-18",
-      "orig_end": "2025-10-18",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
