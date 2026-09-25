@@ -1,6 +1,6 @@
 {
   "_doc": "부산 주요 연례 축제 사전 예약 캘린더. title_keywords 매칭 시 booking_opens_at 추정. annual_month 는 본행사 월 (UTC 기준 한국 시즌). booking_offset_days = 본행사 N일 전 발매 시작.",
-  "_updated_at": "2026-09-11",
+  "_updated_at": "2026-09-25",
   "festivals": [
     {
       "name": "부산국제영화제 (BIFF)",
@@ -622,6 +622,21 @@
       "booking_offset_days": 14,
       "booking_type": "현장 행사",
       "note": "10월 부산시 전역. 부산시·부산관광공사 주최 가을 메가-이벤트 (시월뮤직·시월무비·시월컬처·시월고메·시월테크 등 10개 분야 26개 프로그램). 2026: 10/4~28."
+    },
+    {
+      "name": "라라라 페스티벌",
+      "title_keywords": [
+        "라라라 페스티벌",
+        "라라라페스티벌"
+      ],
+      "annual_month": 10,
+      "exact_dates": {
+        "2026": ["2026-10-23", "2026-10-25"]
+      },
+      "venue": "온천천 어울마당 (부산대역 하부)",
+      "booking_offset_days": 0,
+      "booking_type": "현장 행사",
+      "note": "10월 하순 부산 금정구 온천천 어울마당 (부산대역 하부). 커피·빵·디저트 체류형 힐링 축제. 제10회 2026: 10/23~25."
     }
   ]
 }
