@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-09-29T01:21Z",
-  "count": 10,
+  "generated_at": "2026-09-30T00:57Z",
+  "count": 9,
   "confirmed_count": 1,
-  "estimated_count": 9,
+  "estimated_count": 8,
   "regions": [
     "경남",
     "울산",
@@ -57,24 +57,6 @@
       "lon": 128.1365143052,
       "orig_start": "2025-10-24",
       "orig_end": "2025-11-02",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3377048",
-      "category": "festival",
-      "region": "합천",
-      "title": "합천황토한우축제",
-      "start": "2026-10-24",
-      "end": "2026-10-26",
-      "venue": null,
-      "address": "경상남도 합천군 합천읍 문화로 62",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/18/3544918_image2_1.jpg",
-      "tel": "055-933-0050",
-      "lat": 35.5601470965,
-      "lon": 128.1601289425,
-      "orig_start": "2025-10-24",
-      "orig_end": "2025-10-26",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
