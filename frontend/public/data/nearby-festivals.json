@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-08T01:14Z",
-  "count": 9,
-  "confirmed_count": 1,
+  "generated_at": "2026-10-09T01:24Z",
+  "count": 8,
+  "confirmed_count": 0,
   "estimated_count": 8,
   "regions": [
     "경남",
@@ -26,21 +26,6 @@
       "orig_end": "2025-11-16",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-234232",
-      "category": "festival",
-      "region": "사천",
-      "title": "사천에어쇼",
-      "start": "2026-10-22",
-      "end": "2026-10-25",
-      "venue": null,
-      "address": "경상남도 사천시 사천읍 정의리",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/49/3566649_image2_1.png",
-      "tel": "055-831-2061",
-      "lat": 35.0911816485,
-      "lon": 128.0699132182,
-      "estimated": false
     },
     {
       "id": "nearby-3019716",
