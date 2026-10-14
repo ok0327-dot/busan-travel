@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-10-13T02:45Z",
-  "count": 8,
+  "generated_at": "2026-10-14T00:32Z",
+  "count": 7,
   "confirmed_count": 0,
-  "estimated_count": 8,
+  "estimated_count": 7,
   "regions": [
     "경남",
     "울산",
@@ -24,24 +24,6 @@
       "lon": 128.0892925564,
       "orig_start": "2025-10-01",
       "orig_end": "2025-11-16",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3019716",
-      "category": "festival",
-      "region": "합천",
-      "title": "대장경기록문화축제",
-      "start": "2026-10-24",
-      "end": "2026-11-02",
-      "venue": null,
-      "address": "경상남도 합천군 가야면 가야산로 1160",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/75/3559875_image2_1.JPG",
-      "tel": "055-930-4697",
-      "lat": 35.7673871185,
-      "lon": 128.1365143052,
-      "orig_start": "2025-10-24",
-      "orig_end": "2025-11-02",
       "estimated": true,
       "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
     },
