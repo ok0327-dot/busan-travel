@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-10-15T00:18:32+00:00",
-  "version": "20261015T001832",
+  "generated_at": "2026-10-15T23:50:58+00:00",
+  "version": "20261015T235058",
   "scope": "all",
   "counts": {
-    "places": 714,
+    "places": 715,
     "courses": 56,
-    "guides": 334,
+    "guides": 335,
     "events_by_month": {
       "undated": 7,
       "2018-06": 1,
@@ -25,7 +25,7 @@
       "2026-07": 156,
       "2026-08": 158,
       "2026-09": 184,
-      "2026-10": 126,
+      "2026-10": 127,
       "2026-11": 27,
       "2026-12": 18,
       "2027-01": 1,
@@ -37,31 +37,31 @@
       "2027-08": 5,
       "2027-09": 4
     },
-    "weather_short_rows": 151800,
-    "weather_mid_rows": 31,
+    "weather_short_rows": 153780,
+    "weather_mid_rows": 32,
     "air_quality_rows": 840,
     "beaches": 7
   },
   "adapters": {
     "art_busan": {
       "rows": 9,
-      "last_seen": "2026-10-14T00:27:12+00:00"
+      "last_seen": "2026-10-15T23:46:27+00:00"
     },
     "bexco": {
       "rows": 74,
-      "last_seen": "2026-10-14T00:27:41+00:00"
+      "last_seen": "2026-10-15T23:46:49+00:00"
     },
     "busan_beach": {
       "rows": 7,
-      "last_seen": "2026-10-15T00:09:25+00:00"
+      "last_seen": "2026-10-15T23:47:56+00:00"
     },
     "busan_festival": {
       "rows": 42,
-      "last_seen": "2026-10-14T00:24:54+00:00"
+      "last_seen": "2026-10-15T23:44:06+00:00"
     },
     "busan_food": {
       "rows": 437,
-      "last_seen": "2026-10-14T00:24:59+00:00"
+      "last_seen": "2026-10-15T23:44:15+00:00"
     },
     "dabom": {
       "rows": 668,
@@ -69,75 +69,75 @@
     },
     "dureraum": {
       "rows": 55,
-      "last_seen": "2026-10-15T00:02:57+00:00"
+      "last_seen": "2026-10-15T23:45:40+00:00"
     },
     "dureraum_film": {
       "rows": 21,
-      "last_seen": "2026-10-15T00:02:58+00:00"
+      "last_seen": "2026-10-15T23:45:41+00:00"
     },
     "festivalbusan:7bridges": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:biennale": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:busanbell": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:busanport": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:fireworks": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:rockfest": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:seafestival": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:taxchelin": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "festivalbusan:wheat": {
       "rows": 1,
-      "last_seen": "2026-10-15T00:03:10+00:00"
+      "last_seen": "2026-10-15T23:45:52+00:00"
     },
     "foodie_tour": {
-      "rows": 94,
-      "last_seen": "2026-10-14T00:27:24+00:00"
+      "rows": 95,
+      "last_seen": "2026-10-15T23:46:37+00:00"
     },
     "galmaet": {
       "rows": 4,
-      "last_seen": "2026-10-14T00:27:46+00:00"
+      "last_seen": "2026-10-15T23:46:55+00:00"
     },
     "moca_busan": {
       "rows": 7,
-      "last_seen": "2026-10-14T00:26:14+00:00"
+      "last_seen": "2026-10-15T23:45:32+00:00"
     },
     "naver_blog:bsbukgusns": {
       "rows": 114,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:bscf2009": {
       "rows": 125,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:bsdonggublog": {
       "rows": 298,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:bsjunggu": {
-      "rows": 217,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "rows": 218,
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:cooolbusan": {
       "rows": 50,
@@ -145,35 +145,35 @@
     },
     "naver_blog:cooolbusan_travel": {
       "rows": 36,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:hudpr": {
-      "rows": 271,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "rows": 272,
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:moca_busan": {
       "rows": 103,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_blog:yeonjegu": {
       "rows": 112,
-      "last_seen": "2026-10-15T00:00:52+00:00"
+      "last_seen": "2026-10-15T23:44:22+00:00"
     },
     "naver_local": {
-      "rows": 64,
-      "last_seen": "2026-10-15T00:03:28+00:00"
+      "rows": 65,
+      "last_seen": "2026-10-15T23:46:10+00:00"
     },
     "naver_neighborhood": {
       "rows": 47,
-      "last_seen": "2026-10-15T00:03:39+00:00"
+      "last_seen": "2026-10-15T23:46:22+00:00"
     },
     "tour_api": {
       "rows": 52,
-      "last_seen": "2026-10-14T00:25:00+00:00"
+      "last_seen": "2026-10-15T23:44:16+00:00"
     },
     "vb_attraction": {
       "rows": 213,
-      "last_seen": "2026-10-14T00:27:46+00:00"
+      "last_seen": "2026-10-15T23:46:55+00:00"
     },
     "vb_festival_curated": {
       "rows": 42,
@@ -189,7 +189,11 @@
     },
     "vb_theme": {
       "rows": 241,
-      "last_seen": "2026-10-14T00:27:49+00:00"
+      "last_seen": "2026-10-15T23:46:57+00:00"
+    },
+    "walking_tour": {
+      "rows": 1,
+      "last_seen": "2026-10-15T23:46:57+00:00"
     }
   }
 }
