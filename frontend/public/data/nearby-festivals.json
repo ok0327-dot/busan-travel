@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-10-22T00:09Z",
-  "count": 7,
+  "generated_at": "2026-10-23T00:18Z",
+  "count": 6,
   "confirmed_count": 0,
-  "estimated_count": 7,
+  "estimated_count": 6,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3037482",
-      "category": "festival",
-      "region": "진주",
-      "title": "2025 진주전통공예비엔날레",
-      "start": "2026-10-01",
-      "end": "2026-11-16",
-      "venue": null,
-      "address": "경상남도 진주시 진주대로879번길 18 (강남동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/60/3548860_image2_1.png",
-      "tel": "055-749-8707",
-      "lat": 35.1785527282,
-      "lon": 128.0892925564,
-      "orig_start": "2025-10-01",
-      "orig_end": "2025-11-16",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3344495",
       "category": "festival",
