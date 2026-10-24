@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-10-23T00:18:16+00:00",
-  "version": "20261023T001816",
+  "generated_at": "2026-10-24T00:01:19+00:00",
+  "version": "20261024T000119",
   "scope": "all",
   "counts": {
-    "places": 717,
+    "places": 763,
     "courses": 56,
     "guides": 336,
     "events_by_month": {
@@ -25,9 +25,9 @@
       "2026-07": 156,
       "2026-08": 157,
       "2026-09": 184,
-      "2026-10": 164,
-      "2026-11": 28,
-      "2026-12": 19,
+      "2026-10": 171,
+      "2026-11": 30,
+      "2026-12": 18,
       "2027-01": 1,
       "2027-03": 1,
       "2027-04": 4,
@@ -38,7 +38,7 @@
       "2027-09": 4,
       "2027-10": 3
     },
-    "weather_short_rows": 159828,
+    "weather_short_rows": 160692,
     "weather_mid_rows": 32,
     "air_quality_rows": 840,
     "beaches": 7
@@ -46,23 +46,23 @@
   "adapters": {
     "art_busan": {
       "rows": 9,
-      "last_seen": "2026-10-23T00:05:26+00:00"
+      "last_seen": "2026-10-23T23:55:57+00:00"
     },
     "bexco": {
-      "rows": 74,
-      "last_seen": "2026-10-23T00:06:05+00:00"
+      "rows": 75,
+      "last_seen": "2026-10-23T23:56:20+00:00"
     },
     "busan_beach": {
       "rows": 7,
-      "last_seen": "2026-10-23T00:09:31+00:00"
+      "last_seen": "2026-10-23T23:59:03+00:00"
     },
     "busan_festival": {
       "rows": 42,
-      "last_seen": "2026-10-23T00:02:25+00:00"
+      "last_seen": "2026-10-23T23:53:52+00:00"
     },
     "busan_food": {
-      "rows": 437,
-      "last_seen": "2026-10-23T00:02:30+00:00"
+      "rows": 472,
+      "last_seen": "2026-10-23T23:53:57+00:00"
     },
     "dabom": {
       "rows": 668,
@@ -70,111 +70,111 @@
     },
     "dureraum": {
       "rows": 57,
-      "last_seen": "2026-10-23T00:04:38+00:00"
+      "last_seen": "2026-10-23T23:55:15+00:00"
     },
     "dureraum_film": {
       "rows": 21,
-      "last_seen": "2026-10-23T00:04:39+00:00"
+      "last_seen": "2026-10-23T23:55:16+00:00"
     },
     "festivalbusan:7bridges": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:biennale": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:busanbell": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:busanport": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:fireworks": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:rockfest": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:seafestival": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:taxchelin": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "festivalbusan:wheat": {
       "rows": 1,
-      "last_seen": "2026-10-23T00:04:49+00:00"
+      "last_seen": "2026-10-23T23:55:26+00:00"
     },
     "foodie_tour": {
       "rows": 95,
-      "last_seen": "2026-10-23T00:05:38+00:00"
+      "last_seen": "2026-10-23T23:56:07+00:00"
     },
     "galmaet": {
       "rows": 4,
-      "last_seen": "2026-10-23T00:06:11+00:00"
+      "last_seen": "2026-10-23T23:56:25+00:00"
     },
     "moca_busan": {
       "rows": 7,
-      "last_seen": "2026-10-22T00:05:14+00:00"
+      "last_seen": "2026-10-23T23:55:07+00:00"
     },
     "naver_blog:bsbukgusns": {
       "rows": 120,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:bscf2009": {
       "rows": 131,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:bsdonggublog": {
-      "rows": 313,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "rows": 317,
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:bsjunggu": {
       "rows": 230,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:cooolbusan": {
       "rows": 50,
       "last_seen": "2026-04-25T15:06:10+00:00"
     },
     "naver_blog:cooolbusan_travel": {
-      "rows": 42,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "rows": 43,
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:hudpr": {
-      "rows": 282,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "rows": 283,
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:moca_busan": {
       "rows": 103,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_blog:yeonjegu": {
-      "rows": 115,
-      "last_seen": "2026-10-23T00:02:37+00:00"
+      "rows": 118,
+      "last_seen": "2026-10-23T23:54:03+00:00"
     },
     "naver_local": {
       "rows": 67,
-      "last_seen": "2026-10-23T00:05:08+00:00"
+      "last_seen": "2026-10-23T23:55:42+00:00"
     },
     "naver_neighborhood": {
       "rows": 48,
-      "last_seen": "2026-10-23T00:05:20+00:00"
+      "last_seen": "2026-10-23T23:55:52+00:00"
     },
     "tour_api": {
       "rows": 52,
-      "last_seen": "2026-10-23T00:02:31+00:00"
+      "last_seen": "2026-10-23T23:53:58+00:00"
     },
     "vb_attraction": {
       "rows": 213,
-      "last_seen": "2026-10-23T00:06:11+00:00"
+      "last_seen": "2026-10-23T23:56:25+00:00"
     },
     "vb_festival_curated": {
       "rows": 42,
@@ -190,11 +190,11 @@
     },
     "vb_theme": {
       "rows": 241,
-      "last_seen": "2026-10-23T00:06:12+00:00"
+      "last_seen": "2026-10-23T23:56:27+00:00"
     },
     "walking_tour": {
       "rows": 2,
-      "last_seen": "2026-10-23T00:06:13+00:00"
+      "last_seen": "2026-10-23T23:56:27+00:00"
     }
   }
 }
