@@ -1,50 +1,14 @@
 {
-  "generated_at": "2026-10-27T00:51Z",
-  "count": 6,
+  "generated_at": "2026-10-28T00:42Z",
+  "count": 4,
   "confirmed_count": 0,
-  "estimated_count": 6,
+  "estimated_count": 4,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3344495",
-      "category": "festival",
-      "region": "하동",
-      "title": "하동별맛축제",
-      "start": "2026-11-07",
-      "end": "2026-11-09",
-      "venue": null,
-      "address": "경상남도 하동군 하동읍 비파리",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/08/3559708_image2_1.jpg",
-      "tel": "055-880-6582~4",
-      "lat": 35.0594575822,
-      "lon": 127.7625159968,
-      "orig_start": "2025-11-07",
-      "orig_end": "2025-11-09",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
-    {
-      "id": "nearby-3562944",
-      "category": "festival",
-      "region": "창원",
-      "title": "창원산단 문화축제",
-      "start": "2026-11-08",
-      "end": "2026-11-09",
-      "venue": null,
-      "address": "경상남도 창원시 성산구 외동반림로 9 (중앙동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/32/3562932_image2_1.png",
-      "tel": "070-5117-3755",
-      "lat": 35.2213639824,
-      "lon": 128.6734819584,
-      "orig_start": "2025-11-08",
-      "orig_end": "2025-11-09",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3396705",
       "category": "festival",
