@@ -1508,6 +1508,13 @@ function _aiSegmentKey(target) {
   if (tStr === ai.dates.tomorrow) return "tomorrow";
   if (tStr === ai.dates.weekend) return "weekend";
   if (tStr === ai.dates.next_weekend) return "next_weekend";
+  // AI 의 weekend 구간은 토요일 날짜 하나로 저장되지만 토~일 이틀을 다룬다 → 그 다음 날(일)도 같은 구간
+  if (target.getDay() === 0) {
+    const sat = new Date(target); sat.setDate(sat.getDate() - 1);
+    const satStr = `${sat.getFullYear()}-${String(sat.getMonth()+1).padStart(2,"0")}-${String(sat.getDate()).padStart(2,"0")}`;
+    if (satStr === ai.dates.weekend) return "weekend";
+    if (satStr === ai.dates.next_weekend) return "next_weekend";
+  }
   // 생성일이 지나 선택 날짜를 덮는 구간이 없음 → 남의 날짜 요약을 보여주지 않는다
   return null;
 }
@@ -1619,7 +1626,9 @@ function _newItemsPool() {
     pool.push({ ...p, _newKind: p.source === "naver_local" ? "신상" : "최근 추가" });
   }
   // events — first_seen 최근 + 아직 안 끝난 것만. 지난 행사 후기 글("[축제후기] … 현장 스케치")은 갈 수 없으니 제외.
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // 로컬 날짜로 (toISOString 은 UTC 라 KST 00~09시엔 어제 날짜가 된다)
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   for (const e of events) {
     if ((e.first_seen || "").slice(0, 10) < cutoffIso) continue;
     if ((e.end || e.start || "9999") < todayIso) continue;
