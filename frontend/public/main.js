@@ -964,9 +964,13 @@ async function init() {
     zoomTimer = setTimeout(() => refreshWeatherBadges(currentTargetDate), 200);
   });
 
-  // 초기: 오늘 날짜 기준 필터 + 배지
-  applyDateFilter(new Date());
-  refreshWeatherBadges(new Date());
+  // 초기: 요일에 맞는 기본 preset(목~일 = 이번 주말) 기준 필터 + 배지
+  const initPreset = defaultPreset();
+  const initTarget = resolvePreset(initPreset) || new Date();
+  document.querySelectorAll(".chip[data-preset]").forEach(b =>
+    b.classList.toggle("active", b.dataset.preset === initPreset));
+  applyDateFilter(initTarget);
+  refreshWeatherBadges(initTarget);
 
   // Bottom sheet 터치 드래그 (peek ↔ half ↔ full)
   enableSheetDrag();
@@ -1504,9 +1508,49 @@ function _aiSegmentKey(target) {
   if (tStr === ai.dates.tomorrow) return "tomorrow";
   if (tStr === ai.dates.weekend) return "weekend";
   if (tStr === ai.dates.next_weekend) return "next_weekend";
-  return "today";
+  // AI 의 weekend 구간은 토요일 날짜 하나로 저장되지만 토~일 이틀을 다룬다 → 그 다음 날(일)도 같은 구간
+  if (target.getDay() === 0) {
+    const sat = new Date(target); sat.setDate(sat.getDate() - 1);
+    const satStr = `${sat.getFullYear()}-${String(sat.getMonth()+1).padStart(2,"0")}-${String(sat.getDate()).padStart(2,"0")}`;
+    if (satStr === ai.dates.weekend) return "weekend";
+    if (satStr === ai.dates.next_weekend) return "next_weekend";
+  }
+  // 생성일이 지나 선택 날짜를 덮는 구간이 없음 → 남의 날짜 요약을 보여주지 않는다
+  return null;
 }
-const _AI_SEG_LABEL = { today: "오늘", tomorrow: "내일", weekend: "이번 주말", next_weekend: "다음 주말" };
+
+// 라벨은 AI 생성 시점이 아니라 "지금" 기준으로 붙인다.
+// (전엔 어제 생성된 tomorrow 구간이 오늘 화면에 "내일의 부산"으로 떴다)
+function _relDayLabel(target) {
+  const now = new Date();
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const diff = Math.round((t - t0) / 86400000);
+  if (diff === 0) return "오늘";
+  if (diff === 1) return "내일";
+  const day = t.getDay();
+  if ((day === 6 || day === 0) && diff > 0 && diff <= 7) return "이번 주말";
+  if ((day === 6 || day === 0) && diff > 7 && diff <= 14) return "다음 주말";
+  return `${t.getMonth() + 1}/${t.getDate()}`;
+}
+
+// AI 추천 제목 → 사이트 안의 실제 행사/장소 (클릭 시 상세로). 못 찾으면 null.
+function _resolveAiTitle(title, events) {
+  if (!title) return null;
+  const core = _eventTitleCore(title);
+  if (core.length < 2) return null;
+  const ev = events.find(e => e.title === title)
+    || (core.length >= 4 && events.find(e => {
+      const c = _eventTitleCore(e.title);
+      return c.length >= 4 && (c.includes(core) || core.includes(c));
+    }));
+  if (ev) return ev;
+  const places = window.__data?.places?.places || [];
+  const bare = title.replace(/\([^)]*\)/g, "").trim();
+  return places.find(p => p.title === title || p.title === bare)
+    || (window.__mishik || []).find(p => p.title === title || p.title === bare)
+    || null;
+}
 
 // B3 — AI picks title → places 의 menu/gugun lookup
 function _buildPlaceIndex() {
@@ -1521,33 +1565,46 @@ function _buildPlaceIndex() {
   return idx;
 }
 
-function renderAiPickCard(target) {
+// targets: 클릭 가능한 항목을 모으는 배열 (renderTodayHighlights 가 data-ai 인덱스로 showDetail)
+function renderAiPickCard(target, events = [], targets = []) {
   const ai = window.__aiSummary;
   if (!ai) return "";
   const segKey = _aiSegmentKey(target);
-  const seg = ai[segKey] || ai.today;
+  if (!segKey) return "";
+  const seg = ai[segKey];
   if (!seg || !seg.summary) return "";
-  const tag = _AI_SEG_LABEL[segKey] || "오늘";
+  const tag = _relDayLabel(target);
   const wx = ai.weather?.[segKey];
+  // 오늘 생성분이 아니면 생성일을 밝힌다 (매일 수집이 하루 실패해도 어제 요약이 그대로 남는다)
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+  const staleNote = ai.valid_for && ai.valid_for !== todayIso
+    ? `<span class="ai-pick-stale">🕒 ${escape(ai.valid_for.slice(5).replace("-", "/"))} 생성</span>` : "";
+  const linkFor = (title, inner) => {
+    const hit = _resolveAiTitle(title, events);
+    if (!hit) return inner;
+    targets.push(hit);
+    return `<button type="button" class="ai-link" data-ai="${targets.length - 1}">${inner}</button>`;
+  };
   const placeIdx = _buildPlaceIndex();
   const picksHTML = (seg.picks || []).slice(0, 3).map(p => {
     const meta = placeIdx[p.title];
     const menuLine = meta?.menu ? `<span class="ai-pick-menu">🍴 ${escape(meta.menu.slice(0, 40))}</span>` : "";
     const gugunLine = meta?.gugun ? `<span class="ai-pick-gugun">📍 ${escape(meta.gugun)}</span>` : "";
     const extras = [menuLine, gugunLine].filter(Boolean).join(" ");
-    return `<li><strong>${escape(p.title || "")}</strong>${p.why ? ` — ${escape(p.why)}` : ""}${extras ? `<br>${extras}` : ""}</li>`;
+    return `<li>${linkFor(p.title, `<strong>${escape(p.title || "")}</strong>`)}${p.why ? ` — ${escape(p.why)}` : ""}${extras ? `<br>${extras}` : ""}</li>`;
   }).join("");
   const courses = (ai.courses || []).slice(0, 3);
   const courseTabs = courses.length
     ? `<div class="ai-courses">${courses.map((c, i) =>
         `<details class="ai-course"${i === 0 ? " open" : ""}>
           <summary>${escape(c.label || "코스")}${c.title ? ` · ${escape(c.title)}` : ""}</summary>
-          ${(c.stops || []).length ? `<ol class="ai-stops">${c.stops.map(s => `<li>${escape(s)}</li>`).join("")}</ol>` : ""}
+          ${(c.stops || []).length ? `<ol class="ai-stops">${c.stops.map(s => `<li>${linkFor(s, escape(s))}</li>`).join("")}</ol>` : ""}
           ${c.note ? `<p class="ai-course-note">${escape(c.note)}</p>` : ""}
         </details>`).join("")}</div>`
     : "";
   return `<article class="ai-pick" aria-label="AI ${escape(tag)}의 부산 추천">
-    <div class="ai-pick-label">🤖 AI Pick · ${escape(tag)}의 부산${wx ? ` · ${escape(wx)}` : ""}</div>
+    <div class="ai-pick-label">🤖 AI Pick · ${escape(tag)}의 부산${wx ? ` · ${escape(wx)}` : ""}${staleNote}</div>
     <p class="ai-pick-summary">${escape(seg.summary)}</p>
     ${picksHTML ? `<ul class="ai-pick-list">${picksHTML}</ul>` : ""}
     ${courseTabs}
@@ -1555,7 +1612,7 @@ function renderAiPickCard(target) {
 }
 
 // ───────── 🆕 신규 추가 섹션 (Phase v3.5) — 식당/카페/공연/전시/축제 통합 ─────────
-// 데이터: source='naver_local' (네이버 동네 신상) + first_seen 최근 14일 모든 카테고리
+// 데이터: first_seen 최근 14일 모든 카테고리 (naver_local 출처는 '신상' 배지)
 function _newItemsPool() {
   const places = window.__data?.places?.places || [];
   const events = window.__data?.allEventPoi || [];
@@ -1563,21 +1620,20 @@ function _newItemsPool() {
   cutoff.setDate(cutoff.getDate() - 14);
   const cutoffIso = cutoff.toISOString().slice(0, 10);
   const pool = [];
-  // food/cafe — naver_local source 우선, 그 외는 first_seen 최근만
+  // 모든 항목 first_seen 최근 14일만. (전엔 naver_local 이면 날짜 무관 "신상" — 4월 발견분까지 신규로 보였다)
   for (const p of places) {
-    if (p.source === "naver_local") {
-      pool.push({ ...p, _newKind: "신상" });
-      continue;
-    }
-    if ((p.first_seen || "").slice(0, 10) >= cutoffIso) {
-      pool.push({ ...p, _newKind: "최근 추가" });
-    }
+    if ((p.first_seen || "").slice(0, 10) < cutoffIso) continue;
+    pool.push({ ...p, _newKind: p.source === "naver_local" ? "신상" : "최근 추가" });
   }
-  // events — first_seen 최근만
+  // events — first_seen 최근 + 아직 안 끝난 것만. 지난 행사 후기 글("[축제후기] … 현장 스케치")은 갈 수 없으니 제외.
+  // 로컬 날짜로 (toISOString 은 UTC 라 KST 00~09시엔 어제 날짜가 된다)
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   for (const e of events) {
-    if ((e.first_seen || "").slice(0, 10) >= cutoffIso) {
-      pool.push({ ...e, _newKind: "최근 추가" });
-    }
+    if ((e.first_seen || "").slice(0, 10) < cutoffIso) continue;
+    if ((e.end || e.start || "9999") < todayIso) continue;
+    if (/후기|스케치|결과 ?보고/.test(e.title || "")) continue;
+    pool.push({ ...e, _newKind: "최근 추가" });
   }
   // dedup by id
   const seen = new Set();
@@ -1636,10 +1692,6 @@ function _newItemHTML(p, idx) {
 }
 
 // ───────── 🔥 인기 큐레이션 (popularity_score 기반, v3.7) ─────────
-function _formatK(n) {
-  if (!n) return "";
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}K` : n.toLocaleString();
-}
 
 // ── 날짜 시드 결정적 PRNG (하루 단위 로테이션용) ──
 // xmur3(시드 해시) → mulberry32(PRNG). 같은 날 = 같은 결과(리로드/재방문 안정),
@@ -1695,8 +1747,12 @@ function _weightedSampleNoReplace(items, weights, k, rng) {
 // 점수 높을수록 자주 노출되되 날짜마다 조합이 바뀜 → 같은 화면도 매일 신선.
 function _popularFoodPool(limit = 10) {
   const places = window.__data?.places?.places || [];
+  // naver_local(네이버 '신상' 검색 후보)은 제외 — 언급 수가 가게명 블로그 검색 총건수라 짧은 이름이
+  // 엉뚱한 글로 부풀어(2관=영화관 2관 265만, 스테이트=힐스테이트 22만) 점수 상한 95를 독차지했다.
+  // 신상은 🆕 신규 섹션에서 따로 보여준다.
   let ranked = places
-    .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0)
+    .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0
+      && p.source !== "naver_local")
     .sort((a, b) => (b.popularity_score || 0) - (a.popularity_score || 0));
   // 제목+구 중복 제거(높은 점수 유지) — 같은 지점이 두 번 노출되는 것 방지.
   const seen = new Set();
@@ -1751,8 +1807,9 @@ function _popularEventsPool(target, limit = 10) {
 function _popularItemHTML(p, idx, kind) {
   const cat = CATEGORIES[p.category] || {};
   const emoji = cat.emoji || "📌";
+  // 맛집은 "📝 1499.5K" 같은 블로그 검색 총건수 대신 대표메뉴(없으면 업종) — 그 수치는 리뷰 수가 아니다
   const trailing = kind === "food"
-    ? (p.naver_reviews ? `📝 ${_formatK(p.naver_reviews)}` : (p.gugun || ""))
+    ? (p.menu ? `🍴 ${escape(p.menu.split(/[,/]|￦|₩/)[0].trim().slice(0, 18))}` : `${emoji} ${cat.label || ""}`)
     : (p.start ? `${(p.start || "").slice(5)}${p.end && p.end !== p.start ? "~" + (p.end || "").slice(5) : ""}` : (p.venue || ""));
   const sub = kind === "food"
     ? (p.gugun ? escape(p.gugun) : "")
@@ -1761,7 +1818,11 @@ function _popularItemHTML(p, idx, kind) {
     ? `<img class="popular-thumb" src="${escape(p.image)}" loading="lazy" onerror="this.style.display='none'" alt="">`
     : `<div class="popular-thumb popular-thumb-empty">${emoji}</div>`;
   // 스토리/히스토리 — excerpt(story_excerpt) > description, 30자 미만은 카테고리 텍스트라 noise → 생략.
-  const story = (p.excerpt || p.description || "").trim();
+  // 블로그 발췌(excerpt)는 가게명으로 검색한 아무 글이라 다른 가게·행사 이야기가 섞인다 →
+  // 발췌에 가게명이 들어 있을 때만 쓰고, 아니면 공식 설명(description)으로.
+  const nameKey = (p.title || "").replace(/\([^)]*\)|\s/g, "");
+  const excerptOk = p.excerpt && nameKey && p.excerpt.replace(/\s/g, "").includes(nameKey);
+  const story = ((excerptOk ? p.excerpt : "") || p.description || "").trim();
   const storyHTML = story.length >= 30
     ? `<div class="popular-story">${escape(story.slice(0, 90))}${story.length > 90 ? "…" : ""}</div>`
     : "";
@@ -1848,11 +1909,13 @@ function _nearbyItemHTML(p, idx) {
     : "";
   const estTag = est ? `<span class="nearby-est">예상</span>` : "";
   const place = p.venue ? escape(p.venue) : (p.address ? escape(p.address) : "");
+  // 추정 이월분은 제목의 작년 연도("2025 울산문화박람회")가 "예상 2026" 날짜와 충돌 → 연도 접두어 제거
+  const title = est ? (p.title || "").replace(/^\s*(19|20)\d\d년?\s*/, "") : (p.title || "");
   return `<button class="popular-card nearby-card${est ? " nearby-estimated" : ""}" data-idx="${idx}" data-kind="nearby">
     ${thumb}
     <div class="nearby-region">${escape(p.region || "근교")}</div>
     <div class="popular-body">
-      <div class="popular-title">${escape(p.title || "(제목 없음)")}</div>
+      <div class="popular-title">${escape(title || "(제목 없음)")}</div>
       <div class="popular-meta">${estTag}${dateStr}${place ? " · " + place : ""}</div>
     </div>
   </button>`;
@@ -1879,6 +1942,45 @@ function _mishikItemHTML(p, idx) {
   </button>`;
 }
 
+// ───────── 가족 주말 관점 보정 (2026-10 사용자 관점 개선) ─────────
+// 9세 아이와 갈 만한 행사는 가산, 업계 대상(B2B) 박람회는 감산 — 출처 priority 만으로는
+// "패패부산(신발섬유패션전시회)·수산EXPO" 같은 업계 행사가 가족 추천 Top 에 올라왔다.
+const _FAMILY_RE = /어린이|키즈|아이와|아이랑|가족|유아|동화|인형극|체험|베이비|그림책|과학관|동물|놀이/;
+const _B2B_RE = /산업전|전시회|EXPO|Expo|엑스포|기자재|수출|바이어|비즈니스|컨퍼런스|포럼|박람회/;
+// 일반 관람객 대상 박람회(게임쇼·먹거리·공예)는 감산하지 않는다
+const _CONSUMER_SHOW_RE = /게임|지스타|식품|푸드|주류|와인|공예/;
+function _isFamilyEvent(p) {
+  return _FAMILY_RE.test(`${p.title || ""} ${(p.hero_tags || []).join(" ")}`);
+}
+function _isTradeEvent(p) {
+  // 벡스코 업계 박람회는 전부 festival 로 수집됨 — 전시/공연 카테고리는 건드리지 않는다
+  const t = p.title || "";
+  return p.category === "festival" && !_isFamilyEvent(p) && !_CONSUMER_SHOW_RE.test(t) && _B2B_RE.test(t);
+}
+function _familyPriority(p) {
+  return (p.priority ?? 0) + (_isFamilyEvent(p) ? 2 : 0) - (_isTradeEvent(p) ? 3 : 0);
+}
+
+// 같은 행사가 출처별로 여러 번 수집됨 ("부산불꽃축제" / "제21회 부산불꽃축제" / "아름다운 …, 부산불꽃축제").
+// 시작일이 같고, 정규화 제목 하나가 다른 하나를 포함하면 같은 행사로 보고 priority 높은 쪽만 남긴다.
+function _eventTitleCore(t) {
+  return (t || "")
+    .replace(/\[[^\]]*\]|\([^)]*\)/g, "")
+    .replace(/제\s*\d+\s*회|20\d\d년?/g, "")
+    .replace(/[^0-9A-Za-z가-힣]/g, "")
+    .toLowerCase();
+}
+function _dedupeEvents(sorted) {
+  const kept = [];
+  for (const p of sorted) {
+    const core = _eventTitleCore(p.title);
+    const dup = core.length >= 4 && kept.some(k =>
+      k.start === p.start && k._core.length >= 4 && (k._core.includes(core) || core.includes(k._core)));
+    if (!dup) kept.push({ ...p, _core: core });
+  }
+  return kept;
+}
+
 function renderTodayHighlights(target) {
   target = target || new Date();
   const month = String(target.getMonth() + 1).padStart(2, "0");
@@ -1890,13 +1992,12 @@ function renderTodayHighlights(target) {
     if (kind === "active") active.push({ ...poi, _k: "active" });
     else if (kind === "upcoming") upcoming.push({ ...poi, _k: "upcoming" });
   }
-  // Hero 통합 정렬: priority DESC, 같으면 시작일 ASC (임박 우선)
-  const combined = [...active, ...upcoming];
-  combined.sort((a, b) => {
-    const pa = a.priority ?? 0, pb = b.priority ?? 0;
+  // Hero 통합 정렬: 가족 보정 priority DESC, 같으면 시작일 ASC (임박 우선) → 중복 행사 제거
+  const combined = _dedupeEvents([...active, ...upcoming].sort((a, b) => {
+    const pa = _familyPriority(a), pb = _familyPriority(b);
     if (pa !== pb) return pb - pa;
     return (a.start || "").localeCompare(b.start || "");
-  });
+  }));
   const hero = combined.slice(0, 5);
   const tail = combined.slice(5);
 
@@ -1912,7 +2013,11 @@ function renderTodayHighlights(target) {
   const today = new Date();
   const isToday = target.toDateString() === today.toDateString();
   const days = ["일", "월", "화", "수", "목", "금", "토"];
-  const heroDate = isToday ? "오늘" : `${target.getMonth() + 1}월 ${target.getDate()}일 (${days[target.getDay()]})`;
+  // 토요일이면 주말 이틀을 함께 표기 (일요일 행사도 "곧 시작"으로 같이 보이므로)
+  const sun = new Date(target); sun.setDate(sun.getDate() + 1);
+  const heroDate = target.getDay() === 6
+    ? `${isToday ? "오늘부터 " : ""}주말 ${target.getMonth() + 1}/${target.getDate()}(토)~${sun.getMonth() + 1}/${sun.getDate()}(일)`
+    : isToday ? "오늘" : `${target.getMonth() + 1}월 ${target.getDate()}일 (${days[target.getDay()]})`;
   const heroSub = season?.title || "부산 여행";
 
   const topBar = `<div class="highlight-hero">
@@ -1939,12 +2044,13 @@ function renderTodayHighlights(target) {
   }
 
   // ① AI Pick
-  const aiPickHTML = renderAiPickCard(target);
+  const aiTargets = [];
+  const aiPickHTML = renderAiPickCard(target, combined, aiTargets);
 
   // ② Hero Top 3
   let heroHTML;
   if (hero.length) {
-    heroHTML = `<div class="highlight-section hl-hero-section">
+    heroHTML = `<div class="highlight-section hl-hero-section" data-nav="⭐ 추천">
       <div class="hs-title">⭐ ${isToday ? "오늘의" : "이 날의"} 추천 Top ${hero.length}</div>
       <div class="hero-grid">
         ${hero.map((p, i) => heroCardHTML(p, i, target)).join("")}
@@ -1962,7 +2068,7 @@ function renderTodayHighlights(target) {
   const _foodPoolSize = (window.__data?.places?.places || [])
     .filter(p => (p.category === "food" || p.category === "cafe") && (p.popularity_score || 0) > 0).length;
   const popularFoodHTML = popularFood.length >= 3
-    ? `<div class="highlight-section popular-section">
+    ? `<div class="highlight-section popular-section" data-nav="🔥 맛집">
         <div class="hs-title">🔥 오늘의 인기 맛집·카페 ${popularFood.length}곳</div>
         <div class="hs-note">🔄 매일 새로 추천 · 부산 전역 ${_foodPoolSize}곳 중 · 네이버 블로그 언급 수 + 평점 기반</div>
         <div class="popular-grid">${popularFood.map((p, i) => _popularItemHTML(p, i, "food")).join("")}</div>
@@ -1972,7 +2078,7 @@ function renderTodayHighlights(target) {
   // ④ 🎭 이번주 공연/전시 TOP 10
   const popularEvents = _popularEventsPool(target, 10);
   const popularEventsHTML = popularEvents.length >= 2
-    ? `<div class="highlight-section popular-section popular-events">
+    ? `<div class="highlight-section popular-section popular-events" data-nav="🎭 공연·전시">
         <div class="hs-title">🎭 이번주 공연·전시 TOP ${popularEvents.length}</div>
         <div class="hs-note">부산 메이저 venue 중심 · ${popularEvents.some(e => parseDate(e.start) && parseDate(e.start) >= new Date(target.getFullYear(), target.getMonth(), target.getDate() + 7)) ? "다가오는 3개월 포함" : "이번주 진행 중"}</div>
         <div class="popular-grid">${popularEvents.map((p, i) => _popularItemHTML(p, i, "event")).join("")}</div>
@@ -1990,7 +2096,7 @@ function renderTodayHighlights(target) {
       ? `<div class="new-extra" hidden>${extra.map((p, i) => _newItemHTML(p, i + initial)).join("")}</div>
          <button class="new-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
-    newHTML = `<div class="highlight-section new-section">
+    newHTML = `<div class="highlight-section new-section" data-nav="🆕 신규">
       <div class="hs-title">🆕 새로 추가된 곳 ${newItems.length}건 — 공연·전시·식당·카페</div>
       <div class="hs-note">최근 2주 신규 등록 행사 + 네이버 동네 신상 (카테고리별 라운드로빈 다양화)</div>
       <div class="new-grid">${head.map((p, i) => _newItemHTML(p, i)).join("")}</div>
@@ -2018,7 +2124,7 @@ function renderTodayHighlights(target) {
         ).join("")}</div>
       </details>`;
     }).join("");
-    reservationHTML = `<div class="highlight-section reservation-section">
+    reservationHTML = `<div class="highlight-section reservation-section" data-nav="🗓 예약">
       <div class="hs-title">🗓 사전 예약 권장 · D-30 이내 ${reservations.length}건</div>
       <div class="hs-note">축제 우선 표시. 공연은 접힌 상태 (인터파크 등 자체 알림 권장).</div>
       ${groupHTML}
@@ -2033,7 +2139,7 @@ function renderTodayHighlights(target) {
     ).join("");
     const blooms = (season.blooms || []).map(b => `<li class="season-item" role="button" tabindex="0" data-kind="꽃·봄빛" data-label="${escape(b)}">${escape(b)}</li>`).join("");
     const scenes = (season.scenes || []).map(s => `<li class="season-item" role="button" tabindex="0" data-kind="풍경" data-label="${escape(s)}">${escape(s)}</li>`).join("");
-    seasonHTML = `<div class="highlight-section">
+    seasonHTML = `<div class="highlight-section" data-nav="🍽 제철">
       <div class="hs-title">🍽 ${target.getMonth() + 1}월 부산 제철</div>
       ${foods ? `<ul class="sm-list"><li class="sm-sub">음식</li>${foods}</ul>` : ""}
       ${blooms ? `<ul class="sm-list"><li class="sm-sub">꽃·봄빛</li>${blooms}</ul>` : ""}
@@ -2042,7 +2148,14 @@ function renderTodayHighlights(target) {
   }
 
   // 🎡 부산 근교 축제 (경남·경주) — 별도 파이프라인(window.__nearby)
-  const nearbyItems = (window.__nearby || []).slice(0, 12);
+  // 확정 일정 먼저, 예년 기준 추정은 뒤로 (각 그룹 안에서는 시작일 순)
+  const nearbyItems = [...(window.__nearby || [])]
+    .sort((a, b) => (a.estimated === true) - (b.estimated === true) || (a.start || "").localeCompare(b.start || ""))
+    .slice(0, 12);
+  const nearbyEstCount = nearbyItems.filter(p => p.estimated === true).length;
+  const nearbyCountLabel = nearbyEstCount === 0 ? `${nearbyItems.length}곳`
+    : nearbyEstCount === nearbyItems.length ? `예상 ${nearbyEstCount}곳`
+    : `확정 ${nearbyItems.length - nearbyEstCount} · 예상 ${nearbyEstCount}곳`;
   let nearbyFestivalHTML = "";
   if (nearbyItems.length) {
     const initial = 6;
@@ -2052,9 +2165,9 @@ function renderTodayHighlights(target) {
       ? `<div class="nearby-extra" hidden>${extra.map((p, i) => _nearbyItemHTML(p, i + initial)).join("")}</div>
          <button class="nearby-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
-    nearbyFestivalHTML = `<div class="highlight-section popular-section nearby-section">
-      <div class="hs-title">🎡 부산 근교 축제 · 경남·울산·경주 ${nearbyItems.length}곳</div>
-      <div class="hs-note">📍 당일치기 여행 · 한국관광공사 · 진행/예정 + <span class="nearby-est">예상</span>은 예년 일정 기준 추정</div>
+    nearbyFestivalHTML = `<div class="highlight-section popular-section nearby-section" data-nav="🎡 근교">
+      <div class="hs-title">🎡 부산 근교 축제 · 경남·울산·경주 ${nearbyCountLabel}</div>
+      <div class="hs-note">📍 당일치기 여행 · 한국관광공사${nearbyEstCount ? ` · <span class="nearby-est">예상</span>은 작년 일정 기준 추정 — 가기 전 공식 공지 확인` : ""}</div>
       <div class="popular-grid">${head.map((p, i) => _nearbyItemHTML(p, i)).join("")}</div>
       ${extraHTML}
     </div>`;
@@ -2086,7 +2199,7 @@ function renderTodayHighlights(target) {
         <div class="mishik-gu-head">${escape(g)} <span>${byGu[g].length}곳</span></div>
         <div class="popular-grid">${byGu[g].map(x => _mishikItemHTML(x.p, x.i)).join("")}</div>
       </div>`).join("");
-    mishikGuideHTML = `<div class="highlight-section popular-section mishik-section">
+    mishikGuideHTML = `<div class="highlight-section popular-section mishik-section" data-nav="🍜 미식">
       <div class="hs-title">🍜 부산 미식 가이드 · 부산의 맛 ${mishikAll.length}곳</div>
       <div class="hs-note">📖 부산시 공식 '2026 부산의 맛'(146곳)·미쉐린 2026 선정 — 7/9부터 무료 배포 · <a href="${guideUrl}" target="_blank" rel="noopener">비짓부산 원본 →</a></div>
       <div class="popular-grid">${head.map(x => _mishikItemHTML(x.p, x.i)).join("")}</div>
@@ -2116,7 +2229,24 @@ function renderTodayHighlights(target) {
   // ⑥ STORY
   const storyHero = renderNarrativeHero();
 
-  $list.innerHTML = aiPickHTML + topBar + heroHTML + popularFoodHTML + popularEventsHTML + newHTML + urgentAlertHTML + reservationHTML + seasonHTML + nearbyFestivalHTML + mishikGuideHTML + tailHTML + storyHero;
+  // 마감 알림은 주말 계획에 바로 영향 → 추천 Top 바로 아래. 섹션 바로가기 줄은 상단 요약 밑에 붙는다(sticky).
+  const navSlot = `<nav class="today-nav" aria-label="섹션 바로가기"></nav>`;
+  $list.innerHTML = aiPickHTML + topBar + navSlot + heroHTML + urgentAlertHTML + popularFoodHTML + popularEventsHTML + newHTML + reservationHTML + seasonHTML + nearbyFestivalHTML + mishikGuideHTML + tailHTML + storyHero;
+
+  // 섹션 바로가기 — 실제로 렌더된 섹션만 칩으로 (데이터 없어 숨은 섹션은 자동 제외)
+  const $nav = $list.querySelector(".today-nav");
+  const navSections = [...$list.querySelectorAll("[data-nav]")];
+  if ($nav && navSections.length >= 3) {
+    $nav.innerHTML = navSections.map((s, i) =>
+      `<button type="button" class="today-nav-chip" data-nav-i="${i}">${escape(s.dataset.nav)}</button>`).join("");
+    $nav.querySelectorAll(".today-nav-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        navSections[Number(btn.dataset.navI)]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+  } else if ($nav) {
+    $nav.remove();
+  }
 
   // 🔥/🎭 인기 카드 클릭 → showDetail
   $list.querySelectorAll(".popular-card").forEach(btn => {
@@ -2133,6 +2263,13 @@ function renderTodayHighlights(target) {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const item = newItems[idx];
+      if (item) showDetail(item);
+    });
+  });
+  // 🤖 AI 추천·코스 항목 클릭 → 사이트 내 행사/장소 상세
+  $list.querySelectorAll(".ai-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const item = aiTargets[Number(btn.dataset.ai)];
       if (item) showDetail(item);
     });
   });
@@ -2239,8 +2376,9 @@ function _dBadge(p, target) {
 function heroCardHTML(p, idx, target) {
   const img = p.image;
   const tags = (p.hero_tags || []).slice(0, 2);
-  const tagHTML = tags.length
-    ? `<div class="hc-tags">${tags.map(t => `<span class="hc-tag">${escape(t)}</span>`).join("")}</div>`
+  const familyTag = _isFamilyEvent(p) ? `<span class="hc-tag hc-tag-family">👨‍👩‍👧 가족</span>` : "";
+  const tagHTML = tags.length || familyTag
+    ? `<div class="hc-tags">${familyTag}${tags.map(t => `<span class="hc-tag">${escape(t)}</span>`).join("")}</div>`
     : "";
   const dBadge = _dBadge(p, target);
   const venue = p.venue || p.address || "";
@@ -2395,18 +2533,26 @@ function resolvePreset(preset) {
   if (preset === "today") return d;
   if (preset === "tomorrow") { d.setDate(d.getDate() + 1); return d; }
   if (preset === "weekend") {
+    // 이번 주말 = 이번 주 토요일. 일요일엔 "오늘(일)"이 아직 이번 주말이다 (전엔 다음 주 토요일로 넘어갔음).
     const day = d.getDay();
-    const addDays = day === 0 ? 6 : 6 - day; // 다음 토요일
-    d.setDate(d.getDate() + addDays);
+    if (day !== 0) d.setDate(d.getDate() + (6 - day));
     return d;
   }
   if (preset === "next-weekend") {
+    // 다음 주말 = 이번 주말 토요일 + 7일 (일요일 기준이면 바로 다음 토요일)
     const day = d.getDay();
-    const addDays = (day === 0 ? 6 : 6 - day) + 7;
-    d.setDate(d.getDate() + addDays);
+    d.setDate(d.getDate() + (day === 0 ? 6 : 6 - day + 7));
     return d;
   }
   return null;
+}
+
+// 첫 화면 기본 날짜 — 목~일에 열면 "이번 주말"부터 보여준다.
+// 주인은 서울 근무 후 금요일 밤 부산 귀가 → 목·금에 주말 계획을 세우고, 토·일엔 당일 결정.
+// Default to "this weekend" Thu–Sun: the owner plans the weekend on Thu/Fri.
+function defaultPreset(now = new Date()) {
+  const day = now.getDay();
+  return day === 0 || day >= 4 ? "weekend" : "today";
 }
 
 function escape(s) {
