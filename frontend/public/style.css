@@ -1997,3 +1997,59 @@ body.view-course #filter-row { display: none !important; }
   border-top: 1px dashed var(--border);
   margin: 22px 0;
 }
+
+/* ───────── 오늘 탭 — 주말 결정 UX 보강 (2026-10) / Today tab weekend-decision tweaks ───────── */
+/* 섹션 바로가기: 긴 피드에서 원하는 섹션으로 한 번에 이동 (sheet-body 스크롤 기준 sticky) */
+.today-nav {
+  position: sticky;
+  top: -8px;               /* .sheet-body padding-top 만큼 끌어올려 빈틈 없이 붙인다 */
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -12px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.today-nav::-webkit-scrollbar { display: none; }
+.today-nav-chip {
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--chip-bg);
+  color: var(--fg);
+  font: 600 12px/1 var(--font-body);
+  cursor: pointer;
+}
+.today-nav-chip:active { background: var(--chip-active); }
+[data-nav] { scroll-margin-top: 52px; }  /* sticky 내비에 섹션 제목이 가리지 않게 */
+
+/* 가족 행사 배지 */
+.hc-tag.hc-tag-family { background: rgba(244, 162, 97, 0.2); color: var(--busan-sunset); }
+
+/* AI 추천: 어제 생성분 표시 + 클릭 가능한 항목 */
+.ai-pick-stale {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.2);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ai-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline dotted rgba(255, 255, 255, 0.45);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.ai-link:hover, .ai-link:focus-visible { color: var(--busan-sunset); }
