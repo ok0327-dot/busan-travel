@@ -79,7 +79,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .dialog .t{font-weight:700;margin-bottom:6px}
 .bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;position:relative}
 .bar i{display:block;height:100%;background:var(--accent)}
-.bar.vs{display:flex}.bar.vs i{background:var(--good)}.bar.vs b{display:block;height:100%;background:var(--bad);flex:1}
+.ctrl{display:flex;height:10px;border-radius:5px;overflow:hidden;margin-top:4px}.ctrl i{display:block;height:100%}
+.ctrl-l{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;margin-top:3px}.ctrl-l .sw{display:inline-block;vertical-align:-1px;margin-right:3px}
 .timeline{display:flex;flex-direction:column;gap:3px;font-size:12px}
 .timeline .it{display:grid;grid-template-columns:52px 1fr;gap:8px;padding:4px 6px;border-radius:4px;border:1px solid var(--line)}
 .timeline .it.done{opacity:.55}.timeline .it.next{border-color:var(--accent)}
@@ -101,7 +102,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </header>
   <div id="mapwrap">
     <canvas id="map"></canvas>
-    <div class="hint" id="hint">클릭해 선택 · 드래그로 이동 · 핀치/Ctrl+스크롤/+− 키로 확대 · 전선은 점령도에 따라 서서히 색이 밀립니다</div>
+    <div class="hint" id="hint">나라를 탭해 선택 · 드래그로 이동 · 핀치/Ctrl+스크롤/+− 키로 확대 · 영토는 점령 비율만큼 서서히 색이 밀립니다</div>
     <div class="zoom"><button class="btn" id="zin" aria-label="확대">+</button><button class="btn" id="zout" aria-label="축소">−</button><button class="btn" id="home" aria-label="내 수도로" style="font-size:12px">홈</button></div>
   </div>
   <div id="panel">
@@ -345,28 +346,24 @@ const BLOCS=[
 const RIVALS=[['RU','UA'],['IN','PK'],['CN','TW'],['KP','KR'],['IL','IR'],['AM','AZ'],['ET','ER'],['SD','SS'],['SA','YE'],['DZ','MA'],['GR','TR'],['VE','GY'],['CN','IN'],['TH','KH'],['RW','CD'],['EG','ET'],['CO','VE'],['IQ','IR'],['AF','PK'],['SY','IL'],['LB','IL'],['UZ','TJ'],['BY','PL'],['RU','GE'],['CN','VN'],['CN','PH'],['ER','DJ'],['NG','NE'],['ML','BF'],['SO','ET'],['IL','PS'],['RU','EE'],['RU','LV'],['RU','LT'],['TR','SY'],['KP','JP'],['CN','JP'],['MM','BD'],['UG','CD'],['TD','SD']];
 const RIV=new Set(RIVALS.map(([a,b])=>a<b?a+'|'+b:b+'|'+a));
 
-// ---- 정적 데이터 구축 ----
-const countries={}, cities=[], byMap={};
+// ---- 정적 데이터: 나라 = 하나의 영토 (도시 없음) ----
+const countries={}, byMap={};
 D.forEach((r,i)=>{
   const [mid,code,name,cn,cla,clo,sn,sla,slo,pop,g]=r;
   const agg=AGG0[code]??((g>=40?0.05:0.15)+((i*7919)%100)/1000-0.05);
-  countries[code]={code,mid,name,pop,g,nb:new Set(),land:new Set(),sea:new Set(),idx:i,agg,tech0:TECH0[code]??(g>=50?2021:g>=30?2017:g>=15?2010:g>=8?2003:g>=4?1995:g>=2?1988:1980),def0:DEF0[code]??(1.5+agg*2),nuke0:NUKES0[code]||0};
+  countries[code]={code,mid,name,pop,g,lat:cla,lon:clo,E0:pop*g,nb:new Set(),land:new Set(),sea:new Set(),idx:i,agg,tech0:TECH0[code]??(g>=50?2021:g>=30?2017:g>=15?2010:g>=8?2003:g>=4?1995:g>=2?1988:1980),def0:DEF0[code]??(1.5+agg*2),nuke0:NUKES0[code]||0};
   byMap[mid]=code;
-  const E=pop*g; // 10억$ (GDP)
-  cities.push({id:cities.length,cc:code,n:cn,lat:cla,lon:clo,cap:true,pop:pop*0.55,E0:E*0.55});
-  cities.push({id:cities.length,cc:code,n:sn,lat:sla,lon:slo,cap:false,pop:pop*0.45,E0:E*0.45});
 });
 BORDERS.forEach(([a,b])=>{ const x=byMap[a],y=byMap[b]; if(x&&y){countries[x].nb.add(y);countries[y].nb.add(x);countries[x].land.add(y);countries[y].land.add(x);} });
 SEA.forEach(([a,b])=>{ if(countries[a]&&countries[b]){countries[a].nb.add(b);countries[b].nb.add(a);countries[a].sea.add(b);countries[b].sea.add(a);} });
-const adj=(a,b)=>a.id!==b.id && (a.cc===b.cc || countries[a.cc].nb.has(b.cc));
-const isSea=(a,b)=>a.cc!==b.cc && countries[a.cc].sea.has(b.cc) && !countries[a.cc].land.has(b.cc);
-const capOf=code=>cities[countries[code].idx*2];
+const CODES=Object.keys(countries);
+const adjR=(a,b)=>a!==b&&countries[a].nb.has(b);
+const isSeaR=(a,b)=>countries[a].sea.has(b)&&!countries[a].land.has(b);
 const blocsOf=code=>BLOCS.filter(b=>b.m.includes(code)&&!(S&&S.left.includes(code)));
 const sameBloc=(a,b)=>blocsOf(a).some(bl=>bl.m.includes(b)&&!(S.left.includes(b)));
 const distKm=(a,b)=>{ const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180; const h=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
-// 메르카토르 투영
 const proj=(lon,lat)=>{ lat=Math.max(-62,Math.min(84,lat)); const x=(lon+180)/360*W; const y=(1-Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))/Math.PI)/2*W; return [x,y]; };
-cities.forEach(c=>{ [c.px,c.py]=proj(c.lon,c.lat); });
+for(const c of Object.values(countries)){ [c.px,c.py]=proj(c.lon,c.lat); }
 const POLY={};
 for(const mid in GEO){ let X0=1e9,Y0=1e9,X1=-1e9,Y1=-1e9; const rings=GEO[mid].map(r=>{ const n=r.length/2, pts=new Float32Array(r.length), ll=new Float32Array(r.length); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
   for(let i=0;i<n;i++){ const lon=r[2*i]/100, lat=r[2*i+1]/100; ll[2*i]=lon; ll[2*i+1]=lat; const [x,y]=proj(lon,lat); pts[2*i]=x; pts[2*i+1]=y; if(x<x0)x0=x;if(y<y0)y0=y;if(x>x1)x1=x;if(y>y1)y1=y; }
@@ -384,13 +381,17 @@ const fdateS=d=>{const o=dateOf(d);return `${String(o.y).slice(2)}.${o.m}.${o.d}
 const ftech=t=>`${Math.floor(t)}년도 기술`;
 const fm=v=>{ v=Math.round(v); if(Math.abs(v)>=10000) return (v/10000).toFixed(1).replace(/\.0$/,'')+'조$'; return v.toLocaleString('ko-KR')+'억$'; };
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct=x=>Math.round(x*100)+'%';
+const nm=code=>countries[code].name;
 
 // ===== 게임 상태 =====
+// S.reg[영토] = {h:점유국, ctrl:{국가:비율}, E:GDP(10억$), u:저항, g:{국가:부대}, f:{국가:전선정보}}
 let S, sel=null, dlg=null, tab='info';
 const view={s:1,x:0,y:0};
-const st=c=>S.city[c.id];
-const owned=code=>cities.filter(c=>st(c).o===code);
-const alive=code=>cities.some(c=>st(c).o===code);
+const R=rc=>S.reg[rc];
+const share=(rc,code)=>R(rc).ctrl[code]||0;
+const held=code=>CODES.filter(rc=>share(rc,code)>0);
+const alive=code=>CODES.some(rc=>share(rc,code)>0);
 const cnt=g=>Object.values(g).reduce((s,n)=>s+n,0);
 const domN=(g,dom)=>Object.entries(g).reduce((s,[id,n])=>s+(UB[id].dom===dom?n:0),0);
 const valueOf=g=>Object.entries(g).reduce((s,[id,n])=>s+n*UB[id].c,0);
@@ -398,27 +399,31 @@ function split(g,pct){ const sent={}; for(const id in g){ const n=Math.floor(g[i
 function portion(g,pct){ const o={}; for(const id in g){ const n=Math.floor(g[id]*pct/100); if(n>0) o[id]=n; } return o; }
 function merge(a,b){ for(const id in b) a[id]=(a[id]||0)+b[id]; }
 function add(g,id,n){ if(n>0) g[id]=(g[id]||0)+n; }
+const gar=(rc,code)=>R(rc).g[code]||{};
+function garAdd(rc,code,g){ if(!cnt(g)) return; const r=R(rc); if(!r.g[code]) r.g[code]={}; merge(r.g[code],g); }
 function addLog(m,k){ S.log.unshift({m,k:k||'',t:S.day}); if(S.log.length>120) S.log.length=120; }
 const wk=(a,b)=>a<b?a+'|'+b:b+'|'+a;
 const atWar=(a,b)=>!!S.wars[wk(a,b)];
 const enemiesOf=code=>Object.keys(S.wars).map(k=>k.split('|')).filter(p=>p.includes(code)).map(p=>p[0]===code?p[1]:p[0]).filter(alive);
-const frontOn=cid=>S.fronts.find(f=>f.tgt===cid);
+const attackers=rc=>{ const r=R(rc); return Object.keys(r.g).filter(o=>o!==r.h&&cnt(r.g[o])&&atWar(o,r.h)); };
 const unlocked=code=>UNITS.filter(u=>u.y<=S.tech[code]&&(!u.nuke||S.nuclear[code]));
-const capLost=code=>st(capOf(code)).o!==code;
-function gdp(code){ let s=0; owned(code).forEach(c=>s+=st(c).E*(c.cc===code?1:0.6)); return s; } // 10억$
+const homeLost=code=>R(code).h!==code;
+function gdp(code){ let s=0; for(const rc of held(code)) s+=R(rc).E*share(rc,code)*(rc===code?1:0.6); return s; }
 function defPct(code){ if(code===PLAYER) return S.defPct; const c=countries[code]; return Math.min(30,c.def0*(enemiesOf(code).length?1.6:1)); }
 const budgetYear=code=>gdp(code)*10*defPct(code)/100; // 억$/년
 function incomeDay(code){ let v=budgetYear(code)/365; if(code===PLAYER){ v*=(0.8+S.trust/250)*(1+S.jobs*0.03); if(S.nukeProg&&!S.nuclear[PLAYER]) v*=0.85; } return v; }
-function allForces(code){ const out=[]; owned(code).forEach(c=>out.push(st(c).g)); S.fronts.forEach(f=>{ if(f.atk===code) out.push(f.g); }); S.moves.forEach(m=>{ if(m.code===code) out.push(m.g); }); return out; }
+function allForces(code){ const out=[]; for(const rc of CODES){ const g=R(rc).g[code]; if(g) out.push(g); } S.moves.forEach(m=>{ if(m.code===code) out.push(m.g); }); return out; }
 const upkeepDay=code=>allForces(code).reduce((s,g)=>s+valueOf(g),0)*0.15/365;
 const milPow=code=>allForces(code).reduce((s,g)=>s+Object.entries(g).reduce((x,[id,n])=>x+n*(UB[id].a+UB[id].d)/2,0),0)*techMult(S.tech[code]);
 const rdPct=code=>code===PLAYER?S.rdPct:12;
-function techCost(code){ const t=S.tech[code]; return 60*Math.pow(Math.max(300,gdp(code))/1800,0.8)*(1+Math.max(0,t-START_YEAR)*0.5); } // 억$ / 기술연도 1년
-function techRate(code){ const inc=incomeDay(code)*365*rdPct(code)/100; const fr=frontier(code); return inc/techCost(code)+Math.max(0,fr-S.tech[code])*0.025; } // 연도/년
-function frontier(ex){ let m=0; for(const code in countries) if(code!==ex&&alive(code)&&S.tech[code]>m) m=S.tech[code]; return m; }
-function techRank(code){ let r=1; for(const c in countries) if(c!==code&&alive(c)&&S.tech[c]>S.tech[code]) r++; return r; }
+function techCost(code){ const t=S.tech[code]; return 60*Math.pow(Math.max(300,gdp(code))/1800,0.8)*(1+Math.max(0,t-START_YEAR)*0.5); }
+const frC={day:-1,a:null,ta:0,tb:0};
+function frontier(ex){ if(frC.day!==S.day){ frC.day=S.day; frC.a=null; frC.ta=0; frC.tb=0; for(const code of CODES){ if(!alive(code)) continue; const t=S.tech[code]; if(t>frC.ta){ frC.tb=frC.ta; frC.ta=t; frC.a=code; } else if(t>frC.tb) frC.tb=t; } } return ex===frC.a?frC.tb:frC.ta; }
+function techRate(code){ const inc=incomeDay(code)*365*rdPct(code)/100; return inc/techCost(code)+Math.max(0,frontier(code)-S.tech[code])*0.025; }
+function techRank(code){ let r=1; for(const c of CODES) if(c!==code&&alive(c)&&S.tech[c]>S.tech[code]) r++; return r; }
+const depth=rc=>Math.min(1.5,1/(0.5+0.5*Math.sqrt(countries[rc].pop/20))); // 큰 나라일수록 점령이 느림
+const needGround=rc=>Math.ceil(Math.sqrt(countries[rc].pop)*1.5);
 
-// 현실적 편성 비율 (미해금 무기 비중은 해금된 무기에 재분배)
 const MIX={g:{inf:0.35,tank:0.2,mech:0.15,spg:0.12,mlrs:0.08,swarm:0.07,robot:0.03},a:{jet4:0.35,jet5:0.25,heli:0.15,drone:0.1,cca:0.05,jet6:0.05,bomb:0.05},s:{dest:0.45,sub:0.4,cv:0.15},m:{cm:0.5,bm:0.35,hyp:0.15},x:{sam:0.55,laser:0.15,cyber:0.2,sat:0.1}};
 function buildForce(code,value,sea){
   const t=S.tech[code], g={};
@@ -432,21 +437,18 @@ function buildForce(code,value,sea){
   return g;
 }
 function fresh(){
-  S={v:3,day:0,speed:0,money:{},tech:{},city:{},fronts:[],moves:[],wars:{},log:[],over:null,trust:60,housing:0,jobs:0,defPct:2.8,rdPct:15,nuclear:{},nukeProg:null,peaceCd:{},left:[],nextF:1,aid:{}};
-  for(const c of Object.values(countries)){ S.tech[c.code]=c.tech0; S.nuclear[c.code]=c.nuke0>0; }
-  cities.forEach(c=>{ S.city[c.id]={o:c.cc,g:{},E:c.E0,u:0}; });
+  S={v:4,day:0,speed:0,money:{},tech:{},reg:{},moves:[],wars:{},log:[],over:null,trust:60,housing:0,jobs:0,defPct:2.8,rdPct:15,nuclear:{},nukeProg:null,peaceCd:{},left:[],aid:{}};
+  for(const c of Object.values(countries)){ S.tech[c.code]=c.tech0; S.nuclear[c.code]=c.nuke0>0; S.reg[c.code]={h:c.code,ctrl:{[c.code]:1},E:c.E0,u:0,g:{},f:{}}; }
   for(const c of Object.values(countries)){
     const force=buildForce(c.code,Math.max(budgetYear(c.code)*2.5,c.pop*1.5),c.sea.size>0); if(domN(force,'g')<6) add(force,'inf',6-domN(force,'g'));
-    const cap=cities[c.idx*2], sec=cities[c.idx*2+1];
-    const g2=split(force,45); merge(st(cap).g,force); merge(st(sec).g,g2);
-    if(c.nuke0) st(cap).g.nuke=c.nuke0;
-    S.money[c.code]=budgetYear(c.code)/6;
+    if(c.nuke0) force.nuke=c.nuke0;
+    S.reg[c.code].g[c.code]=force; S.money[c.code]=budgetYear(c.code)/6;
   }
-  // 2027년 1월 현재 진행 중인 전쟁
+  // 2027년 1월: 러시아–우크라이나 전쟁 진행 중 (동부 일부 점령 상태)
   declareWar('RU','UA',{silent:true}); S.wars[wk('RU','UA')].start=-1050;
-  const msk=capOf('RU'), khk=cities[countries.UA.idx*2+1];
-  const f=openFront(msk,khk,40); if(f) f.p=0.35;
-  addLog('2027년 1월 1일. 대한민국 통수권자로서 실시간 지휘를 시작합니다. 시계는 10분에 1년씩 흐르고, 전선은 하루 단위로 조금씩 밀립니다. ▶를 눌러 시작.','me');
+  const ru=S.reg.RU.g.RU, sent=split(ru,35); delete sent.nuke; if(sent.nuke!=null) add(ru,'nuke',sent.nuke);
+  S.reg.UA.g.RU=sent; S.reg.UA.f.RU={src:'RU',t0:-1050,days:1050,A:0,D:0,gain:0,lossA:0,lossD:0,sea:false}; S.reg.UA.ctrl={UA:0.78,RU:0.22};
+  addLog('2027년 1월 1일. 대한민국 통수권자로서 실시간 지휘를 시작합니다. 10분에 1년이 흐르고, 영토는 하루 단위로 조금씩 넘어갑니다. ▶를 눌러 시작.','me');
   addLog('동맹: 미국 태평양 동맹(미국·일본·호주·필리핀·대만). 동맹국을 공격하면 동맹이 파기되고 회원국이 참전합니다. 북한은 조중 상호방위조약(중국 참전 확률 60%)과 핵 3기를 보유 중.','world');
 }
 
@@ -454,234 +456,238 @@ function fresh(){
 function declareWar(a,b,opt={}){
   if(a===b||atWar(a,b)) return;
   S.wars[wk(a,b)]={start:S.day,cap:{},by:a};
-  const an=countries[a].name,bn=countries[b].name;
+  const an=nm(a),bn=nm(b);
   if(!opt.silent){ if(a===PLAYER){ S.trust=Math.max(0,S.trust-8); addLog(`${bn}에 선전포고 (신뢰도 −8)`,'me'); } else if(b===PLAYER) addLog(`⚠ ${an}이(가) 대한민국에 선전포고! ${opt.reason||'선제공격'}`,'lose'); else addLog(`${an} → ${bn} 선전포고${opt.reason?' ('+opt.reason+')':''}`,'world'); }
-  if(opt.noHonor) return;
-  // 동맹 파기 & 집단방위
+  const dep=opt.depth||0; if(opt.noHonor||dep>=2) return;
   for(const bl of blocsOf(b)){
     if(bl.m.includes(a)&&!S.left.includes(a)){ S.left.push(a); addLog(`${an}, ${bl.n} 탈퇴 — 동맹국 ${bn} 공격`,a===PLAYER?'lose':'world'); }
     const joined=[];
-    for(const L of bl.m){ if(L===a||L===b||!alive(L)||S.left.includes(L)||atWar(L,a)) continue; if(Math.random()<bl.p){ S.wars[wk(L,a)]={start:S.day,cap:{},by:L}; joined.push(countries[L].name); } }
-    if(joined.length) addLog(`${bl.n} 집단방위 발동: ${joined.join(', ')} → ${an} 참전`,a===PLAYER?'lose':(b===PLAYER?'win':'world'));
+    for(const L of bl.m){ if(L===a||L===b||!alive(L)||S.left.includes(L)||atWar(L,a)) continue; if(Math.random()<bl.p){ joined.push(L); } }
+    if(joined.length) addLog(`${bl.n} 집단방위 발동: ${joined.map(nm).join(', ')} → ${an} 참전`,a===PLAYER?'lose':(b===PLAYER?'win':'world'));
+    for(const L of joined) declareWar(L,a,{silent:true,depth:dep+1});
   }
 }
 function makePeace(a,b,how){
   delete S.wars[wk(a,b)];
-  S.fronts.filter(f=>(f.atk===a&&f.def===b)||(f.atk===b&&f.def===a)).forEach(f=>endFront(f,'return'));
-  if(a===PLAYER||b===PLAYER) addLog(`${countries[a===PLAYER?b:a].name}과(와) 휴전 ${how||''}`.trim(),'me'); else addLog(`${countries[a].name}–${countries[b].name} 휴전 ${how||''}`.trim(),'world');
+  for(const rc of CODES){ const r=R(rc); for(const [x,y] of [[a,b],[b,a]]) if(r.h===y&&r.g[x]&&!share(rc,x)) expel(rc,x,'return'); }
+  if(a===PLAYER||b===PLAYER) addLog(`${nm(a===PLAYER?b:a)}과(와) 휴전 ${how||''}`.trim(),'me'); else addLog(`${nm(a)}–${nm(b)} 휴전 ${how||''}`.trim(),'world');
 }
-function nearestOwned(code,from){ let best=null,bd=1e9; owned(code).forEach(c=>{ const d=distKm(c,from); if(d<bd){bd=d;best=c;} }); return best; }
-function endFront(f,how){
-  const i=S.fronts.indexOf(f); if(i>=0) S.fronts.splice(i,1);
-  if(how==='wiped'||!cnt(f.g)) return;
-  const tgt=cities[f.tgt];
-  if(how==='merge'){ merge(st(tgt).g,f.g); return; }
-  if(how==='fail') attr(f.g,0.1);
-  const src=cities[f.src]; const dest=st(src).o===f.atk?src:nearestOwned(f.atk,tgt);
-  if(dest) merge(st(dest).g,f.g);
-  if(how==='fail'&&(f.atk===PLAYER||f.def===PLAYER)) addLog(`${tgt.n} 공세 실패 — ${countries[f.atk].name} 군 ${dest?dest.n+'으로 후퇴':'전멸'}`,f.atk===PLAYER?'lose':'win');
+function nearestHeld(code,from){ let best=null,bd=1e9; for(const rc of held(code)){ if(rc===from) continue; const d=distKm(countries[rc],countries[from]); if(d<bd){bd=d;best=rc;} } return best; }
+// 영토에서 어떤 나라의 부대를 철수시킴
+function expel(rc,code,how){
+  const r=R(rc), g=r.g[code]; const f=r.f[code]; delete r.g[code]; delete r.f[code];
+  if(!g||!cnt(g)||how==='wiped') return;
+  if(how==='fail') attr(g,0.1);
+  let dest=(f&&f.src&&share(f.src,code)>0)?f.src:nearestHeld(code,rc);
+  if(dest) garAdd(dest,code,g);
+  if(how==='fail'&&(code===PLAYER||r.h===PLAYER)) addLog(`${nm(rc)} 공세 실패 — ${nm(code)}군 ${dest?nm(dest)+'(으)로 후퇴':'전멸'}`,code===PLAYER?'lose':'win');
 }
 function attr(g,rate){ let killed=0; for(const id in g){ const u=UB[id]; const x=g[id]*rate*ATTR_F[u.dom]; let k=Math.floor(x); if(Math.random()<x-k) k++; k=Math.min(g[id],k); if(k){ g[id]-=k; killed+=k; if(g[id]<=0) delete g[id]; } } return killed; }
-// 전투력 계산 — 공중 우세가 지상전을 좌우하고, 바다 건너 공격은 해군이 필요
-function calc(force,tgt,atk,def,sea){
-  const gar=st(tgt).g, tA=techMult(S.tech[atk]), tD=techMult(S.tech[def]);
+function calc(force,rc,atk,def,sea){
+  const dg=gar(rc,def), tA=techMult(S.tech[atk]), tD=techMult(S.tech[def]);
   const sum=(g,key,dom)=>Object.entries(g).reduce((s,[id,n])=>s+(UB[id].dom===dom?n*UB[id][key]:0),0);
   const aG=sum(force,'a','g'), aA=sum(force,'a','a'), aS=sum(force,'a','s');
-  const dG=sum(gar,'d','g'), dA=sum(gar,'d','a'), dS=sum(gar,'d','s'), dX=sum(gar,'d','x');
+  const dG=sum(dg,'d','g'), dA=sum(dg,'d','a'), dS=sum(dg,'d','s'), dX=sum(dg,'d','x');
   const isr=g=>1+Math.min(0.24,0.08*(g.sat||0)), cyb=g=>1-Math.min(0.3,0.08*(g.cyber||0));
   const airA=(aA+aS*0.4)*tA, airD=(dA+dX)*tD, ra=(airA+airD)>0?airA/(airA+airD):0.5;
-  let A=(aG*(0.7+0.6*ra)+aA*0.4+(sea?aS*0.5:aS*0.1))*tA*isr(force)*cyb(gar); if(sea) A*=0.7;
-  const terr=(tgt.cap?1.3:1.1)+(def===tgt.cc?0.1:0)-(capLost(def)?0.15:0);
-  const Dv=(dG*(0.7+0.6*(1-ra))+dA*0.3+dX*0.25+(sea?dS*0.6:dS*0.1))*tD*terr*isr(gar)*cyb(force);
+  let A=(aG*(0.7+0.6*ra)+aA*0.4+(sea?aS*0.5:aS*0.1))*tA*isr(force)*cyb(dg)*(atk===rc?1.15:1); if(sea) A*=0.7;
+  const terr=1.1+(def===rc?0.1:0)-(homeLost(def)?0.15:0);
+  const Dv=(dG*(0.7+0.6*(1-ra))+dA*0.3+dX*0.25+(sea?dS*0.6:dS*0.1))*tD*terr*isr(dg)*cyb(force);
   return {A,D:Dv,ra};
 }
-function launchMissiles(force,tgt,atk){
-  const d=st(tgt), def=d.o; const I=Object.entries(d.g).reduce((s,[id,n])=>s+(UB[id].sam||0)*n,0);
+function launchMissiles(force,rc,atk,def){
+  const r=R(rc), dg=gar(rc,def); const I=Object.entries(dg).reduce((s,[id,n])=>s+(UB[id].sam||0)*n,0);
   let rep=[], nukes=0;
   for(const id of Object.keys(force)){ const u=UB[id]; if(!u.once) continue; const n=force[id]; delete force[id];
     const pInt=Math.min(0.9,I*0.07)*u.icpt; let hit=0; for(let i=0;i<n;i++) if(Math.random()>=pInt) hit++;
     if(u.nuke){ nukes+=hit; rep.push(`☢ 핵 ${n}기 발사 → ${hit}기 피폭${n-hit?', '+(n-hit)+'기 요격':''}`); continue; }
-    const hp=Object.entries(d.g).reduce((s,[k,m])=>s+m*(UB[k].a+UB[k].d),0)*techMult(S.tech[def])+1;
-    const dmg=hit*u.a*techMult(S.tech[atk])*1.2; const frac=Math.min(0.6,dmg/(hp+dmg)); attr(d.g,frac/Math.max(0.15,1)); d.E*=Math.max(0.85,1-0.004*hit);
+    const hp=Object.entries(dg).reduce((s,[k,m])=>s+m*(UB[k].a+UB[k].d),0)*techMult(S.tech[def])+1;
+    const dmg=hit*u.a*techMult(S.tech[atk])*1.2; attr(dg,Math.min(0.6,dmg/(hp+dmg))); r.E*=Math.max(0.85,1-0.004*hit);
     rep.push(`${u.n.replace(/ \d+발$/,'')} ${n}발 → 명중 ${hit}, 요격 ${n-hit}`);
   }
-  if(nukes){ d.g={}; d.E*=Math.pow(0.5,nukes); d.u=0; if(atk===PLAYER) S.trust=Math.max(0,S.trust-30*nukes); addLog(`☢ ${countries[atk].name}, ${tgt.n} 핵 공격 — 수비 전멸·경제 ${Math.round(100*Math.pow(0.5,nukes))}%`,atk===PLAYER?'me':(def===PLAYER?'lose':'world'));
-    // 핵 보복 (상호확증파괴)
-    if(S.nuclear[def]){ const have=owned(def).map(c=>st(c).g).find(g=>g.nuke); if(have){ const n=Math.min(have.nuke,2); have.nuke-=n; if(!have.nuke) delete have.nuke; const targets=owned(atk).sort((a,b)=>st(b).E-st(a).E).slice(0,n); targets.forEach(t=>{ st(t).g={}; st(t).E*=0.5; }); addLog(`☢☢ ${countries[def].name} 핵 보복: ${targets.map(t=>t.n).join(', ')} 피폭`,atk===PLAYER?'lose':'world'); S.fronts.filter(f=>targets.some(t=>t.id===f.src)).forEach(f=>attr(f.g,0.6)); } }
+  if(nukes){ if(r.g[def]) r.g[def]={}; r.E*=Math.pow(0.5,nukes); r.u=0; if(atk===PLAYER) S.trust=Math.max(0,S.trust-30*nukes); addLog(`☢ ${nm(atk)}, ${nm(rc)} 핵 공격 — ${nm(def)}군 전멸·경제 ${Math.round(100*Math.pow(0.5,nukes))}%`,atk===PLAYER?'me':(def===PLAYER?'lose':'world'));
+    if(S.nuclear[def]){ const have=held(def).map(x=>R(x).g[def]).find(g=>g&&g.nuke); if(have){ const n=Math.min(have.nuke,2); have.nuke-=n; if(!have.nuke) delete have.nuke;
+      const targets=held(atk).sort((a,b)=>R(b).E*share(b,atk)-R(a).E*share(a,atk)).slice(0,n); targets.forEach(t=>{ R(t).g[atk]={}; R(t).E*=0.5; }); addLog(`☢☢ ${nm(def)} 핵 보복: ${targets.map(nm).join(', ')} 피폭`,atk===PLAYER?'lose':'world'); } }
   }
-  if(rep.length&&(atk===PLAYER||def===PLAYER)) addLog(`${countries[atk].name} → ${tgt.n} 미사일 타격: ${rep.join(' · ')}`,atk===PLAYER?'me':'lose');
+  if(rep.length&&(atk===PLAYER||def===PLAYER)) addLog(`${nm(atk)} → ${nm(rc)} 미사일 타격: ${rep.join(' · ')}`,atk===PLAYER?'me':'lose');
   return nukes;
 }
+function xfer(rc,from,to,amt){ const r=R(rc); amt=Math.max(0,Math.min(amt,share(rc,from))); if(amt<=0) return; r.ctrl[from]=share(rc,from)-amt; r.ctrl[to]=share(rc,to)+amt; if(r.ctrl[from]<1e-6) delete r.ctrl[from]; }
+// 공세: src 영토의 부대를 tgt 영토로 투입 (즉시 점령이 아니라 전선 형성)
 function openFront(src,tgt,pct,byPlayer){
-  const a=st(src), atk=a.o, def=st(tgt).o; if(atk===def) return null;
-  const ex=frontOn(tgt.id); if(ex&&ex.atk!==atk) return null;
-  const sea=isSea(src,tgt);
-  const force=split(a.g,pct); if(!byPlayer&&force.nuke){ add(a.g,'nuke',force.nuke); delete force.nuke; } if(!cnt(force)){ return null; }
-  if(sea&&!domN(force,'s')&&!ex){ merge(a.g,force); return null; }
+  const atk=byPlayer?PLAYER:R(src).h, r=R(tgt), def=r.h; if(atk===def) return null;
+  const g=R(src).g[atk]; if(!g) return null;
+  const sea=isSeaR(src,tgt), ex=!!r.g[atk];
+  const force=split(g,pct); if(!byPlayer&&force.nuke){ add(g,'nuke',force.nuke); delete force.nuke; } if(!cnt(force)) return null;
+  if(sea&&!domN(force,'s')&&!ex){ merge(g,force); return null; }
   if(!atWar(atk,def)) declareWar(atk,def,byPlayer?{}:{reason:'선제공격'});
-  if(byPlayer&&!S.wars[wk(atk,def)]) return null;
-  const nukes=launchMissiles(force,tgt,atk);
-  let f=ex; if(!cnt(force)){ if(f&&nukes) f.p=Math.min(1,f.p+0.3*nukes); return f||null; }
-  if(f){ merge(f.g,force); if(nukes) f.p=Math.min(1,f.p+0.3*nukes); if(atk===PLAYER) addLog(`${tgt.n} 전선에 ${cnt(force)}개 부대 증원`,'me'); }
-  else { f={id:S.nextF++,atk,def,src:src.id,tgt:tgt.id,g:force,p:nukes?0.3*nukes:0,days:0,A:0,D:0,lossA:0,lossD:0,sea,t0:S.day}; S.fronts.push(f);
-    if(atk===PLAYER) addLog(`${src.n} → ${tgt.n} 공세 개시 (${cnt(force)}개 부대${sea?', 상륙작전':''})`,'me'); else if(def===PLAYER) addLog(`⚠ ${countries[atk].name}군이 ${tgt.n}으로 진격 개시 (${cnt(force)}개 부대)`,'lose'); }
-  return f;
+  const nukes=launchMissiles(force,tgt,atk,def);
+  if(nukes) xfer(tgt,def,atk,0.3*nukes);
+  if(cnt(force)) garAdd(tgt,atk,force);
+  if(!r.f[atk]) r.f[atk]={src,t0:S.day,days:0,A:0,D:0,gain:0,lossA:0,lossD:0,sea};
+  if(cnt(force)){ if(ex){ if(atk===PLAYER) addLog(`${nm(tgt)} 전선에 ${cnt(force)}개 부대 증원`,'me'); }
+    else if(atk===PLAYER) addLog(`${nm(src)} → ${nm(tgt)} 공세 개시 (${cnt(force)}개 부대${sea?', 상륙작전':''})`,'me'); else if(def===PLAYER) addLog(`⚠ ${nm(atk)}군이 ${nm(tgt)}(으)로 진격 개시 (${cnt(force)}개 부대)`,'lose'); }
+  return r.f[atk];
 }
-function stepFront(f){
-  const tgt=cities[f.tgt], d=st(tgt);
-  if(d.o===f.atk){ endFront(f,'merge'); return; }
-  if(d.o!==f.def||!atWar(f.atk,f.def)||!alive(f.atk)){ endFront(f,'return'); return; }
-  if(!cnt(f.g)){ endFront(f,'wiped'); return; }
-  const {A,D}=calc(f.g,tgt,f.atk,f.def,f.sea);
-  const gc=domN(f.g,'g'); let gain;
-  if(D<=0.01) gain=K_ADV; else { const R=A/D; gain=K_ADV*(R-1)/(R+1); }
-  if(gain>0){ if(!gc) gain=0; else gain*=Math.min(1,gc/3); if(f.sea) gain*=0.6; if(tgt.cap) gain*=0.75; }
-  f.p=Math.max(0,Math.min(1,f.p+gain)); f.A=A; f.D=D; f.days++; f.gain=gain;
-  let lA=0,lD=0; const base=0.005;
-  if(D<=0.01){} else if(A<=0.01){ lA=0.02; } else { lA=Math.min(0.04,base*Math.sqrt(D/A)); lD=Math.min(0.04,base*Math.sqrt(A/D)); }
-  f.lossA+=attr(f.g,lA); f.lossD+=attr(d.g,lD);
-  if(f.p>=1) capture(f); else if(f.p<=0&&gain<0&&f.days>5) endFront(f,'fail'); else if(!cnt(f.g)) endFront(f,'wiped');
+// 하루치 교전: 영토 안의 모든 침공군이 점유국과 싸우고 비율이 조금씩 넘어감
+function stepRegion(rc){
+  const r=R(rc); const h=r.h; const atks=attackers(rc);
+  for(const a of atks){ const f=r.f[a]||(r.f[a]={src:null,t0:S.day,days:0,A:0,D:0,gain:0,lossA:0,lossD:0,sea:false});
+    const {A,D}=calc(r.g[a],rc,a,h,f.sea); const gc=domN(r.g[a],'g'); let gain;
+    if(D<=0.01) gain=K_ADV; else { const q=A/D; gain=K_ADV*(q-1)/(q+1); }
+    if(gain>0){ if(!gc) gain=0; else gain*=Math.min(1,gc/3); if(f.sea) gain*=0.6; }
+    gain*=depth(rc);
+    if(gain>0) xfer(rc,h,a,gain); else if(gain<0) xfer(rc,a,h,-gain);
+    f.days++; f.A=A; f.D=D; f.gain=gain;
+    let lA=0,lD=0; const base=0.005;
+    if(D<=0.01){} else if(A<=0.01){ lA=0.02; } else { lA=Math.min(0.04,base*Math.sqrt(D/A)); lD=Math.min(0.04,base*Math.sqrt(A/D))/atks.length; }
+    f.lossA+=attr(r.g[a],lA); if(r.g[h]) f.lossD+=attr(r.g[h],lD);
+    if(!cnt(r.g[a])) expel(rc,a,'wiped'); else if(share(rc,a)<=0&&gain<0&&f.days>5) expel(rc,a,'fail');
+  }
+  // 소탕: 교전국이 부대 없이 남긴 잔여 영토는 점유국 지상군이 충분하면 서서히 흡수
+  const hg=domN(gar(rc,h),'g');
+  for(const o of Object.keys(r.ctrl)){ if(o===h||!atWar(o,h)||(r.g[o]&&cnt(r.g[o]))) continue; if(hg>=needGround(rc)*0.5) xfer(rc,o,h,K_ADV*0.5*depth(rc)); }
+  if(!atks.length&&Object.keys(r.ctrl).length<2) return;
+  // 점유국 교체 (과반 + 10%p 이상 앞설 때)
+  const best=Object.entries(r.ctrl).sort((x,y)=>y[1]-x[1])[0];
+  if(best&&best[0]!==h&&best[1]>share(rc,h)+0.1){ const old=h; r.h=best[0]; const w=S.wars[wk(old,r.h)]; if(w) w.cap[r.h]=S.day;
+    addLog(`${nm(r.h)}, ${nm(rc)} 과반 장악 (${pct(best[1])}) — ${nm(old)} ${share(rc,old)>0?pct(share(rc,old))+' 잔존':'축출'}`,r.h===PLAYER?'win':(old===PLAYER?'lose':'world'));
+    if(share(rc,old)<=0){ if(r.g[old]&&cnt(r.g[old])) expel(rc,old,'return'); else { delete r.g[old]; delete r.f[old]; } }
+    if(r.h===PLAYER&&rc!==PLAYER) S.trust=Math.max(0,S.trust-3);
+    if(!alive(old)){ addLog(`${nm(old)} 멸망.`,old===PLAYER?'lose':'world'); for(const key of Object.keys(S.wars)) if(key.split('|').includes(old)) delete S.wars[key]; for(const x of CODES){ if(R(x).g[old]) expel(x,old,'wiped'); } } }
+  else if(share(rc,h)<=0){ /* 점유국 비율 0인데 과반 교체 조건 미충족(동률) — 가장 큰 쪽으로 */ if(best){ r.h=best[0]; } }
 }
-function capture(f){
-  const tgt=cities[f.tgt], d=st(tgt), atk=f.atk, def=f.def;
-  const i=S.fronts.indexOf(f); if(i>=0) S.fronts.splice(i,1);
-  d.o=atk; d.g=f.g; d.E*=0.92; d.u=0;
-  const w=S.wars[wk(atk,def)]; if(w) w.cap[atk]=S.day;
-  const k=atk===PLAYER?'win':(def===PLAYER?'lose':'world');
-  addLog(`${countries[atk].name}, ${tgt.n} 점령 (${countries[def].name}${tgt.cap?' 수도':''}, ${f.days}일 교전, 손실 ${f.lossA}:${f.lossD})`,k);
-  if(tgt.cap&&atk===PLAYER) S.trust=Math.max(0,S.trust-4);
-  if(!alive(def)){ addLog(`${countries[def].name} 멸망.`,def===PLAYER?'lose':'world'); for(const key of Object.keys(S.wars)) if(key.split('|').includes(def)) delete S.wars[key]; S.fronts.filter(x=>x.atk===def).forEach(x=>endFront(x,'wiped')); }
-  if(sel===f.src&&atk===PLAYER) sel=tgt.id;
-}
-function revolt(c){ const s=st(c), from=s.o; s.o=c.cc; s.g={inf:Math.max(3,Math.round(Math.sqrt(c.pop)))}; s.u=0; addLog(`${c.n} 봉기 — ${countries[c.cc].name}으로 복귀 (점령군 철수)`,from===PLAYER?'lose':'world'); }
-function travelDays(a,b,g){ const km=distKm(a,b); let t=1; if(domN(g,'g')||domN(g,'x')) t=Math.max(t,km/400); if(domN(g,'s')) t=Math.max(t,km/700); return Math.min(14,Math.max(1,Math.round(t))); }
-function moveUnits(from,to,g,code){ if(!cnt(g)) return; const eta=travelDays(from,to,g); S.moves.push({from:from.id,to:to.id,g,code,eta,tot:eta}); }
+function revolt(rc){ const r=R(rc), h=r.h; const amt=Math.min(0.25,share(rc,h)); xfer(rc,h,rc,amt); garAdd(rc,rc,{inf:Math.max(3,Math.round(Math.sqrt(countries[rc].pop)))}); r.u=0;
+  if(!atWar(rc,h)) S.wars[wk(rc,h)]={start:S.day,cap:{},by:rc}; if(!r.f[rc]) r.f[rc]={src:null,t0:S.day,days:0,A:0,D:0,gain:0,lossA:0,lossD:0,sea:false};
+  addLog(`${nm(rc)} 봉기 — 저항군이 영토 ${pct(amt)} 탈환, ${nm(h)} 점령군과 교전`,h===PLAYER?'lose':'world'); }
+function travelDays(a,b,g){ const km=distKm(countries[a],countries[b]); let t=1; if(domN(g,'g')||domN(g,'x')) t=Math.max(t,km/400); if(domN(g,'s')) t=Math.max(t,km/700); return Math.min(14,Math.max(1,Math.round(t))); }
+function moveUnits(from,to,g,code){ if(!cnt(g)) return; const eta=travelDays(from,to,g); S.moves.push({from,to,g,code,eta,tot:eta}); }
 // ===== 하루 틱 =====
 function tickDay(){
   S.day++;
-  const codes=Object.keys(countries).filter(alive);
+  const codes=CODES.filter(alive);
   for(const code of codes){
     const inc=incomeDay(code), rd=rdPct(code)/100;
     S.money[code]+=inc*(1-rd)-upkeepDay(code); if(S.money[code]<-inc*60) S.money[code]=-inc*60;
-    S.tech[code]+=inc*rd/techCost(code)+Math.max(0,frontier(code)-S.tech[code])*0.05/365;
+    S.tech[code]+=inc*rd/techCost(code)+Math.max(0,frontier(code)-S.tech[code])*0.025/365;
   }
-  cities.forEach(c=>{ const s=st(c); if(s.E<=0) return; const war=enemiesOf(s.o).length>0, con=!!frontOn(c.id);
-    const gr=0.025-(war?0.03:0)-(con?0.05:0)-(s.o!==c.cc?0.01:0); s.E=Math.max(c.E0*0.15,s.E*(1+gr/365)); });
-  // 이동
-  for(const m of S.moves.slice()){ m.eta--; if(m.eta>0) continue; S.moves.splice(S.moves.indexOf(m),1); const to=cities[m.to], from=cities[m.from];
-    if(st(to).o===m.code){ merge(st(to).g,m.g); if(m.aid&&(m.code===PLAYER||m.aidFrom===PLAYER)) addLog(`${countries[m.aidFrom].name} 증원군 ${cnt(m.g)}개 부대 ${to.n} 도착`,m.code===PLAYER?'win':'me'); }
-    else if(st(from).o===m.code) merge(st(from).g,m.g); else { const n=nearestOwned(m.code,to); if(n) merge(st(n).g,m.g); } }
-  // 전선
-  for(const f of S.fronts.slice()) if(S.fronts.includes(f)) stepFront(f);
+  for(const rc of CODES){ const r=R(rc); const war=enemiesOf(r.h).length>0, con=attackers(rc).length>0;
+    const gr=0.025-(war?0.03:0)-(con?0.05:0)-(r.h!==rc?0.01:0); r.E=Math.max(countries[rc].E0*0.15,r.E*(1+gr/365)); }
+  for(const m of S.moves.slice()){ m.eta--; if(m.eta>0) continue; S.moves.splice(S.moves.indexOf(m),1);
+    if(share(m.to,m.code)>0||R(m.to).g[m.code]){ garAdd(m.to,m.code,m.g); if(m.aid&&(m.code===PLAYER||m.aidFrom===PLAYER)) addLog(`${nm(m.aidFrom)} 증원군 ${cnt(m.g)}개 부대 ${nm(m.to)} 도착`,m.code===PLAYER?'win':'me'); }
+    else if(share(m.from,m.code)>0) garAdd(m.from,m.code,m.g); else { const n=nearestHeld(m.code,m.to); if(n) garAdd(n,m.code,m.g); } }
+  for(const rc of CODES) stepRegion(rc);
   // 점령지 저항
-  cities.forEach(c=>{ const s=st(c); if(s.o===c.cc){ s.u=0; return; } if(!alive(c.cc)&&Math.random()<0.5) return; const need=Math.ceil(Math.sqrt(c.pop)*1.5), gc=domN(s.g,'g');
-    let du=gc>=need?-0.003:0.004*(1-gc/need)*(s.o===PLAYER&&S.trust<25?2:1); if(frontOn(c.id)) du=Math.min(du,0); s.u=Math.max(0,Math.min(1,s.u+du)); if(s.u>=1) revolt(c); });
+  for(const rc of CODES){ const r=R(rc); if(r.h===rc){ r.u=0; continue; } if(share(rc,rc)>0&&r.g[rc]) continue; const need=needGround(rc), gc=domN(gar(rc,r.h),'g');
+    let du=gc>=need?-0.003:0.004*(1-gc/need)*(r.h===PLAYER&&S.trust<25?2:1); if(attackers(rc).length) du=Math.min(du,0); r.u=Math.max(0,Math.min(1,r.u+du)); if(r.u>=1) revolt(rc); }
   if(S.day%10===0) for(const code of codes) if(code!==PLAYER&&alive(code)) aiWar(code);
   if(S.day%30===0) monthly();
   checkEnd();
 }
 function monthly(){
-  const codes=Object.keys(countries).filter(c=>c!==PLAYER&&alive(c));
+  const codes=CODES.filter(c=>c!==PLAYER&&alive(c));
   for(const code of codes){ aiDiplomacy(code); aiBuy(code); aiDefend(code); aiNuke(code); }
   aiPeace(); aid();
-  // 플레이어 국정
   S.trust=Math.max(0,Math.min(100,S.trust+2-(S.defPct-3)*0.6+S.housing*0.5+S.jobs*0.3-(enemiesOf(PLAYER).length?0.5:0)));
-  if(S.trust<25&&Math.random()<0.1){ const occ=owned(PLAYER).filter(c=>c.cc!==PLAYER); if(occ.length) revolt(occ[Math.floor(Math.random()*occ.length)]); }
+  if(S.trust<25&&Math.random()<0.1){ const occ=held(PLAYER).filter(rc=>rc!==PLAYER&&R(rc).h===PLAYER); if(occ.length) revolt(occ[Math.floor(Math.random()*occ.length)]); }
   if(S.nukeProg&&!S.nuclear[PLAYER]&&S.day-S.nukeProg>=730){ S.nuclear[PLAYER]=true; addLog('핵무장 완료 — 핵탄두 생산 가능. 국제 제재 해제.','me'); }
   for(const k in S.peaceCd) if(S.peaceCd[k]<=S.day) delete S.peaceCd[k];
   save();
 }
 // ===== AI =====
-const milCache={}; function milC(code){ const k=code+':'+S.day; if(milCache[k]==null){ for(const x in milCache) delete milCache[x]; milCache[k]=milPow(code); } return milCache[k]; }
 function blocPower(code){ let s=milPow(code); for(const bl of blocsOf(code)) for(const m of bl.m) if(m!==code&&alive(m)&&!S.left.includes(m)) s+=milPow(m)*bl.p*0.5; return s; }
+const neighborsOf=code=>{ const s=new Set(); for(const rc of held(code)) for(const n of countries[rc].nb){ const h=R(n).h; if(h!==code) s.add(h); } return [...s]; };
 function aiDiplomacy(code){
   const c=countries[code], en=enemiesOf(code);
   if(en.length>=2) return;
-  if(Math.random()>c.agg*0.05*(en.length?0.3:1)) return;
+  if(Math.random()>c.agg*0.035*(en.length?0.3:1)) return;
   const my=milPow(code); let best=null,bs=0;
-  for(const t of c.nb){ if(!alive(t)||atWar(code,t)||sameBloc(code,t)) continue;
-    if(S.nuclear[t]&&!S.nuclear[code]) continue; // 핵 억지
-    const riv=RIV.has(wk(code,t)); if(c.agg<0.1&&!riv) continue; const ratio=my/(milPow(t)+1); if(ratio<(riv?0.9:1.6)) continue;
+  for(const t of neighborsOf(code)){ if(!alive(t)||atWar(code,t)||sameBloc(code,t)) continue;
+    const riv=RIV.has(wk(code,t)); if(S.nuclear[t]&&(!S.nuclear[code]||!riv)) continue; // 핵 억지
+    if(c.agg<0.1&&!riv) continue; const ratio=my/(milPow(t)+1); if(ratio<(riv?0.9:1.6)) continue;
     if(blocPower(t)>my*(riv?4:2.5)) continue;
     const sc=ratio*(riv?3:1)*(0.7+Math.random()*0.6); if(sc>bs){bs=sc;best=t;} }
   if(best) declareWar(code,best,{reason:RIV.has(wk(code,best))?'숙적 분쟁':'영토 야욕'});
 }
 function aiWar(code){
   const en=enemiesOf(code); if(!en.length) return; const c=countries[code];
-  for(const m of owned(code)){ const g=st(m).g; if(domN(g,'g')<4) continue;
-    const ts=cities.filter(t=>adj(m,t)&&en.includes(st(t).o)).sort((a,b)=>cnt(st(a).g)-cnt(st(b).g));
-    for(const t of ts){ const ex=frontOn(t.id); if(ex&&ex.atk!==code) continue; const sea=isSea(m,t);
-      const force=portion(g,65); delete force.nuke; if(sea&&!domN(force,'s')) continue;
-      const {A,D}=calc(force,t,code,st(t).o,sea);
-      if(ex){ if(ex.p<0.7&&ex.gain<=0.002&&A/(D+1)>0.8&&cnt(ex.g)<cnt(force)*4){ openFront(m,t,50); break; } }
-      else if(A/(D+1)>1.7-c.agg*0.6){ openFront(m,t,65); break; }
+  for(const rc of held(code)){ const g=R(rc).g[code]; if(!g||domN(g,'g')<4) continue;
+    const ts=[...countries[rc].nb].filter(t=>en.includes(R(t).h)).sort((a,b)=>cnt(gar(a,R(a).h))-cnt(gar(b,R(b).h)));
+    for(const t of ts){ const sea=isSeaR(rc,t), ex=R(t).g[code], f=R(t).f[code];
+      const pc=sea?30:(held(code).length<2?45:65); const force=portion(g,pc); delete force.nuke; if(sea&&!domN(force,'s')) continue;
+      const {A,D}=calc(force,t,code,R(t).h,sea);
+      if(ex){ if(f&&share(t,code)<0.7&&f.gain<=0.002&&A/(D+1)>0.8&&cnt(ex)<cnt(force)*4){ openFront(rc,t,Math.round(pc*0.7)); break; } }
+      else if(A/(D+1)>1.7-c.agg*0.6){ openFront(rc,t,pc); break; }
     }
   }
 }
 function aiBuy(code){
   const m=S.money[code]; if(m<=5) return; const en=enemiesOf(code); const spend=m*(en.length?0.9:0.6);
-  const mine=owned(code); let pool=en.length?mine.filter(x=>cities.some(t=>adj(x,t)&&en.includes(st(t).o))):[]; if(!pool.length) pool=mine;
-  const threatened=pool.filter(x=>frontOn(x.id)); if(threatened.length) pool=threatened;
-  const tgt=pool.reduce((a,b)=>valueOf(st(a).g)<=valueOf(st(b).g)?a:b);
+  const mine=held(code).filter(rc=>R(rc).h===code); if(!mine.length) return;
+  let pool=en.length?mine.filter(rc=>[...countries[rc].nb].some(n=>en.includes(R(n).h))||attackers(rc).length):[]; if(!pool.length) pool=mine;
+  const th=pool.filter(rc=>attackers(rc).length); if(th.length) pool=th;
+  const tgt=pool.reduce((a,b)=>valueOf(gar(a,code))<=valueOf(gar(b,code))?a:b);
   const seaNeed=countries[code].sea.size>0&&(!en.length||en.some(e=>countries[code].sea.has(e)));
-  const g=buildForce(code,spend,seaNeed); const cost=valueOf(g); if(cost<=0) return; merge(st(tgt).g,g); S.money[code]-=cost;
+  const g=buildForce(code,spend,seaNeed); const cost=valueOf(g); if(cost<=0) return; garAdd(tgt,code,g); S.money[code]-=cost;
 }
 function aiDefend(code){
-  for(const f of S.fronts){ if(f.def!==code) continue; const t=cities[f.tgt];
-    const helpers=owned(code).filter(x=>x.id!==t.id&&!frontOn(x.id)&&cnt(st(x).g)>6);
-    for(const h of helpers){ const sent=split(st(h).g,40); if(cnt(sent)) moveUnits(h,t,sent,code); } }
+  for(const rc of held(code)){ if(R(rc).h!==code||!attackers(rc).length) continue;
+    const helpers=held(code).filter(x=>x!==rc&&R(x).h===code&&!attackers(x).length&&cnt(gar(x,code))>6);
+    for(const h of helpers){ const sent=split(R(h).g[code],40); delete sent.nuke; if(sent.nuke!=null) add(R(h).g[code],'nuke',sent.nuke); if(cnt(sent)) moveUnits(h,rc,sent,code); } }
 }
 function aiNuke(code){
-  if(!S.nuclear[code]) return; const have=owned(code).map(c=>st(c).g).find(g=>g.nuke); if(!have) return;
-  const cap=capOf(code); const f=frontOn(cap.id);
-  let target=null, why='';
-  if(f&&st(cap).o===code&&f.p>0.7&&Math.random()<0.25){ target=cities[f.src]; if(st(target).o!==f.atk) target=nearestOwned(f.atk,cap); why=`${cap.n} 함락 임박`; }
-  else if(capLost(code)&&Math.random()<0.5){ const en=enemiesOf(code); const e=en.find(x=>x===st(cap).o)||en[0]; if(e) target=capOf(e).id!=null&&st(capOf(e)).o===e?capOf(e):nearestOwned(e,cap); why='수도 상실 보복'; }
-  if(!target) return;
-  have.nuke--; if(!have.nuke) delete have.nuke; const force={nuke:1};
-  const atkCode=st(target).o; S.fronts.filter(x=>x.src===target.id).forEach(x=>attr(x.g,0.6));
-  launchMissiles(force,target,code); addLog(`☢ ${countries[code].name} 핵 사용 (${why}) → ${target.n}`,atkCode===PLAYER?'lose':'world');
+  if(!S.nuclear[code]) return; const have=held(code).map(x=>R(x).g[code]).find(g=>g&&g.nuke); if(!have) return;
+  const home=R(code); let target=null, why='', vs=null;
+  if(home.h===code){ const a=attackers(code).sort((x,y)=>share(code,y)-share(code,x))[0]; if(a&&share(code,a)>0.6&&Math.random()<0.25){ const f=home.f[a]; target=(f&&f.src&&share(f.src,a)>0)?f.src:nearestHeld(a,code); vs=a; why=`본토 ${pct(share(code,a))} 상실, 함락 임박`; } }
+  else if(Math.random()<0.5){ const e=home.h; if(atWar(code,e)){ target=held(e).sort((x,y)=>R(y).E*share(y,e)-R(x).E*share(x,e))[0]; vs=e; why='본토 상실 보복'; } }
+  if(!target||!vs) return;
+  have.nuke--; if(!have.nuke) delete have.nuke;
+  if(home.g[vs]) attr(home.g[vs],0.6);
+  launchMissiles({nuke:1},target,code,vs); addLog(`☢ ${nm(code)} 핵 사용 (${why}) → ${nm(target)}`,vs===PLAYER?'lose':'world');
 }
 function aiPeace(){
   for(const key of Object.keys(S.wars)){ const [a,b]=key.split('|'); const w=S.wars[key]; if(a===PLAYER||b===PLAYER) continue; if(!alive(a)||!alive(b)){ delete S.wars[key]; continue; }
     const months=(S.day-w.start)/30, last=Math.max(w.cap[a]||w.start,w.cap[b]||w.start);
-    const fronts=S.fronts.filter(f=>(f.atk===a&&f.def===b)||(f.atk===b&&f.def===a));
-    const winning=fronts.some(f=>f.p>0.3&&f.gain>0);
+    const fs=[]; for(const rc of CODES){ const r=R(rc); if(r.h===b&&r.g[a]&&r.f[a]) fs.push(r.f[a]); if(r.h===a&&r.g[b]&&r.f[b]) fs.push(r.f[b]); }
+    const mop=CODES.some(rc=>{ const r=R(rc); return (r.h===a&&share(rc,b)>0&&domN(gar(rc,a),'g')>=needGround(rc)*0.5)||(r.h===b&&share(rc,a)>0&&domN(gar(rc,b),'g')>=needGround(rc)*0.5); });
+    const winning=fs.some(f=>f.gain>0.0005&&f.days>30)||mop;
     if(months>12&&(S.day-last)/30>9&&!winning&&Math.random()<0.15) makePeace(a,b,'(소모전 종결)');
-    else if(months>6&&!fronts.length&&Math.random()<0.1) makePeace(a,b,'(교착)');
+    else if(months>6&&!fs.length&&Math.random()<0.1) makePeace(a,b,'(교착)');
     else { const pa=milPow(a),pb=milPow(b); if(months>3&&!winning&&(pa<pb*0.35||pb<pa*0.35)&&Math.random()<0.2) makePeace(a,b,'(열세 측 강화 요청)'); } }
 }
 function aid(){
-  for(const bl of BLOCS){ for(const v of bl.m){ if(!alive(v)||S.left.includes(v)) continue; const fs=S.fronts.filter(f=>f.def===v); if(!fs.length) continue;
-    const f=fs.reduce((x,y)=>x.p>=y.p?x:y), t=cities[f.tgt];
-    for(const L of bl.m){ if(L===v||L===PLAYER||!alive(L)||S.left.includes(L)||!atWar(L,f.atk)) continue; const key=L+'>'+v; if(S.aid[key]&&S.day-S.aid[key]<30) continue;
-      const big=owned(L).filter(x=>!frontOn(x.id)).sort((x,y)=>valueOf(st(y).g)-valueOf(st(x).g))[0]; if(!big) continue;
-      const g=st(big).g, sent={}; for(const id in g){ const u=UB[id]; if(u.once||u.dom==='s') continue; const n=Math.floor(g[id]*0.05); if(n>0){ sent[id]=n; g[id]-=n; if(!g[id]) delete g[id]; } }
-      if(!cnt(sent)) continue; S.aid[key]=S.day; const eta=Math.min(14,Math.max(2,Math.round(distKm(big,t)/900))); S.moves.push({from:big.id,to:t.id,g:sent,code:v,eta,tot:eta,aid:1,aidFrom:L});
-      if(v===PLAYER) addLog(`${countries[L].name} 증원군 ${cnt(sent)}개 부대 ${t.n}으로 출발 (${eta}일)`,'win'); } } }
+  for(const bl of BLOCS){ for(const v of bl.m){ if(!alive(v)||S.left.includes(v)) continue;
+    const under=held(v).filter(rc=>R(rc).h===v&&attackers(rc).length); if(!under.length) continue;
+    const rc=under.sort((x,y)=>(1-share(y,v))-(1-share(x,v)))[0]; const atk=attackers(rc)[0];
+    for(const L of bl.m){ if(L===v||L===PLAYER||!alive(L)||S.left.includes(L)||!atWar(L,atk)) continue; const key=L+'>'+v; if(S.aid[key]&&S.day-S.aid[key]<30) continue;
+      const big=held(L).filter(x=>R(x).h===L&&!attackers(x).length).sort((x,y)=>valueOf(gar(y,L))-valueOf(gar(x,L)))[0]; if(!big) continue;
+      const g=R(big).g[L], sent={}; for(const id in g){ const u=UB[id]; if(u.once||u.dom==='s') continue; const n=Math.floor(g[id]*0.05); if(n>0){ sent[id]=n; g[id]-=n; if(!g[id]) delete g[id]; } }
+      if(!cnt(sent)) continue; S.aid[key]=S.day; const eta=Math.min(14,Math.max(2,Math.round(distKm(countries[big],countries[rc])/900))); S.moves.push({from:big,to:rc,g:sent,code:v,eta,tot:eta,aid:1,aidFrom:L});
+      if(v===PLAYER) addLog(`${nm(L)} 증원군 ${cnt(sent)}개 부대 ${nm(rc)}(으)로 출발 (${eta}일)`,'win'); } } }
 }
 function offerPeace(e){
   const key=wk(PLAYER,e); if(S.peaceCd[key]) return false; S.peaceCd[key]=S.day+90;
   const w=S.wars[key]; if(!w) return false; const months=(S.day-w.start)/30;
-  const winning=S.fronts.some(f=>f.atk===e&&f.def===PLAYER&&f.p>0.3&&f.gain>0);
+  const winning=CODES.some(rc=>R(rc).h===PLAYER&&R(rc).f[e]&&R(rc).g[e]&&R(rc).f[e].gain>0.0005&&share(rc,e)>0.2);
   const ok=!winning&&(months>6||milPow(e)<milPow(PLAYER)*0.9)&&Math.random()<0.75;
-  if(ok) makePeace(PLAYER,e,'(제안 수락)'); else addLog(`${countries[e].name}, 휴전 제안 거절`,'lose');
+  if(ok) makePeace(PLAYER,e,'(제안 수락)'); else addLog(`${nm(e)}, 휴전 제안 거절`,'lose');
   return ok;
 }
-function checkEnd(){ if(S.over) return; const n=owned(PLAYER).length; if(n===0){ S.over='lose'; return; } let tot=0; cities.forEach(c=>tot+=st(c).E); if(n===cities.length||gdp(PLAYER)>=tot*0.6) S.over='win'; if(S.over) S.speed=0; }
+function checkEnd(){ if(S.over) return; if(!alive(PLAYER)){ S.over='lose'; S.speed=0; return; } let tot=0; for(const rc of CODES) tot+=R(rc).E; if(gdp(PLAYER)>=tot*0.6){ S.over='win'; S.speed=0; } }
 
 // ===== 저장 =====
-function save(){ try{localStorage.setItem('ww2027-save',JSON.stringify(S));}catch(e){} }
-function load(){ try{const j=localStorage.getItem('ww2027-save'); if(j){const o=JSON.parse(j); if(o&&o.v===3&&o.city&&Object.keys(o.city).length===cities.length&&o.fronts) return o;}}catch(e){} return null; }
+function save(){ try{localStorage.setItem('ww2027r-save',JSON.stringify(S));}catch(e){} }
+function load(){ try{const j=localStorage.getItem('ww2027r-save'); if(j){const o=JSON.parse(j); if(o&&o.v===4&&o.reg&&Object.keys(o.reg).length===CODES.length) return o;}}catch(e){} return null; }
 
 // ===== 실시간 루프 =====
 let last=performance.now(), acc=0, dayFrac=0, dirty=true, lastDraw=0, uiLock=false, fx=[];
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function anyFront(){ for(const rc of CODES) if(attackers(rc).length) return true; return false; }
 function frame(now){
   const dt=Math.min(now-last,500); last=now; let ticked=0;
   if(S&&!S.over&&S.speed>0){ acc+=dt*S.speed; while(acc>=MS_PER_DAY&&ticked<4){ acc-=MS_PER_DAY; tickDay(); ticked++; } if(ticked===4) acc=0; dayFrac=acc/MS_PER_DAY; }
-  if(ticked){ dirty=true; S.fronts.forEach(f=>{ if(f.gain!==undefined&&Math.random()<0.6){ const a=cities[f.src],b=cities[f.tgt]; const q=0.35+0.4*f.p; fx.push({x:a.px+(b.px-a.px)*q+(Math.random()-.5)*8/view.s,y:a.py+(b.py-a.py)*q+(Math.random()-.5)*8/view.s,t0:now,dur:RM?0:450,kind:'boom'}); } }); if(S.over) render(); else liveUpdate(ticked); }
-  const live=S&&(S.moves.length||fx.length||(S.fronts.length&&S.speed>0));
+  if(ticked){ dirty=true; for(const rc of CODES){ for(const a of attackers(rc)){ if(Math.random()<0.6){ const f=R(rc).f[a]; const s=countries[f&&f.src?f.src:a], t=countries[rc]; const q=0.35+0.4*share(rc,a); fx.push({x:s.px+(t.px-s.px)*q+(Math.random()-.5)*8/view.s,y:s.py+(t.py-s.py)*q+(Math.random()-.5)*8/view.s,t0:now,dur:RM?0:450}); } } } if(S.over) render(); else liveUpdate(); }
+  const live=S&&(S.moves.length||fx.length||(S.speed>0&&anyFront()));
   if(dirty||(live&&now-lastDraw>50)){ draw(); lastDraw=now; dirty=false; }
   requestAnimationFrame(frame);
 }
@@ -694,8 +700,8 @@ new ResizeObserver(resize).observe(cv);
 function centerOn(lon,lat,s){ const [x,y]=proj(lon,lat); view.s=s; view.x=cw/2-x*s; view.y=ch/2-y*s; }
 const sx=c=>c.px*view.s+view.x, sy=c=>c.py*view.s+view.y;
 function pathRings(rings,s,tx,ty){ let any=false; ctx.beginPath(); for(const r of rings){ const b=r.bb; if(b[2]*s+tx<0||b[0]*s+tx>cw||b[3]*s+ty<0||b[1]*s+ty>ch) continue; any=true; const p=r.pts; ctx.moveTo(p[0]*s+tx,p[1]*s+ty); for(let i=2;i<p.length;i+=2) ctx.lineTo(p[i]*s+tx,p[i+1]*s+ty); ctx.closePath(); } return any; }
-// 반평면 클립: 점 (mx,my)를 지나고 법선 (nx,ny) 방향 쪽
 function clipHalf(mx,my,nx,ny){ const L=1e6, px=-ny, py=nx; ctx.beginPath(); ctx.moveTo(mx+px*L,my+py*L); ctx.lineTo(mx-px*L,my-py*L); ctx.lineTo(mx-px*L+nx*L,my-py*L+ny*L); ctx.lineTo(mx+px*L+nx*L,my+py*L+ny*L); ctx.closePath(); ctx.clip(); }
+function badge(x,y,text,col,big){ ctx.font=(big?'bold 11px ':'bold 10px ')+css('--body'); const w=ctx.measureText(text).width+10, h=big?18:16; ctx.fillStyle=col; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(x-w/2,y-h/2,w,h,h/2); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(text,x,y); }
 function draw(){
   if(!S) return;
   ctx.clearRect(0,0,cw,ch); ctx.fillStyle=css('--sea'); ctx.fillRect(0,0,cw,ch);
@@ -704,48 +710,39 @@ function draw(){
   for(const mid in POLY){
     const code=byMap[mid], rings=POLY[mid];
     if(!code){ if(pathRings(rings,s,tx,ty)){ ctx.fillStyle=css('--neutral'); ctx.globalAlpha=.5; ctx.fill('evenodd'); ctx.globalAlpha=1; ctx.stroke(); } continue; }
-    const c1=cities[countries[code].idx*2], c2=cities[countries[code].idx*2+1], o1=st(c1).o, o2=st(c2).o, f1=frontOn(c1.id), f2=frontOn(c2.id);
-    if(o1===o2&&!(f1&&f1.p>0)&&!(f2&&f2.p>0)){ if(pathRings(rings,s,tx,ty)){ ctx.fillStyle=ownerColor(o1); ctx.globalAlpha=.72; ctx.fill('evenodd'); ctx.globalAlpha=1; ctx.stroke(); } continue; }
-    if(!pathRings(rings,s,tx,ty)) continue;
-    ctx.stroke();
+    const r=R(code); if(!pathRings(rings,s,tx,ty)) continue;
+    ctx.fillStyle=ownerColor(r.h); ctx.globalAlpha=.72; ctx.fill('evenodd'); ctx.globalAlpha=1; ctx.stroke();
+    const others=Object.keys(r.ctrl).filter(o=>o!==r.h&&r.ctrl[o]>0.002).sort((a,b)=>r.ctrl[b]-r.ctrl[a]);
+    if(!others.length) continue;
     const bb=rings.bb, corners=[[bb[0],bb[1]],[bb[2],bb[1]],[bb[0],bb[3]],[bb[2],bb[3]]].map(([x,y])=>[x*s+tx,y*s+ty]);
-    for(const [c,o,f,other] of [[c1,o1,f1,c2],[c2,o2,f2,c1]]){
-      ctx.save(); pathRings(rings,s,tx,ty); ctx.clip('evenodd');
-      const ax=sx(c),ay=sy(c),bx=sx(other),by=sy(other); let nx=ax-bx, ny=ay-by; const L=Math.hypot(nx,ny)||1; nx/=L; ny/=L;
-      clipHalf((ax+bx)/2,(ay+by)/2,nx,ny);
-      ctx.fillStyle=ownerColor(o); ctx.globalAlpha=.72; ctx.fillRect(0,0,cw,ch);
-      if(f&&f.p>0){ const sc=cities[f.src]; let ux=sx(c)-sx(sc), uy=sy(c)-sy(sc); const UL=Math.hypot(ux,uy)||1; ux/=UL; uy/=UL;
-        let pmin=1e18,pmax=-1e18; for(const [x,y] of corners){ const p=x*ux+y*uy; if(p<pmin)pmin=p; if(p>pmax)pmax=p; }
-        const fp=pmin+f.p*(pmax-pmin); const mx=ux*fp, my=uy*fp; // 전선 위 한 점
-        ctx.save(); clipHalf(mx,my,-ux,-uy); ctx.fillStyle=ownerColor(f.atk); ctx.fillRect(0,0,cw,ch); ctx.restore();
-        ctx.globalAlpha=1; ctx.strokeStyle=ownerColor(f.atk); ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.beginPath(); ctx.moveTo(mx-uy*1e5,my+ux*1e5); ctx.lineTo(mx+uy*1e5,my-ux*1e5); ctx.stroke(); ctx.setLineDash([]); }
-      ctx.globalAlpha=1; ctx.restore();
+    for(const o of others){
+      const f=r.f[o], src=countries[(f&&f.src)||o], t=countries[code]; let ux=sx(t)-sx(src), uy=sy(t)-sy(src); const UL=Math.hypot(ux,uy); if(UL<1){ux=1;uy=0;} else {ux/=UL;uy/=UL;}
+      let pmin=1e18,pmax=-1e18; for(const [x,y] of corners){ const p=x*ux+y*uy; if(p<pmin)pmin=p; if(p>pmax)pmax=p; }
+      const fp=pmin+r.ctrl[o]*(pmax-pmin), mx=ux*fp, my=uy*fp; if(!isFinite(mx)||!isFinite(my)) continue;
+      ctx.save(); pathRings(rings,s,tx,ty); ctx.clip('evenodd'); clipHalf(mx,my,-ux,-uy); ctx.fillStyle=ownerColor(o); ctx.globalAlpha=.8; ctx.fillRect(0,0,cw,ch); ctx.globalAlpha=1;
+      ctx.strokeStyle=ownerColor(o); ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.beginPath(); ctx.moveTo(mx-uy*1e5,my+ux*1e5); ctx.lineTo(mx+uy*1e5,my-ux*1e5); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
     }
   }
-  const selC=sel!=null?cities[sel]:null, fg=css('--fg');
-  // 전선 화살표 & 이동 중 부대
-  for(const f of S.fronts){ const a=cities[f.src], b=cities[f.tgt]; const ax=sx(a),ay=sy(a),bx=sx(b),by=sy(b); if(Math.max(ax,bx)<-50||Math.min(ax,bx)>cw+50||Math.max(ay,by)<-50||Math.min(ay,by)>ch+50) continue;
-    ctx.setLineDash([5,5]); ctx.strokeStyle=ownerColor(f.atk); ctx.lineWidth=1.5; ctx.globalAlpha=.75; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
-    const q=0.35+0.4*f.p, px=ax+(bx-ax)*q, py=ay+(by-ay)*q, ang=Math.atan2(by-ay,bx-ax);
-    ctx.save(); ctx.translate(px,py); ctx.rotate(ang); ctx.fillStyle=ownerColor(f.atk); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(7,0); ctx.lineTo(-5,-5); ctx.lineTo(-3,0); ctx.lineTo(-5,5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
-    ctx.font='bold 10px '+css('--body'); ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillStyle='#fff'; ctx.strokeStyle='rgba(0,0,0,.65)'; ctx.lineWidth=2.5; const lab=`${Math.round(f.p*100)}%`; ctx.strokeText(lab,px,py-7); ctx.fillText(lab,px,py-7); }
-  for(const m of S.moves){ const a=cities[m.from], b=cities[m.to]; const q=Math.min(1,(m.tot-m.eta+dayFrac)/m.tot), x=sx(a)+(sx(b)-sx(a))*q, y=sy(a)+(sy(b)-sy(a))*q; if(x<-20||y<-20||x>cw+20||y>ch+20) continue;
+  const fg=css('--fg');
+  // 선택 영토 & 인접 영토 강조
+  if(sel){ const mine=share(sel,PLAYER)>0||!!R(sel).g[PLAYER];
+    for(const mid in POLY){ const code=byMap[mid]; if(!code) continue; if(code===sel){ if(pathRings(POLY[mid],s,tx,ty)){ ctx.lineWidth=3; ctx.strokeStyle=css('--sel'); ctx.stroke(); } }
+      else if(mine&&adjR(sel,code)){ if(pathRings(POLY[mid],s,tx,ty)){ ctx.setLineDash([4,4]); ctx.lineWidth=2; ctx.strokeStyle=R(code).h===PLAYER?css('--good'):css('--bad'); ctx.stroke(); ctx.setLineDash([]); } } } }
+  // 침공 화살표
+  for(const rc of CODES){ const r=R(rc); for(const a of Object.keys(r.g)){ if(a===r.h||!cnt(r.g[a])) continue; const f=r.f[a]; const sc=countries[(f&&f.src)||a], t=countries[rc]; const ax=sx(sc),ay=sy(sc),bx=sx(t),by=sy(t);
+    if(Math.max(ax,bx)<-50||Math.min(ax,bx)>cw+50||Math.max(ay,by)<-50||Math.min(ay,by)>ch+50) continue;
+    ctx.setLineDash([5,5]); ctx.strokeStyle=ownerColor(a); ctx.lineWidth=1.5; ctx.globalAlpha=.75; ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+    const q=0.35+0.4*share(rc,a), px=ax+(bx-ax)*q, py=ay+(by-ay)*q, ang=Math.atan2(by-ay,bx-ax);
+    ctx.save(); ctx.translate(px,py); ctx.rotate(ang); ctx.fillStyle=ownerColor(a); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(8,0); ctx.lineTo(-6,-6); ctx.lineTo(-3,0); ctx.lineTo(-6,6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+    badge(px,py-14,`${cnt(r.g[a])} · ${pct(share(rc,a))}`,ownerColor(a)); } }
+  for(const m of S.moves){ const a=countries[m.from], b=countries[m.to]; const q=Math.min(1,(m.tot-m.eta+dayFrac)/m.tot), x=sx(a)+(sx(b)-sx(a))*q, y=sy(a)+(sy(b)-sy(a))*q; if(x<-20||y<-20||x>cw+20||y>ch+20) continue;
     ctx.save(); ctx.translate(x,y); ctx.rotate(Math.atan2(sy(b)-sy(a),sx(b)-sx(a))); ctx.fillStyle=ownerColor(m.code); ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(5,0); ctx.lineTo(-4,-3.5); ctx.lineTo(-2.5,0); ctx.lineTo(-4,3.5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
-  cities.forEach(c=>{
-    const x=sx(c),y=sy(c); const cs=st(c),r=c.cap?8:6;
-    if(x<-30||y<-30||x>cw+30||y>ch+30) return;
-    ctx.fillStyle=ownerColor(cs.o); ctx.beginPath();
-    if(c.cap) ctx.rect(x-r,y-r,r*2,r*2); else ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=cs.o===c.cc?'rgba(0,0,0,.45)':'#fff'; ctx.stroke();
-    if(cs.u>0.05){ ctx.strokeStyle='#ffb000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,r+3,-Math.PI/2,-Math.PI/2+cs.u*Math.PI*2); ctx.stroke(); }
-    if(selC){
-      if(c.id===sel){ctx.lineWidth=3;ctx.strokeStyle=css('--sel');ctx.beginPath();ctx.arc(x,y,r+6,0,Math.PI*2);ctx.stroke();}
-      else if(st(selC).o===PLAYER&&adj(selC,c)){ctx.setLineDash([3,3]);ctx.lineWidth=1.5;ctx.strokeStyle=cs.o===PLAYER?css('--good'):css('--bad');ctx.beginPath();ctx.arc(x,y,r+5,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
-    }
-    ctx.fillStyle='#fff'; ctx.font='bold 10px '+css('--body'); ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.strokeStyle='rgba(0,0,0,.65)'; ctx.lineWidth=2.5; const n=cnt(cs.g); ctx.strokeText(n,x,y); ctx.fillText(n,x,y);
-    if((c.cap&&view.s>=0.9)||view.s>=2.2){ ctx.font=(c.cap?'bold 11px ':'10px ')+css('--body'); ctx.fillStyle=fg; ctx.textBaseline='top'; ctx.strokeStyle=css('--sea'); ctx.lineWidth=3; const lab=c.cap&&view.s<2.2?countries[c.cc].name:c.n; ctx.strokeText(lab,x,y+r+3); ctx.fillText(lab,x,y+r+3); }
-  });
+  // 영토 배지 (점유국 부대 수) & 이름
+  for(const rc of CODES){ const c=countries[rc], r=R(rc); const x=sx(c), y=sy(c); if(x<-40||y<-30||x>cw+40||y>ch+30) continue; const big=c.pop>=20;
+    if(!big&&s<1.4) continue;
+    badge(x,y,String(cnt(gar(rc,r.h))),ownerColor(r.h),big);
+    if(r.u>0.05){ ctx.strokeStyle='#ffb000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,13,-Math.PI/2,-Math.PI/2+r.u*Math.PI*2); ctx.stroke(); }
+    if((big&&s>=0.9)||s>=2.2){ ctx.font=(big?'bold 11px ':'10px ')+css('--body'); ctx.fillStyle=fg; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.strokeStyle=css('--sea'); ctx.lineWidth=3; const lab=r.h===rc?c.name:`${c.name} (${nm(r.h)})`; ctx.strokeText(lab,x,y+10); ctx.fillText(lab,x,y+10); } }
   const now=performance.now(); fx=fx.filter(f=>now-f.t0<f.dur);
   for(const f of fx){ const q=(now-f.t0)/f.dur, x=f.x*view.s+view.x, y=f.y*view.s+view.y; ctx.fillStyle=`rgba(255,200,60,${0.7*(1-q)})`; ctx.beginPath(); ctx.arc(x,y,2+q*7,0,Math.PI*2); ctx.fill(); ctx.strokeStyle=`rgba(255,110,20,${1-q})`; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,3+q*12,0,Math.PI*2); ctx.stroke(); }
 }
@@ -773,48 +770,48 @@ window.addEventListener('keydown',e=>{ if(e.target&&/INPUT|BUTTON/.test(e.target
 function zoomAt(cx,cy,f){ const ns=Math.min(12,Math.max(0.25,view.s*f)); const k=ns/view.s; view.x=cx-(cx-view.x)*k; view.y=cy-(cy-view.y)*k; view.s=ns; draw(); }
 document.getElementById('zin').onclick=()=>zoomAt(cw/2,ch/2,1.3);
 document.getElementById('zout').onclick=()=>zoomAt(cw/2,ch/2,1/1.3);
-document.getElementById('home').onclick=()=>{const m=owned(PLAYER); const c=m.find(x=>x.cc===PLAYER&&x.cap)||m[0]||cities[0]; centerOn(c.lon,c.lat,Math.max(view.s,3)); draw();};
+document.getElementById('home').onclick=()=>{const rc=share(PLAYER,PLAYER)>0?PLAYER:(held(PLAYER)[0]||PLAYER); const c=countries[rc]; centerOn(c.lon,c.lat,Math.max(view.s,3)); draw();};
 document.getElementById('sp0').onclick=()=>setSpeed(0); document.getElementById('sp1').onclick=()=>setSpeed(1); document.getElementById('sp3').onclick=()=>setSpeed(3);
 
+function regionAt(x,y){ const [lon,lat]=unproj((x-view.x)/view.s,(y-view.y)/view.s);
+  for(const mid in POLY){ const code=byMap[mid]; if(!code) continue; const bb=POLY[mid].bb; const px=(x-view.x)/view.s, py=(y-view.y)/view.s; if(px<bb[0]||px>bb[2]||py<bb[1]||py>bb[3]) continue; if(POLY[mid].some(r=>pip(lon,lat,r.ll))) return code; }
+  let best=null,bd=18; for(const rc of CODES){ const c=countries[rc]; const d=Math.hypot(sx(c)-x,sy(c)-y); if(d<bd){bd=d;best=rc;} } return best; }
 function tap(x,y){
   if(S.over) return;
-  let best=null,bd=22;
-  cities.forEach(c=>{const d=Math.hypot(sx(c)-x,sy(c)-y); if(d<bd){bd=d;best=c;}});
-  if(!best){ const [lon,lat]=unproj((x-view.x)/view.s,(y-view.y)/view.s);
-    for(const mid in POLY){ const code=byMap[mid]; if(!code) continue; if(POLY[mid].some(r=>pip(lon,lat,r.ll))){ best=cities[countries[code].idx*2]; break; } } }
+  const best=regionAt(x,y);
   if(!best){ sel=null; dlg=null; render(); return; }
-  const cur=sel!=null?cities[sel]:null;
-  if(cur&&st(cur).o===PLAYER&&best.id!==sel&&adj(cur,best)){ dlg={from:cur.id,to:best.id,pct:60,kind:st(best).o===PLAYER?'move':'attack'}; tab='info'; render(); return; }
-  sel=best.id; dlg=null; tab='info'; render();
+  if(sel&&best!==sel&&(share(sel,PLAYER)>0||R(sel).g[PLAYER])&&adjR(sel,best)&&R(sel).g[PLAYER]){ dlg={from:sel,to:best,pct:60,kind:R(best).h===PLAYER?'move':'attack'}; tab='info'; render(); return; }
+  sel=best; dlg=null; tab='info'; render();
 }
 // ===== 패널 =====
 const pb=document.getElementById('pbody');
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
 pb.addEventListener('pointerdown',e=>{ if(e.target.tagName==='INPUT') uiLock=true; });
-window.addEventListener('pointerup',()=>{ if(uiLock){ uiLock=false; } });
-const garHtml=g=>{ const ks=Object.keys(g); if(!ks.length) return '<span class="muted">주둔 병력 없음</span>'; return `<div class="units">${ks.map(id=>`<span class="n">${UB[id].n}</span><span>${g[id]}</span><span class="s">${UB[id].once?'1회 발사':'공'+UB[id].a+' 방'+UB[id].d}</span>`).join('')}</div>`; };
-const pct=x=>Math.round(x*100)+'%';
-function frontHtml(f){ const a=cities[f.src],t=cities[f.tgt]; const r=f.A/(f.D+0.001); const tr=f.gain>0.0005?`<span class="good">전진 중 (${(f.gain*100).toFixed(2)}%/일)</span>`:f.gain<-0.0005?`<span class="bad">밀리는 중</span>`:`<span class="warn">교착</span>`;
-  return `<div class="dialog"><div class="t">${esc(countries[f.atk].name)} → ${esc(t.n)} 전선 ${f.sea?'(상륙)':''} · ${f.days}일째</div>
-  <div class="bar"><i style="width:${f.p*100}%;background:${ownerColor(f.atk)}"></i></div>
-  <div class="kv"><span>점령도</span><span><b>${pct(f.p)}</b> ${tr}</span><span>전투력 (공:방)</span><span>${Math.round(f.A)} : ${Math.round(f.D)} (${r.toFixed(2)}배)</span><span>투입 부대</span><span>${cnt(f.g)}개 (누적 손실 공 ${f.lossA} / 방 ${f.lossD})</span>${domN(f.g,'g')?'':'<span class="warn">주의</span><span class="warn">지상군 없음 — 폭격만으로는 점령 불가</span>'}</div>
-  ${f.atk===PLAYER?`<div class="row"><button class="btn small" id="retreat">후퇴 (10% 손실)</button><span class="muted">증원: 인접 내 도시에서 ${esc(t.n)} 선택</span></div>`:''}</div>`; }
+window.addEventListener('pointerup',()=>{ uiLock=false; });
+const garHtml=g=>{ const ks=Object.keys(g); if(!ks.length) return '<span class="muted">부대 없음</span>'; return `<div class="units">${ks.map(id=>`<span class="n">${UB[id].n}</span><span>${g[id]}</span><span class="s">${UB[id].once?'1회 발사':'공'+UB[id].a+' 방'+UB[id].d}</span>`).join('')}</div>`; };
+const ctrlHtml=rc=>{ const r=R(rc); const es=Object.entries(r.ctrl).sort((a,b)=>b[1]-a[1]); return `<div class="ctrl">${es.map(([o,v])=>`<i style="width:${v*100}%;background:${ownerColor(o)}"></i>`).join('')}</div><div class="ctrl-l">${es.map(([o,v])=>`<span><span class="sw" style="background:${ownerColor(o)}"></span>${esc(nm(o))} ${pct(v)}${o===r.h?' (점유)':''}</span>`).join('')}</div>`; };
+function frontHtml(rc,a){ const r=R(rc), f=r.f[a]||{}, g=r.g[a]; const q=f.A/(f.D+0.001); const tr=f.gain>0.0005?`<span class="good">전진 중 (+${(f.gain*100).toFixed(2)}%p/일)</span>`:f.gain<-0.0005?`<span class="bad">밀리는 중</span>`:`<span class="warn">교착</span>`;
+  return `<div class="dialog"><div class="t">${esc(nm(a))} → ${esc(nm(rc))} 전선 ${f.sea?'(상륙)':''} · ${f.days||0}일째</div>
+  <div class="kv"><span>점령 비율</span><span><b>${pct(share(rc,a))}</b> ${tr}</span><span>전투력 (공:방)</span><span>${Math.round(f.A||0)} : ${Math.round(f.D||0)} (${q.toFixed(2)}배)</span><span>투입 부대</span><span>${cnt(g)}개 (누적 손실 공 ${f.lossA||0} / 방 ${f.lossD||0})</span>${domN(g,'g')?'':'<span class="warn">주의</span><span class="warn">지상군 없음 — 폭격만으로는 영토를 못 뺏음</span>'}</div>
+  ${a===PLAYER?`<div class="row"><button class="btn small" data-retreat="${rc}">후퇴 (10% 손실)</button><span class="muted">증원: 인접 내 영토 선택 후 ${esc(nm(rc))} 탭</span></div>`:''}${garHtml(g)}</div>`; }
 function render(){
   draw(); renderStats();
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===tab));
   const top=pb.scrollTop;
-  if(tab==='log') pb.innerHTML=`<ul class="log">${S.log.map(l=>`<li class="${l.k}"><span class="muted">${fdateS(l.t)}</span> ${esc(l.m)}</li>`).join('')}</ul>`;
+  if(tab==='log') pb.innerHTML=logHtml();
   else if(tab==='world') renderWorld();
   else if(tab==='nation') renderNation();
   else if(tab==='tech') renderTech();
   else renderInfo();
   pb.scrollTop=top; showOver();
 }
+const logHtml=()=>`<ul class="log">${S.log.map(l=>`<li class="${l.k}"><span class="muted">${fdateS(l.t)}</span> ${esc(l.m)}</li>`).join('')}</ul>`;
 function renderStats(){
-  const mine=owned(PLAYER); document.getElementById('clock').textContent=fdate(S.day);
-  document.getElementById('stats').innerHTML=`<span>자금 <b>${fm(S.money[PLAYER])}</b></span><span>신뢰 <b>${Math.round(S.trust)}</b></span><span>기술 <b>${Math.floor(S.tech[PLAYER])}년도</b></span><span>군사력 <b>${Math.round(milPow(PLAYER))}</b></span><span>도시 <b>${mine.length}</b>/${cities.length}</span>${enemiesOf(PLAYER).length?`<span class="bad">교전 ${enemiesOf(PLAYER).length}개국</span>`:''}`;
+  document.getElementById('clock').textContent=fdate(S.day);
+  let tot=0; for(const rc of CODES) tot+=R(rc).E;
+  document.getElementById('stats').innerHTML=`<span>자금 <b>${fm(S.money[PLAYER])}</b></span><span>신뢰 <b>${Math.round(S.trust)}</b></span><span>기술 <b>${Math.floor(S.tech[PLAYER])}년도</b></span><span>군사력 <b>${Math.round(milPow(PLAYER))}</b></span><span>세계 GDP <b>${(gdp(PLAYER)/tot*100).toFixed(1)}%</b></span>${enemiesOf(PLAYER).length?`<span class="bad">교전 ${enemiesOf(PLAYER).length}개국</span>`:''}`;
 }
-function liveUpdate(){ renderStats(); if(uiLock) return; if(tab==='info'||tab==='log'||tab==='world'){ const top=pb.scrollTop; if(tab==='info') renderInfo(); else if(tab==='log') pb.innerHTML=`<ul class="log">${S.log.map(l=>`<li class="${l.k}"><span class="muted">${fdateS(l.t)}</span> ${esc(l.m)}</li>`).join('')}</ul>`; else renderWorld(); pb.scrollTop=top; }
+function liveUpdate(){ renderStats(); if(uiLock) return; if(tab==='info'||tab==='log'||tab==='world'){ const top=pb.scrollTop; if(tab==='info') renderInfo(); else if(tab==='log') pb.innerHTML=logHtml(); else renderWorld(); pb.scrollTop=top; }
   else pb.querySelectorAll('[data-live]').forEach(el=>{ const f=LIVE[el.dataset.live]; if(f) el.innerHTML=f(); }); }
 const LIVE={
   money:()=>fm(S.money[PLAYER]), inc:()=>`${fm(incomeDay(PLAYER)*365)} / 년 (하루 ${fm(incomeDay(PLAYER))})`, up:()=>`${fm(upkeepDay(PLAYER)*365)} / 년`, gdp:()=>fm(gdp(PLAYER)*10),
@@ -822,11 +819,12 @@ const LIVE={
   tech:()=>`<b>${S.tech[PLAYER].toFixed(1)}년도</b> (세계 ${techRank(PLAYER)}위 · 최첨단 ${frontier().toFixed(1)}년도)`, trate:()=>`연 +${techRate(PLAYER).toFixed(2)}년 (R&D ${fm(incomeDay(PLAYER)*365*S.rdPct/100)}/년)`,
   mult:()=>`×${techMult(S.tech[PLAYER]).toFixed(2)}`, nuke:()=>S.nuclear[PLAYER]?'보유 — 핵탄두 생산 가능':S.nukeProg?`개발 중 ${Math.min(100,Math.round((S.day-S.nukeProg)/730*100))}% (제재로 세수 −15%)`:'미보유',
 };
+const hCost=()=>30+15*S.housing, jCost=()=>40+20*S.jobs;
 function renderNation(){
   const en=enemiesOf(PLAYER), allies=blocsOf(PLAYER).flatMap(b=>b.m.filter(m=>m!==PLAYER&&alive(m)&&!S.left.includes(m)));
-  pb.innerHTML=`<div class="kv"><span>보유 자금</span><span data-live="money">${LIVE.money()}</span><span>GDP</span><span data-live="gdp">${LIVE.gdp()}</span><span>국방 예산</span><span data-live="inc">${LIVE.inc()}</span><span>부대 유지비</span><span data-live="up">${LIVE.up()}</span><span>신뢰도</span><span data-live="trust">${LIVE.trust()}</span><span>동맹</span><span>${allies.length?allies.map(a=>esc(countries[a].name)).join(', '):'없음'}</span><span>교전국</span><span>${en.length?en.map(e=>`${esc(countries[e].name)} <button class="btn small" data-peace="${e}" ${S.peaceCd[wk(PLAYER,e)]?'disabled':''}>휴전 제안</button>`).join(' '):'없음'}</span></div>
+  pb.innerHTML=`<div class="kv"><span>보유 자금</span><span data-live="money">${LIVE.money()}</span><span>GDP</span><span data-live="gdp">${LIVE.gdp()}</span><span>국방 예산</span><span data-live="inc">${LIVE.inc()}</span><span>부대 유지비</span><span data-live="up">${LIVE.up()}</span><span>신뢰도</span><span data-live="trust">${LIVE.trust()}</span><span>동맹</span><span>${allies.length?allies.map(a=>esc(nm(a))).join(', '):'없음'}</span><span>교전국</span><span>${en.length?en.map(e=>`${esc(nm(e))} <button class="btn small" data-peace="${e}" ${S.peaceCd[wk(PLAYER,e)]?'disabled':''}>휴전 제안</button>`).join(' '):'없음'}</span></div>
   <h3>국방비 — GDP 대비 <b id="dv">${S.defPct.toFixed(1)}</b>%</h3><input type="range" id="def" min="1" max="10" step="0.1" value="${S.defPct}">
-  <p class="muted" style="margin:4px 0 0;font-size:12px">3%가 기준. 높이면 예산은 늘지만 신뢰도가 매달 떨어집니다 (전시 −0.5 추가). 선전포고 −8, 수도 점령 −4, 핵 사용 −30.</p>
+  <p class="muted" style="margin:4px 0 0;font-size:12px">3%가 기준. 높이면 예산은 늘지만 신뢰도가 매달 떨어집니다 (전시 −0.5 추가). 선전포고 −8, 타국 영토 과반 장악 −3, 핵 사용 −30.</p>
   <h3>R&D 비중 — 예산의 <b id="rv">${S.rdPct}</b>%</h3><input type="range" id="rd" min="0" max="50" step="5" value="${S.rdPct}">
   <p class="muted" style="margin:4px 0 0;font-size:12px">기술 <span data-live="tech">${LIVE.tech()}</span> · <span data-live="trate">${LIVE.trate()}</span></p>
   <h3>민생 투자 — 신뢰도</h3><div class="shop">
@@ -841,55 +839,54 @@ function renderNation(){
   const bn=pb.querySelector('#bn'); if(bn) bn.onclick=()=>{ if(S.money[PLAYER]<300) return; S.money[PLAYER]-=300; S.nukeProg=S.day; S.trust=Math.max(0,S.trust-15); addLog('핵 개발 프로그램 착수 — 국제 제재 시작 (신뢰 −15)','me'); save(); render(); };
   pb.querySelectorAll('[data-peace]').forEach(b=>b.onclick=()=>{ offerPeace(b.dataset.peace); save(); render(); });
 }
-const hCost=()=>30+15*S.housing, jCost=()=>40+20*S.jobs;
 function renderTech(){
   const t=S.tech[PLAYER]; const list=UNITS.filter(u=>!u.nuke).sort((a,b)=>a.y-b.y); const nxt=list.find(u=>u.y>t);
-  const top=Object.keys(countries).filter(alive).sort((a,b)=>S.tech[b]-S.tech[a]).slice(0,8);
+  const top=CODES.filter(alive).sort((a,b)=>S.tech[b]-S.tech[a]).slice(0,8);
   pb.innerHTML=`<div class="kv"><span>대한민국 기술</span><span data-live="tech">${LIVE.tech()}</span><span>연간 진척</span><span data-live="trate">${LIVE.trate()}</span><span>전투 효율</span><span><span data-live="mult">${LIVE.mult()}</span> (기술 1년 = +4%, 2010년도 기준)</span></div>
   <p class="muted" style="margin:6px 0 0;font-size:12px">R&D 비중은 국정 탭에서 조정. 최첨단에 뒤처진 나라는 기술 확산으로 조금 더 빨리 따라잡고, 최첨단을 넘어서면 연구 비용이 급증합니다.</p>
-  <h3>기술 선도국</h3><ul class="rank">${top.map((c,i)=>`<li><span class="muted">${i+1}</span><span class="sw" style="background:${ownerColor(c)}"></span><span>${esc(countries[c].name)}</span><span class="muted">${S.tech[c].toFixed(1)}년도</span></li>`).join('')}</ul>
+  <h3>기술 선도국</h3><ul class="rank">${top.map((c,i)=>`<li><span class="muted">${i+1}</span><span class="sw" style="background:${ownerColor(c)}"></span><span>${esc(nm(c))}</span><span class="muted">${S.tech[c].toFixed(1)}년도</span></li>`).join('')}</ul>
   <h3>무기 해금 연표</h3><div class="timeline">${list.map(u=>`<div class="it ${u.y<=t?'done':''} ${u===nxt?'next':''}"><span class="muted">${u.y}년도</span><span><b>${u.n}</b> <span class="muted">${esc(u.s)} · ${fm(u.c)}${u.y<=t?'':' · 약 '+Math.max(0.1,(u.y-t)/Math.max(0.05,techRate(PLAYER))).toFixed(1)+'년 후'}</span></span></div>`).join('')}</div>`;
 }
 function renderWorld(){
-  const wars=Object.keys(S.wars).map(k=>{ const [a,b]=k.split('|'); return {a,b,w:S.wars[k],fs:S.fronts.filter(f=>(f.atk===a&&f.def===b)||(f.atk===b&&f.def===a))}; }).sort((x,y)=>((x.a===PLAYER||x.b===PLAYER)?-1:0)-((y.a===PLAYER||y.b===PLAYER)?-1:0)||y.fs.length-x.fs.length);
-  const rows=Object.keys(countries).filter(alive).map(code=>({code,n:owned(code).length,m:Math.round(milPow(code)),g:gdp(code),t:S.tech[code]})).sort((a,b)=>b.n-a.n||b.m-a.m);
-  pb.innerHTML=`<h3 style="margin-top:0">진행 중인 전쟁 (${wars.length})</h3>${wars.length?wars.map(x=>`<div class="war"><b>${esc(countries[x.a].name)}</b> vs <b>${esc(countries[x.b].name)}</b> <span class="muted">· ${Math.max(0,Math.floor((S.day-x.w.start)/30))}개월</span>${x.fs.map(f=>`<div class="f">${esc(countries[f.atk].name)} → ${esc(cities[f.tgt].n)} 점령도 ${pct(f.p)} <span class="${f.gain>0.0005?'good':f.gain<-0.0005?'bad':'warn'}">${f.gain>0.0005?'전진':f.gain<-0.0005?'후퇴':'교착'}</span></div>`).join('')||'<div class="f">전선 없음 (교착)</div>'}</div>`).join(''):'<p class="muted">없음</p>'}
-  <h3>국력 순위</h3><ul class="rank">${rows.slice(0,40).map((r,i)=>`<li><span class="muted">${i+1}</span><span class="sw" style="background:${ownerColor(r.code)}"></span><span>${esc(countries[r.code].name)} <span class="muted">${Math.floor(r.t)}년도 기술</span></span><span class="muted">도시 ${r.n} · 군사력 ${r.m} · GDP ${fm(r.g*10)}</span></li>`).join('')}</ul><p class="muted" style="margin:8px 0 0">생존 ${rows.length}개국 / 멸망 ${Object.keys(countries).length-rows.length}개국 (상위 40개 표시)</p>`;
+  const wars=Object.keys(S.wars).map(k=>{ const [a,b]=k.split('|'); const fs=[]; for(const rc of CODES){ const r=R(rc); for(const [x,y] of [[a,b],[b,a]]) if(r.h===y&&r.g[x]&&cnt(r.g[x])) fs.push({atk:x,rc,f:r.f[x]||{}}); } return {a,b,w:S.wars[k],fs}; }).sort((x,y)=>((x.a===PLAYER||x.b===PLAYER)?-1:0)-((y.a===PLAYER||y.b===PLAYER)?-1:0)||y.fs.length-x.fs.length);
+  const rows=CODES.filter(alive).map(code=>({code,n:held(code).length,m:Math.round(milPow(code)),g:gdp(code),t:S.tech[code]})).sort((a,b)=>b.g-a.g);
+  pb.innerHTML=`<h3 style="margin-top:0">진행 중인 전쟁 (${wars.length})</h3>${wars.length?wars.map(x=>`<div class="war"><b>${esc(nm(x.a))}</b> vs <b>${esc(nm(x.b))}</b> <span class="muted">· ${Math.max(0,Math.floor((S.day-x.w.start)/30))}개월</span>${x.fs.map(o=>`<div class="f">${esc(nm(o.atk))} → ${esc(nm(o.rc))} 영토 ${pct(share(o.rc,o.atk))} <span class="${o.f.gain>0.0005?'good':o.f.gain<-0.0005?'bad':'warn'}">${o.f.gain>0.0005?'전진':o.f.gain<-0.0005?'후퇴':'교착'}</span></div>`).join('')||'<div class="f">전선 없음 (교착)</div>'}</div>`).join(''):'<p class="muted">없음</p>'}
+  <h3>국력 순위 (GDP)</h3><ul class="rank">${rows.slice(0,40).map((r,i)=>`<li><span class="muted">${i+1}</span><span class="sw" style="background:${ownerColor(r.code)}"></span><span>${esc(nm(r.code))} <span class="muted">${Math.floor(r.t)}년도 기술</span></span><span class="muted">영토 ${r.n} · 군사력 ${r.m} · GDP ${fm(r.g*10)}</span></li>`).join('')}</ul><p class="muted" style="margin:8px 0 0">생존 ${rows.length}개국 / 멸망 ${CODES.length-rows.length}개국 (상위 40개 표시)</p>`;
 }
 function renderInfo(){
-  if(sel==null){ pb.innerHTML=`<p class="muted" style="margin:0">지도에서 도시나 나라를 탭하세요. 사각형은 수도, 원은 주요 도시, 숫자는 주둔 부대 수입니다. 내 도시를 선택한 뒤 점선 표시된 인접 도시를 탭하면 이동(초록)·공격(빨강)할 수 있습니다.</p>
-    <div class="kv"><span>시간</span><span>실시간 — 10분에 1년. ▶▶는 3배속, 스페이스로 일시정지</span><span>전선</span><span>공격은 즉시 점령이 아니라 전선을 만들고, 전투력 비율에 따라 하루 단위로 점령도가 밀립니다 (3:1이면 두어 달, 1.2:1이면 1년 이상)</span><span>공중 우세</span><span>전투기·방공이 많은 쪽이 지상전 효율 +30%. 지상군이 없으면 점령 불가</span><span>해상</span><span>바다 건너 공격은 구축함·잠수함·항모가 있어야 하며 속도 −40%</span><span>기술</span><span>각국 기술 연도(n년도 기술)가 1년 차이마다 전투 효율 4%</span><span>선공</span><span>AI도 야욕·숙적 관계에 따라 선제공격합니다. 동맹(집단방위)과 핵 억지가 이를 억제합니다</span><span>저항</span><span>점령지는 주둔 지상군이 부족하면 봉기 게이지(노란 원)가 차서 원래 나라로 돌아갑니다</span></div>`; return; }
-  const c=cities[sel], cs=st(c), mineC=cs.o===PLAYER, f=frontOn(c.id), oc=countries[cs.o];
-  const need=Math.ceil(Math.sqrt(c.pop)*1.5);
-  let h=`<div class="city-h"><span class="name">${esc(c.n)}</span><span class="chip ${mineC?'mine':''}">${mineC?'아군':esc(oc.name)+' 소유'}</span><span class="chip">${c.cap?'수도':'주요 도시'} · ${esc(countries[c.cc].name)}</span><span class="chip">${ftech(S.tech[cs.o])}</span>${S.nuclear[cs.o]?'<span class="chip warn">☢ 핵보유</span>':''}${blocsOf(cs.o).map(b=>`<span class="chip">${esc(b.n)}</span>`).join('')}</div>
-  <div class="kv"><span>GDP</span><span>${fm(cs.E*10)}</span><span>방어력</span><span>${Math.round(calc({},c,cs.o,cs.o,false).D)} (효율 ×${techMult(S.tech[cs.o]).toFixed(2)})</span>${cs.o!==c.cc?`<span>점령지 저항</span><span>${pct(cs.u)} ${domN(cs.g,'g')>=need?'<span class="good">안정 (지상군 충분)</span>':`<span class="bad">지상군 ${need}개 대대 필요</span>`}</span>`:''}${mineC&&atWar(PLAYER,cs.o)?'':''}</div>
-  <h3>주둔 병력 (${cnt(cs.g)})</h3>${garHtml(cs.g)}`;
-  if(f) h+=frontHtml(f);
-  if(mineC){
+  if(!sel){ pb.innerHTML=`<p class="muted" style="margin:0">지도에서 나라를 탭하세요. 배지 숫자는 점유국 부대 수입니다. 내 영토를 선택한 뒤 점선 표시된 인접 영토를 탭하면 이동(초록)·공격(빨강)할 수 있습니다.</p>
+    <div class="kv"><span>시간</span><span>실시간 — 10분에 1년. ▶▶는 3배속, 스페이스로 일시정지</span><span>영토</span><span>도시가 아니라 나라 전체가 하나의 영토이고, 여러 나라가 비율로 나눠 가질 수 있습니다. 공격은 즉시 점령이 아니라 전투력 비율에 따라 하루 단위로 비율이 넘어갑니다 (3:1이면 두어 달, 1.2:1이면 1년 이상). 큰 나라일수록 느립니다</span><span>점유국</span><span>비율이 가장 큰 나라가 영토를 점유하고 수입·생산을 가집니다 (10%p 이상 앞서야 교체)</span><span>공중 우세</span><span>전투기·방공이 많은 쪽이 지상전 효율 +30%. 지상군이 없으면 영토를 못 뺏음</span><span>해상</span><span>바다 건너 공격은 구축함·잠수함·항모가 있어야 하며 속도 −40%</span><span>기술</span><span>각국 기술 연도(n년도 기술)가 1년 차이마다 전투 효율 4%</span><span>선공</span><span>AI도 야욕·숙적 관계에 따라 선제공격합니다. 동맹(집단방위)과 핵 억지가 이를 억제합니다</span><span>저항</span><span>점령지는 주둔 지상군이 부족하면 봉기 게이지(노란 원)가 차서 원래 나라가 영토 일부를 되찾습니다</span></div>`; return; }
+  const rc=sel, r=R(rc), c=countries[rc], h=r.h, mine=h===PLAYER, myG=r.g[PLAYER];
+  const need=needGround(rc);
+  let hd=`<div class="city-h"><span class="name">${esc(c.name)}</span><span class="chip ${mine?'mine':''}">${mine?'아군 점유':esc(nm(h))+' 점유'}</span><span class="chip">${ftech(S.tech[h])}</span>${S.nuclear[h]?'<span class="chip warn">☢ 핵보유</span>':''}${blocsOf(h).map(b=>`<span class="chip">${esc(b.n)}</span>`).join('')}</div>${ctrlHtml(rc)}
+  <div class="kv"><span>GDP</span><span>${fm(r.E*10)}</span><span>방어력</span><span>${Math.round(calc({},rc,h,h,false).D)} (효율 ×${techMult(S.tech[h]).toFixed(2)})</span>${h!==rc?`<span>점령지 저항</span><span>${pct(r.u)} ${domN(gar(rc,h),'g')>=need?'<span class="good">안정 (지상군 충분)</span>':`<span class="bad">지상군 ${need}개 대대 필요</span>`}</span>`:''}</div>
+  <h3>${esc(nm(h))} 주둔군 (${cnt(gar(rc,h))})</h3>${garHtml(gar(rc,h))}`;
+  for(const a of Object.keys(r.g)){ if(a===h||!cnt(r.g[a])) continue; hd+=frontHtml(rc,a); }
+  if(mine){
     const ul=unlocked(PLAYER); let lastDom='';
-    h+=`<h3>생산 — 자금 ${fm(S.money[PLAYER])}</h3><div class="shop">${UNITS.map(u=>{ const ok=ul.includes(u); if(!ok&&u.nuke) return ''; const dh=u.dom!==lastDom?`<span class="dom">${DOM_N[u.dom]}</span>`:''; lastDom=u.dom;
+    hd+=`<h3>생산 — 자금 ${fm(S.money[PLAYER])}</h3><div class="shop">${UNITS.map(u=>{ const ok=ul.includes(u); if(!ok&&u.nuke) return ''; const dh=u.dom!==lastDom?`<span class="dom">${DOM_N[u.dom]}</span>`:''; lastDom=u.dom;
       return dh+`<span class="${ok?'':'lock'}"><b>${u.n}</b> <span class="s">${esc(u.s)} · ${fm(u.c)} · ${u.once?'타격 '+u.a:'공'+u.a+' 방'+u.d} · ${u.y}년도 기술</span></span><span>${ok?`<button class="btn small" data-b="${u.id}" data-n="1" ${S.money[PLAYER]<u.c?'disabled':''}>+1</button> <button class="btn small" data-b="${u.id}" data-n="5" ${S.money[PLAYER]<u.c*5?'disabled':''}>+5</button>`:`<span class="muted" style="font-size:11px">🔒 ${u.y}년도</span>`}</span>`; }).join('')}</div>`;
-    const en=cities.filter(t=>adj(c,t)&&st(t).o!==PLAYER);
-    h+=`<p class="muted" style="margin:8px 0 0">인접 타국 도시: ${en.length?en.map(t=>esc(t.n)+' ('+esc(countries[st(t).o].name)+', 방어 '+Math.round(calc({},t,PLAYER,st(t).o,false).D)+(atWar(PLAYER,st(t).o)?', 교전 중':'')+')').join(', '):'없음'}</p>`;
+    const en=[...c.nb].filter(t=>R(t).h!==PLAYER);
+    hd+=`<p class="muted" style="margin:8px 0 0">인접 타국 영토: ${en.length?en.map(t=>esc(nm(t))+' ('+esc(nm(R(t).h))+' 점유, 방어 '+Math.round(calc({},t,PLAYER,R(t).h,false).D)+(atWar(PLAYER,R(t).h)?', 교전 중':'')+')').join(', '):'없음'}</p>`;
   }
   if(dlg){
-    const fr=cities[dlg.from], t=cities[dlg.to], fs=st(fr), tgtO=st(t).o; const tmp=portion(fs.g,dlg.pct); const sea=isSea(fr,t); const ex=frontOn(t.id);
-    let warn=[]; if(dlg.kind==='attack'){ if(ex&&ex.atk!==PLAYER) warn.push(`${esc(countries[ex.atk].name)}이(가) 이미 공격 중인 도시 — 개입 불가`); if(sea&&!domN(tmp,'s')) warn.push('상륙작전에는 해상 전력(구축함·잠수함·항모)이 필요'); if(!domN(tmp,'g')) warn.push('지상군 없이는 점령 불가 (타격만 가능)'); if(S.nuclear[tgtO]) warn.push(`${esc(countries[tgtO].name)}은(는) 핵보유국 — 수도 함락 임박 시 핵 보복 위험. 방공포대로 요격 가능`); if(!atWar(PLAYER,tgtO)){ warn.push('선전포고 (신뢰 −8)'); for(const bl of blocsOf(tgtO)){ if(bl.m.includes(PLAYER)) warn.push(`${esc(bl.n)} 동맹국 공격 → 동맹 파기, 회원국 참전 확률 ${Math.round(bl.p*100)}%`); else warn.push(`${esc(bl.n)} 회원국 — 다른 회원국 참전 확률 ${Math.round(bl.p*100)}%`); } } }
-    const est=dlg.kind==='attack'?calc(tmp,t,PLAYER,tgtO,sea):null; const canAct=cnt(tmp)>0&&!(dlg.kind==='attack'&&ex&&ex.atk!==PLAYER)&&!(dlg.kind==='attack'&&sea&&!domN(tmp,'s')&&!ex);
-    h+=`<div class="dialog"><div class="t">${esc(fr.n)} → ${esc(t.n)} ${dlg.kind==='attack'?(ex?'전선 증원':'공격'):'이동'}${sea?' (해상)':''}</div>
+    const fr=dlg.from, t=dlg.to, fg=gar(fr,PLAYER), tgtO=R(t).h; const tmp=portion(fg,dlg.pct); const sea=isSeaR(fr,t); const ex=!!R(t).g[PLAYER];
+    let warn=[]; if(dlg.kind==='attack'){ if(sea&&!domN(tmp,'s')&&!ex) warn.push('상륙작전에는 해상 전력(구축함·잠수함·항모)이 필요'); if(!domN(tmp,'g')) warn.push('지상군 없이는 영토를 못 뺏음 (타격만 가능)'); if(S.nuclear[tgtO]) warn.push(`${esc(nm(tgtO))}은(는) 핵보유국 — 본토 60% 이상 상실 시 핵 보복 위험. 방공포대로 요격 가능`); if(!atWar(PLAYER,tgtO)){ warn.push('선전포고 (신뢰 −8)'); for(const bl of blocsOf(tgtO)){ if(bl.m.includes(PLAYER)) warn.push(`${esc(bl.n)} 동맹국 공격 → 동맹 파기, 회원국 참전 확률 ${Math.round(bl.p*100)}%`); else warn.push(`${esc(bl.n)} 회원국 — 다른 회원국 참전 확률 ${Math.round(bl.p*100)}%`); } } }
+    const est=dlg.kind==='attack'?calc(tmp,t,PLAYER,tgtO,sea):null; const canAct=cnt(tmp)>0&&!(dlg.kind==='attack'&&sea&&!domN(tmp,'s')&&!ex);
+    hd+=`<div class="dialog"><div class="t">${esc(nm(fr))} → ${esc(nm(t))} ${dlg.kind==='attack'?(ex?'전선 증원':'공격'):'이동'}${sea?' (해상)':''}</div>
     <label for="pct">보낼 비율: <b id="pv">${dlg.pct}</b>% (${cnt(tmp)}개 부대)</label><input type="range" id="pct" min="10" max="100" step="10" value="${dlg.pct}">
     ${est?`<div class="kv"><span>예상 전투력</span><span>공 ${Math.round(est.A)} : 방 ${Math.round(est.D)} → ${est.D>0?(est.A/est.D).toFixed(2)+'배':'무방비'} ${est.A/(est.D+0.001)>=1.5?'<span class="good">우세</span>':est.A/(est.D+0.001)>=1?'<span class="warn">근소 우세 — 장기전</span>':'<span class="bad">열세</span>'}</span><span>공중 우세</span><span>${Math.round(est.ra*100)}%</span></div>`:`<div class="kv"><span>소요</span><span>${cnt(tmp)?travelDays(fr,t,tmp):0}일</span></div>`}
     ${warn.length?`<p class="warn" style="margin:6px 0 0;font-size:12px">⚠ ${warn.join(' · ')}</p>`:''}
     <div class="row"><button class="btn primary" id="go" ${canAct?'':'disabled'}>${dlg.kind==='attack'?(ex?'증원 투입':'공세 개시'):'이동'}</button><button class="btn" id="cancel">취소</button></div></div>`;
   }
-  pb.innerHTML=h;
-  pb.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{ const u=UB[b.dataset.b]; let n=+b.dataset.n; n=Math.min(n,Math.floor(S.money[PLAYER]/u.c)); if(n<=0) return; cs.g[u.id]=(cs.g[u.id]||0)+n; S.money[PLAYER]-=n*u.c; save(); render(); });
-  const rt=pb.querySelector('#retreat'); if(rt&&f) rt.onclick=()=>{ endFront(f,'fail'); addLog(`${c.n} 전선에서 후퇴`,'me'); save(); render(); };
+  pb.innerHTML=hd;
+  pb.querySelectorAll('[data-b]').forEach(b=>b.onclick=()=>{ const u=UB[b.dataset.b]; let n=+b.dataset.n; n=Math.min(n,Math.floor(S.money[PLAYER]/u.c)); if(n<=0) return; garAdd(rc,PLAYER,{[u.id]:n}); S.money[PLAYER]-=n*u.c; save(); render(); });
+  pb.querySelectorAll('[data-retreat]').forEach(b=>b.onclick=()=>{ expel(b.dataset.retreat,PLAYER,'fail'); addLog(`${nm(b.dataset.retreat)} 전선에서 후퇴`,'me'); save(); render(); });
   const rg=pb.querySelector('#pct'); if(rg){ rg.oninput=()=>{dlg.pct=+rg.value; render();};
     pb.querySelector('#cancel').onclick=()=>{dlg=null;render();};
-    pb.querySelector('#go').onclick=()=>{ const fr=cities[dlg.from],t=cities[dlg.to];
-      if(dlg.kind==='move'){ const sent=split(st(fr).g,dlg.pct); moveUnits(fr,t,sent,PLAYER); addLog(`${fr.n} → ${t.n} ${cnt(sent)}개 부대 이동 (${travelDays(fr,t,sent)}일)`,'me'); }
-      else { const nf=openFront(fr,t,dlg.pct,true); if(nf) sel=t.id; }
+    pb.querySelector('#go').onclick=()=>{ const fr=dlg.from,t=dlg.to;
+      if(dlg.kind==='move'){ const sent=split(R(fr).g[PLAYER],dlg.pct); moveUnits(fr,t,sent,PLAYER); addLog(`${nm(fr)} → ${nm(t)} ${cnt(sent)}개 부대 이동 (${travelDays(fr,t,sent)}일)`,'me'); }
+      else { const nf=openFront(fr,t,dlg.pct,true); if(nf) sel=t; }
       dlg=null; if(S.speed===0) setSpeed(1); save(); render(); };
   }
 }
@@ -898,17 +895,17 @@ function showOver(){
   if(!S.over){ if(o) o.remove(); return; }
   if(o) return;
   o=document.createElement('div'); o.className='overlay'; o.id='over';
-  o.innerHTML=S.over==='win'?`<div class="card"><h2>세계 패권</h2><p>${fdate(S.day)}, 대한민국이 세계 경제의 60% 이상을 지배합니다. (${owned(PLAYER).length}개 도시)</p><button class="btn primary" id="again">새 게임</button></div>`
-    :`<div class="card"><h2>대한민국 멸망</h2><p>${fdate(S.day)}에 마지막 도시를 잃었습니다.</p><button class="btn primary" id="again">다시 도전</button></div>`;
+  o.innerHTML=S.over==='win'?`<div class="card"><h2>세계 패권</h2><p>${fdate(S.day)}, 대한민국이 세계 경제의 60% 이상을 지배합니다. (영토 ${held(PLAYER).length}곳)</p><button class="btn primary" id="again">새 게임</button></div>`
+    :`<div class="card"><h2>대한민국 멸망</h2><p>${fdate(S.day)}에 마지막 영토를 잃었습니다.</p><button class="btn primary" id="again">다시 도전</button></div>`;
   document.getElementById('mapwrap').appendChild(o); o.querySelector('#again').onclick=newGame;
 }
 function newGame(){ fresh(); sel=null; dlg=null; tab='info'; setSpeed(0); save(); render(); }
 document.getElementById('newGame').onclick=()=>{ const b=document.getElementById('newGame'); if(b.dataset.c==='1'){ b.dataset.c=''; b.textContent='초기화'; newGame(); } else { b.dataset.c='1'; b.textContent='정말 초기화? 다시 탭'; setTimeout(()=>{b.dataset.c='';b.textContent='초기화';},2500); } };
 matchMedia('(prefers-color-scheme:dark)').addEventListener('change',draw);
-document.addEventListener('visibilitychange',()=>{ if(document.hidden&&S){ save(); } last=performance.now(); acc=0; });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&S) save(); last=performance.now(); acc=0; });
 
 function start(hot){
-  S=(hot&&hot.S)||load(); if(!S) fresh();
+  S=(hot&&hot.S&&hot.S.v===4)?hot.S:load(); if(!S) fresh();
   S.speed=0; setSpeed(0);
   try{ window.claude?.hot?.snapshot?.(()=>({S})); }catch(e){}
   resize(); centerOn(127,37,3); render(); last=performance.now(); requestAnimationFrame(frame);
