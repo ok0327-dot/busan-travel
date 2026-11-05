@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-11-04T01:36Z",
-  "count": 4,
+  "generated_at": "2026-11-05T01:48Z",
+  "count": 3,
   "confirmed_count": 0,
-  "estimated_count": 4,
+  "estimated_count": 3,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3396705",
-      "category": "festival",
-      "region": "울산",
-      "title": "2025 울산문화박람회",
-      "start": "2026-12-04",
-      "end": "2026-12-07",
-      "venue": null,
-      "address": "울산광역시 울주군 삼남읍 울산역로 255",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/38/3567838_image2_1.jpg",
-      "tel": "052-255-1943",
-      "lat": 35.5556598644,
-      "lon": 129.1316827314,
-      "orig_start": "2025-12-04",
-      "orig_end": "2025-12-07",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-3578130",
       "category": "festival",
