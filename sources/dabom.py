@@ -8,9 +8,12 @@
 from __future__ import annotations
 
 import html as _html
+import logging
 import re
 
 from sources._adapter import HTTPSession, report
+
+logger = logging.getLogger(__name__)
 from sources._venues import guess_venue_coords
 from storage.db import Event
 
@@ -24,6 +27,11 @@ DATE_RANGE_RE = re.compile(r"(\d{4}\.\d{2}\.\d{2})\s*~\s*(\d{4}\.\d{2}\.\d{2})")
 FN_VIEW_RE = re.compile(r"fn_view\('(\d+)'")  # 사이트가 2번째 인자(카테고리코드) 추가 → 첫 인자(res_no)만 추출
 IMG_RE = re.compile(r'src="(/images/contents/[^"]+)"')
 LI_RE = re.compile(r"<li[^>]*>.*?</li>", re.DOTALL)
+# boardlist class variant: handles extra classes, quote style changes, case
+_BOARDLIST_RE = re.compile(
+    r'<ul[^>]+class=["\'][^"\']*boardlist[^"\']*\btype1\b[^"\']*["\']',
+    re.IGNORECASE,
+)
 
 # 다봄 카테고리 라벨 → 우리 카테고리
 EXHIBITION_TAGS = ("전시", "미술", "조각", "사진전")
@@ -45,11 +53,18 @@ def _parse_date(s: str | None) -> str | None:
 
 
 def _extract_list_section(html: str) -> str:
+    # Try regex first (tolerates extra classes, single/double quotes)
+    m = _BOARDLIST_RE.search(html)
+    if m:
+        start = m.start()
+        end = html.find("</ul>", start + len(m.group()))
+        return html[start:end] if end > start else ""
+    # Legacy exact-string fallback (pre-2026-07 site markup)
     start = html.find('class="boardlist type1">')
-    if start < 0:
-        return ""
-    end = html.find("</ul>", start)
-    return html[start:end] if end > start else ""
+    if start >= 0:
+        end = html.find("</ul>", start)
+        return html[start:end] if end > start else ""
+    return ""
 
 
 def _parse_li(li: str) -> dict | None:
@@ -114,6 +129,12 @@ def _fetch_page(page: int) -> list[dict]:
         return []
     section = _extract_list_section(r.text)
     if not section:
+        if page == 1:
+            logger.warning(
+                "dabom: boardlist section not found on page 1 "
+                "(HTML length=%d) — site markup may have changed",
+                len(r.text),
+            )
         return []
     items = []
     for li in LI_RE.findall(section):
