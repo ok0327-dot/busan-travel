@@ -1,32 +1,14 @@
 {
-  "generated_at": "2026-11-11T01:32Z",
-  "count": 3,
+  "generated_at": "2026-11-12T02:36Z",
+  "count": 2,
   "confirmed_count": 0,
-  "estimated_count": 3,
+  "estimated_count": 2,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
   "festivals": [
-    {
-      "id": "nearby-3578130",
-      "category": "festival",
-      "region": "울산",
-      "title": "울산의 밤, 크리스마스 마켓",
-      "start": "2026-12-05",
-      "end": "2026-12-27",
-      "venue": null,
-      "address": "울산광역시 남구 대공원로 94 (옥동)",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/65/3578165_image2_1.jpg",
-      "tel": "052-271-8701",
-      "lat": 35.5316989268,
-      "lon": 129.2935470479,
-      "orig_start": "2025-12-05",
-      "orig_end": "2025-12-27",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    },
     {
       "id": "nearby-2933428",
       "category": "festival",
