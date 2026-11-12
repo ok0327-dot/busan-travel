@@ -347,6 +347,9 @@ const BLOCS=[
 const RIVALS=[['RU','UA'],['IN','PK'],['CN','TW'],['KP','KR'],['IL','IR'],['AM','AZ'],['ET','ER'],['SD','SS'],['SA','YE'],['DZ','MA'],['GR','TR'],['VE','GY'],['CN','IN'],['TH','KH'],['RW','CD'],['EG','ET'],['CO','VE'],['IQ','IR'],['AF','PK'],['SY','IL'],['LB','IL'],['UZ','TJ'],['BY','PL'],['RU','GE'],['CN','VN'],['CN','PH'],['ER','DJ'],['NG','NE'],['ML','BF'],['SO','ET'],['IL','PS'],['RU','EE'],['RU','LV'],['RU','LT'],['TR','SY'],['KP','JP'],['CN','JP'],['MM','BD'],['UG','CD'],['TD','SD']];
 const RIV=new Set(RIVALS.map(([a,b])=>a<b?a+'|'+b:b+'|'+a));
 
+// 날짜변경선(경도 ±180)을 가로지르는 링을 잘라 지도 전체 폭의 띠가 생기지 않게 함 (피지 등)
+{ const splitRing=r=>{ const out=[]; let cur=[r[0],r[1]]; for(let i=2;i<r.length;i+=2){ if(Math.abs(r[i]-r[i-2])>18000){ if(cur.length>=6) out.push(cur); cur=[]; } cur.push(r[i],r[i+1]); } if(cur.length>=6) out.push(cur); return out; };
+  for(const mid in GEO) GEO[mid]=GEO[mid].flatMap(splitRing); }
 // ---- 정적 데이터: 나라 = 하나의 영토 (도시 없음) ----
 const countries={}, byMap={};
 D.forEach((r,i)=>{
@@ -369,6 +372,9 @@ const POLY={};
 for(const mid in GEO){ let X0=1e9,Y0=1e9,X1=-1e9,Y1=-1e9; const rings=GEO[mid].map(r=>{ const n=r.length/2, pts=new Float32Array(r.length), ll=new Float32Array(r.length); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
   for(let i=0;i<n;i++){ const lon=r[2*i]/100, lat=r[2*i+1]/100; ll[2*i]=lon; ll[2*i+1]=lat; const [x,y]=proj(lon,lat); pts[2*i]=x; pts[2*i+1]=y; if(x<x0)x0=x;if(y<y0)y0=y;if(x>x1)x1=x;if(y>y1)y1=y; }
   X0=Math.min(X0,x0);Y0=Math.min(Y0,y0);X1=Math.max(X1,x1);Y1=Math.max(Y1,y1); return {pts,ll,bb:[x0,y0,x1,y1]}; }); rings.bb=[X0,Y0,X1,Y1]; POLY[mid]=rings; }
+// 국경 세그먼트: 이웃과 공유하는 변은 지배국이 같아지면 '옛 국경'으로 바뀜
+const SEGNB={}; { const map=new Map(); for(const mid in GEO) GEO[mid].forEach((r,ri)=>{ const n=r.length/2; for(let i=0;i<n-1;i++){ const a=r[2*i]+','+r[2*i+1], b=r[2*i+2]+','+r[2*i+3]; const k=a<b?a+'|'+b:b+'|'+a; let s=map.get(k); if(!s){ s=[]; map.set(k,s); } s.push(mid); } });
+  for(const mid in GEO) SEGNB[mid]=GEO[mid].map(r=>{ const n=r.length/2, out=new Array(n-1).fill(null); for(let i=0;i<n-1;i++){ const a=r[2*i]+','+r[2*i+1], b=r[2*i+2]+','+r[2*i+3]; const k=a<b?a+'|'+b:b+'|'+a; const s=map.get(k); if(s&&s.length>=2) out[i]=s.find(x=>x!==mid)||null; } return out; }); }
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const dark=()=>{const t=document.documentElement.dataset.theme; return t==='dark'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches);};
 const colorCache={};
@@ -793,9 +799,9 @@ function draw(){
   ctx.lineWidth=Math.max(0.5,Math.min(1.2,s*0.5)); ctx.strokeStyle=css('--border');
   for(const mid in POLY){
     const code=byMap[mid], rings=POLY[mid];
-    if(!code){ if(pathRings(rings,s,tx,ty)){ ctx.fillStyle=css('--neutral'); ctx.globalAlpha=.5; ctx.fill('evenodd'); ctx.globalAlpha=1; ctx.stroke(); } continue; }
+    if(!code){ if(pathRings(rings,s,tx,ty)){ ctx.fillStyle=css('--neutral'); ctx.globalAlpha=.5; ctx.fill('evenodd'); ctx.globalAlpha=1; } continue; }
     const r=R(code); if(!pathRings(rings,s,tx,ty)) continue;
-    ctx.fillStyle=ownerColor(r.h); ctx.globalAlpha=.72; ctx.fill('evenodd'); ctx.globalAlpha=1; ctx.stroke();
+    ctx.fillStyle=ownerColor(r.h); ctx.globalAlpha=.72; ctx.fill('evenodd'); ctx.globalAlpha=1;
     const others=Object.keys(r.ctrl).filter(o=>o!==r.h&&r.ctrl[o]>0.002).sort((a,b)=>r.ctrl[b]-r.ctrl[a]);
     if(!others.length) continue;
     const bb=rings.bb, corners=[[bb[0],bb[1]],[bb[2],bb[1]],[bb[0],bb[3]],[bb[2],bb[3]]].map(([x,y])=>[x*s+tx,y*s+ty]);
@@ -804,9 +810,19 @@ function draw(){
       let pmin=1e18,pmax=-1e18; for(const [x,y] of corners){ const p=x*ux+y*uy; if(p<pmin)pmin=p; if(p>pmax)pmax=p; }
       const fp=pmin+r.ctrl[o]*(pmax-pmin), mx=ux*fp, my=uy*fp; if(!isFinite(mx)||!isFinite(my)) continue;
       ctx.save(); pathRings(rings,s,tx,ty); ctx.clip('evenodd'); clipHalf(mx,my,-ux,-uy); ctx.fillStyle=ownerColor(o); ctx.globalAlpha=.8; ctx.fillRect(0,0,cw,ch); ctx.globalAlpha=1;
-      ctx.strokeStyle=ownerColor(o); ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.beginPath(); ctx.moveTo(mx-uy*1e5,my+ux*1e5); ctx.lineTo(mx+uy*1e5,my-ux*1e5); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+      const fighting=r.g[o]&&cnt(r.g[o])&&atWar(o,r.h);
+      if(fighting){ ctx.strokeStyle=ownerColor(o); ctx.lineWidth=2; ctx.setLineDash([6,4]); } else { ctx.strokeStyle=css('--border'); ctx.lineWidth=Math.max(1,Math.min(2,s*0.7)); }
+      ctx.beginPath(); ctx.moveTo(mx-uy*1e5,my+ux*1e5); ctx.lineTo(mx+uy*1e5,my-ux*1e5); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
     }
   }
+  // 국경선: 지배국이 다른 변만 실선, 같은 지배국 사이의 옛 국경은 희미한 점선, 해안선은 기본
+  { const bw=Math.max(0.5,Math.min(1.2,s*0.5)); const paths={coast:new Path2D(),border:new Path2D(),old:new Path2D()};
+    for(const mid in POLY){ const rings=POLY[mid], code=byMap[mid]; const h1=code?R(code).h:null; const nbs=SEGNB[mid];
+      rings.forEach((ring,ri)=>{ const b=ring.bb; if(b[2]*s+tx<0||b[0]*s+tx>cw||b[3]*s+ty<0||b[1]*s+ty>ch) return; const p=ring.pts, nb=nbs[ri];
+        for(let i=0;i<nb.length;i++){ const o=nb[i]; let cat; if(!o) cat='coast'; else { const oc=byMap[o]; const h2=oc?R(oc).h:null; cat=(h1&&h2&&h1===h2)?'old':'border'; }
+          const P=paths[cat]; P.moveTo(p[2*i]*s+tx,p[2*i+1]*s+ty); P.lineTo(p[2*i+2]*s+tx,p[2*i+3]*s+ty); } }); }
+    ctx.strokeStyle=css('--border'); ctx.lineWidth=bw; ctx.stroke(paths.coast); ctx.lineWidth=bw*1.4; ctx.stroke(paths.border);
+    ctx.globalAlpha=.3; ctx.lineWidth=Math.max(0.5,bw*0.7); ctx.setLineDash([2,3]); ctx.stroke(paths.old); ctx.setLineDash([]); ctx.globalAlpha=1; }
   const fg=css('--fg');
   // 선택 영토 & 인접 영토 강조
   if(sel){ const mine=share(sel,PLAYER)>0||!!R(sel).g[PLAYER];
@@ -951,7 +967,7 @@ function renderWorld(){
 }
 function renderInfo(){
   if(!sel){ pb.innerHTML=`<p class="muted" style="margin:0">지도에서 나라를 탭하세요. 배지 숫자는 점유국 부대 수입니다. 내 영토를 선택한 뒤 다른 영토를 탭하면 이동·공격할 수 있습니다 (점선 = 인접, 그 외는 원정).</p>
-    <div class="kv"><span>시간</span><span>실시간 — 10분에 1년. ▶▶는 3배속, 스페이스로 일시정지</span><span>영토</span><span>도시가 아니라 나라 전체가 하나의 영토이고, 여러 나라가 비율로 나눠 가질 수 있습니다. 공격은 즉시 점령이 아니라 전투력 비율에 따라 하루 단위로 비율이 넘어갑니다 (3:1이면 두어 달, 1.2:1이면 1년 이상). 큰 나라일수록 느립니다</span><span>점유국</span><span>비율이 가장 큰 나라가 영토를 점유하고 수입·생산을 가집니다 (10%p 이상 앞서야 교체)</span><span>공중 우세</span><span>전투기·방공이 많은 쪽이 지상전 효율 +30%. 지상군이 없으면 영토를 못 뺏음</span><span>해상</span><span>바다 건너 공격은 구축함·잠수함·항모가 있어야 하며 속도 −40%</span><span>공습</span><span>공격 대화창의 공습 버튼으로 사거리 내 항공 부대를 출격시켜 적 주둔군과 경제를 타격합니다. 폭격기는 9,000km까지 닿아 먼 나라도 때릴 수 있지만 영토는 지상군이 있어야 뺏습니다</span><span>원정</span><span>인접하지 않은 나라도 공격할 수 있습니다. 구축함 1척당 6개, 항모 1척당 20개 부대를 실을 수 있고, 거리 500km마다 도착 병력이 절반으로 줄며 700km/일로 항해합니다. 상륙 후엔 해상 공격 규칙이 적용됩니다</span><span>기술</span><span>각국 기술 연도(n년도 기술)가 1년 차이마다 전투 효율 4%</span><span>선공</span><span>AI도 야욕·숙적 관계에 따라 선제공격합니다. 동맹(집단방위)과 핵 억지가 이를 억제합니다</span><span>저항</span><span>점령지는 주둔 지상군이 부족하면 봉기 게이지(노란 원)가 차서 원래 나라가 영토 일부를 되찾습니다</span><span>병참</span><span>영토마다 동시에 싸울 수 있는 부대 수에 한계가 있어 대군을 몰아넣어도 속도가 비례해 오르지 않습니다. 본토가 침공당하면 예비군이 자동 소집됩니다</span><span>인구</span><span>영토마다 인구가 있어 출산(가난할수록 높음)·전쟁 사망·난민 유출입으로 변합니다. 인구는 동원 가능 병력 한도, GDP, 점령에 필요한 주둔군 수를 정합니다</span></div>`; return; }
+    <div class="kv"><span>시간</span><span>실시간 — 10분에 1년. ▶▶는 3배속, 스페이스로 일시정지</span><span>영토</span><span>도시가 아니라 나라 전체가 하나의 영토이고, 여러 나라가 비율로 나눠 가질 수 있습니다. 공격은 즉시 점령이 아니라 전투력 비율에 따라 하루 단위로 비율이 넘어갑니다 (3:1이면 두어 달, 1.2:1이면 1년 이상). 큰 나라일수록 느립니다</span><span>점유국</span><span>비율이 가장 큰 나라가 영토를 점유하고 수입·생산을 가집니다 (10%p 이상 앞서야 교체)</span><span>국경</span><span>국경선은 실제 지배권을 따라 다시 그려집니다. 같은 나라가 지배하는 영토 사이의 옛 국경은 희미한 점선이 되고, 교전 중인 전선은 점선, 휴전으로 굳은 분단선은 실선 국경이 됩니다</span><span>공중 우세</span><span>전투기·방공이 많은 쪽이 지상전 효율 +30%. 지상군이 없으면 영토를 못 뺏음</span><span>해상</span><span>바다 건너 공격은 구축함·잠수함·항모가 있어야 하며 속도 −40%</span><span>공습</span><span>공격 대화창의 공습 버튼으로 사거리 내 항공 부대를 출격시켜 적 주둔군과 경제를 타격합니다. 폭격기는 9,000km까지 닿아 먼 나라도 때릴 수 있지만 영토는 지상군이 있어야 뺏습니다</span><span>원정</span><span>인접하지 않은 나라도 공격할 수 있습니다. 구축함 1척당 6개, 항모 1척당 20개 부대를 실을 수 있고, 거리 500km마다 도착 병력이 절반으로 줄며 700km/일로 항해합니다. 상륙 후엔 해상 공격 규칙이 적용됩니다</span><span>기술</span><span>각국 기술 연도(n년도 기술)가 1년 차이마다 전투 효율 4%</span><span>선공</span><span>AI도 야욕·숙적 관계에 따라 선제공격합니다. 동맹(집단방위)과 핵 억지가 이를 억제합니다</span><span>저항</span><span>점령지는 주둔 지상군이 부족하면 봉기 게이지(노란 원)가 차서 원래 나라가 영토 일부를 되찾습니다</span><span>병참</span><span>영토마다 동시에 싸울 수 있는 부대 수에 한계가 있어 대군을 몰아넣어도 속도가 비례해 오르지 않습니다. 본토가 침공당하면 예비군이 자동 소집됩니다</span><span>인구</span><span>영토마다 인구가 있어 출산(가난할수록 높음)·전쟁 사망·난민 유출입으로 변합니다. 인구는 동원 가능 병력 한도, GDP, 점령에 필요한 주둔군 수를 정합니다</span></div>`; return; }
   const rc=sel, r=R(rc), c=countries[rc], h=r.h, mine=h===PLAYER, myG=r.g[PLAYER];
   const need=needGround(rc);
   let hd=`<div class="city-h"><span class="name">${esc(c.name)}</span><span class="chip ${mine?'mine':''}">${mine?'아군 점유':esc(nm(h))+' 점유'}</span><span class="chip">${ftech(S.tech[h])}</span>${S.nuclear[h]?'<span class="chip warn">☢ 핵보유</span>':''}${blocsOf(h).map(b=>`<span class="chip">${esc(b.n)}</span>`).join('')}</div>${ctrlHtml(rc)}
