@@ -54,13 +54,19 @@ _ATTENDABLE_TITLE = re.compile(
     r"전시|영화제|예술제|문화제|한마당|운동회|야시장"
 )
 _NOT_ATTENDABLE_TITLE = re.compile(
-    r"모집|공모|후기|결과|성료|취소|연기|수상|선정|접수|신청|교육|강좌|강의|수강|특강|아카데미|"
+    r"모집|공모|후기|결과|성료|취소|연기|수상|선정|접수|신청(?!사)|교육|강좌|강의|수강|특강|아카데미|"
     r"프로그램|설명회|간담회|포럼|세미나|채용|일자리|취업|창업|휴관|휴무|통제|공사|점검|스케치|"
     r"다녀왔|다녀온|훈련|설문|조사|투표|환급|유치|혜택|이벤트|챌린지|모음|총정리|라인업|가볼만한|"
     r"추천|임산부|어르신|시니어|중장년"
 )
 # 여러 행사를 묶은 글·소식지 — 날짜를 하나로 줄일 수 없다 / multi-event roundups & newsletters
 _ROUNDUP_TITLE = re.compile(r"모음|총정리|라인업|알리미|한눈에")
+# 제목이 모집·신청 글이면 카테고리와 무관하게 게시일을 유지한다. 이미 festival 로 분류된
+# '○○축제 자원봉사자 모집' 이 행사일로 옮겨지면 그 주말 Top 5 에 끼어들기 때문.
+# ('신청사' 같은 낱말은 제외) / recruitment titles keep the post date, whatever the category.
+_RECRUIT_TITLE = re.compile(
+    r"모집|공모|자원\s*봉사|봉사자|참여자|참가자|서포터즈|선정|선발|공고|접수|신청(?!사)|채용|당첨"
+)
 # 본문이 '참가자 모집' 글이면 날짜가 있어도 누구나 가는 행사가 아니다 / sign-up-only programmes
 _RECRUIT_BODY = re.compile(
     r"모집합니다|모집해요|모집\s*중|참여자\s*모집|참가자\s*모집|수강\s*신청|수강생|선정\s*가[족정]|선발"
@@ -97,6 +103,8 @@ def _event_period(title: str, text: str | None, post_date: str | None) -> EventP
     / Unlabelled dates count only for event-announcement titles."""
     if _ROUNDUP_TITLE.search(title):
         return None  # '7월 행사 모음.zip' — 첫 행사 날짜가 글 전체의 날짜가 아니다 / roundup posts
+    if _RECRUIT_TITLE.search(title):
+        return None  # 모집·신청 글은 게시일 유지 → 승격도 없음 / sign-up posts keep the post date
     period = extract_event_period(title, text, post_date)
     if period and period.basis == "text" and (
         not _ATTENDABLE_TITLE.search(title) or _NOT_ATTENDABLE_TITLE.search(title)
