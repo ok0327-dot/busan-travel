@@ -1359,6 +1359,26 @@ a i[class^="ph-"] { vertical-align: -2px; margin-right: 4px; }
   margin-right: 6px;
   font-weight: 600;
 }
+/* 항목 전체가 버튼 (탭·키보드로 상세 열기) — 모양은 기존 li 텍스트와 동일하게 리셋 */
+.urgent-alert .urg-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.urgent-alert .urg-item:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .urgent-alert .urg-cat { margin-right: 4px; }
 .urgent-alert .urg-kind {
   font-size: 11px;
