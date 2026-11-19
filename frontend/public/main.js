@@ -1475,9 +1475,19 @@ function _bookingCategoryGroup(p) {
   return { key: "other", label: "🗓 기타 사전 예약", icon: "🗓" };
 }
 
+// 로컬 날짜 → "YYYY-MM-DD" (toISOString 은 UTC 라 KST 자정 전후로 하루 밀림)
+// Local date → "YYYY-MM-DD" (toISOString is UTC and shifts the day around KST midnight)
+function _localIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // booking 임박 행사 추출 (D-N 이내, deadline 또는 start 기준)
-function _bookingPool(combined, target, maxDays) {
-  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+// D-day 는 선택한 날짜(target)가 아니라 실제 오늘(now) 기준 — 예매 마감은 현실의 행동이라
+// 목·금에 주말(토)을 보며 계획할 때 금요일 마감 건이 D-(-1) 로 사라지면 안 된다.
+// D-day counts from the real today, not the selected target: booking is a real-world action,
+// and the owner plans on Thu/Fri while the target defaults to Saturday.
+function _bookingPool(combined, maxDays, now = new Date()) {
+  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const out = [];
   for (let i = 0; i < combined.length; i++) {
     const p = combined[i];
@@ -2018,16 +2028,18 @@ function renderTodayHighlights(target) {
   const hero = combined.slice(0, 5);
   const tail = combined.slice(5);
 
-  // 사전 예약 — D-7 (urgent) + D-30 (full) 두 단계
-  const reservationsUrgent = _bookingPool(combined, target, 7);
-  const reservations = _bookingPool(combined, target, 30);
+  // 사전 예약 — D-7 (urgent) + D-30 (full) 두 단계.
+  // 기준일은 target(기본 토요일)이 아닌 실제 오늘 — 목·금 저녁에 주말을 계획할 때도
+  // 금요일 마감 건이 보여야 하므로. / Reference is the real today, not the target Saturday.
+  const today = new Date();
+  const reservationsUrgent = _bookingPool(combined, 7, today);
+  const reservations = _bookingPool(combined, 30, today);
 
-  // 오늘 발매 ("🆕 오늘 티켓 오픈") — booking_opens_at == 오늘
-  const todayIso = `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,"0")}-${String(target.getDate()).padStart(2,"0")}`;
+  // 오늘 발매 ("🆕 오늘 티켓 오픈") — booking_opens_at == 실제 오늘 (target 날짜 아님)
+  const todayIso = _localIso(today);
   const opensToday = combined.filter(p => p.booking_opens_at === todayIso);
 
   const season = (window.__seasonal?.months || {})[month];
-  const today = new Date();
   const isToday = target.toDateString() === today.toDateString();
   const days = ["일", "월", "화", "수", "목", "금", "토"];
   // 토요일이면 주말 이틀을 함께 표기 (일요일 행사도 "곧 시작"으로 같이 보이므로)
@@ -2043,15 +2055,17 @@ function renderTodayHighlights(target) {
   </div>`;
 
   // ⓪ 상단 긴급 알림 — D-7 이내 마감 임박 (축제 우선) + 오늘 발매
+  // 각 항목은 <button> 이라 탭·키보드(Tab/Enter)로 상세 열기 가능 (클릭 연결은 아래 .urg-item)
+  // Each item is a <button> so it opens the detail on tap or keyboard (wired via .urg-item below).
   let urgentAlertHTML = "";
   if (reservationsUrgent.length || opensToday.length) {
     const urgentItems = reservationsUrgent.slice(0, 5).map(({ poi, idx, daysTo, refKind }) => {
       const grp = _bookingCategoryGroup(poi);
       const dLabel = daysTo === 0 ? "오늘" : `D-${daysTo}`;
-      return `<li data-idx="${idx}"><strong>${dLabel}</strong> <span class="urg-cat">${grp.icon}</span> ${escape(poi.title.slice(0, 40))} <span class="urg-kind">${refKind}</span></li>`;
+      return `<li><button type="button" class="urg-item" data-idx="${idx}"><strong>${dLabel}</strong> <span class="urg-cat">${grp.icon}</span> ${escape(poi.title.slice(0, 40))} <span class="urg-kind">${refKind}</span></button></li>`;
     }).join("");
-    const opensHTML = opensToday.slice(0, 3).map((p, i) =>
-      `<li class="urg-opens"><strong>🆕 오늘 발매</strong> ${escape(p.title.slice(0, 40))}</li>`
+    const opensHTML = opensToday.slice(0, 3).map(p =>
+      `<li class="urg-opens"><button type="button" class="urg-item" data-idx="${combined.indexOf(p)}"><strong>🆕 오늘 발매</strong> ${escape(p.title.slice(0, 40))}</button></li>`
     ).join("");
     urgentAlertHTML = `<div class="urgent-alert">
       <div class="urg-title">🚨 이번주 마감·발매 ${reservationsUrgent.length + opensToday.length}건</div>
@@ -2334,8 +2348,8 @@ function renderTodayHighlights(target) {
   }
 
 
-  // Hero + chip 클릭 → POI 상세
-  $list.querySelectorAll(".hero-card, .chip").forEach(btn => {
+  // Hero + chip + 긴급 알림 항목 클릭 → POI 상세
+  $list.querySelectorAll(".hero-card, .chip, .urg-item").forEach(btn => {
     btn.addEventListener("click", () => {
       const idx = Number(btn.dataset.idx);
       const poi = combined[idx];
@@ -2435,7 +2449,7 @@ function chipHTML(p, idx, target) {
 function reservationChipHTML(p, idx, daysTo) {
   const mile = daysTo <= 7 ? "d-7" : daysTo <= 14 ? "d-14" : "d-30";
   return `<button class="chip chip-reservation chip-${mile}" data-idx="${idx}">
-    <span class="chip-d chip-d-${mile}">D-${daysTo}</span>
+    <span class="chip-d chip-d-${mile}">${daysTo === 0 ? "오늘" : `D-${daysTo}`}</span>
     <span class="chip-title">${escape(p.title || "(제목 없음)")}</span>
   </button>`;
 }
