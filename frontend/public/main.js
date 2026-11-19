@@ -1527,6 +1527,12 @@ function _sameEventLikely(a, b) {
   const va = _venueKey(a.venue), vb = _venueKey(b.venue);
   return va.length >= 3 && vb.length >= 3 && (va.includes(vb) || vb.includes(va));
 }
+// 같은 행사로 보이는 항목은 앞의 것 하나만 남긴다 (순서 유지). / Keep the first of each same-event group.
+function _uniqueEvents(pois) {
+  const kept = [];
+  for (const p of pois) if (!kept.some(k => _sameEventLikely(k, p))) kept.push(p);
+  return kept;
+}
 
 // 🚨 긴급 박스 전용 순서·중복 정리 (D-30 섹션은 _bookingPool 의 카테고리순 결과를 그대로 쓴다).
 // ① 실제 마감일이 있는 건("마감")을 먼저 daysTo 오름차순, ② 마감일 없이 시작일 기준인 건("시작")은 그 뒤.
@@ -2078,8 +2084,10 @@ function renderTodayHighlights(target) {
   const reservations = _bookingPool(combined, 30, today);
 
   // 오늘 발매 ("🆕 오늘 티켓 오픈") — booking_opens_at == 실제 오늘 (target 날짜 아님)
+  // 출처만 다른 같은 행사가 둘 다 오늘 발매면 한 줄·한 건으로 (앞쪽 = 정렬상 우선인 것 유지)
+  // Collapse cross-source duplicates so one event counts and renders once.
   const todayIso = _localIso(today);
-  const opensToday = combined.filter(p => p.booking_opens_at === todayIso);
+  const opensToday = _uniqueEvents(combined.filter(p => p.booking_opens_at === todayIso));
 
   const season = (window.__seasonal?.months || {})[month];
   const isToday = target.toDateString() === today.toDateString();
@@ -2102,17 +2110,23 @@ function renderTodayHighlights(target) {
   let urgentAlertHTML = "";
   const urgentList = _urgentBookingList(reservationsUrgent, opensToday);
   if (urgentList.length || opensToday.length) {
-    const urgentItems = urgentList.slice(0, 5).map(({ poi, idx, daysTo, refKind }) => {
+    const itemHTML = ({ poi, idx, daysTo, refKind }) => {
       const grp = _bookingCategoryGroup(poi);
       const dLabel = daysTo === 0 ? "오늘" : `D-${daysTo}`;
       return `<li><button type="button" class="urg-item" data-idx="${idx}"><strong>${dLabel}</strong> <span class="urg-cat">${grp.icon}</span> ${escape(poi.title.slice(0, 40))} <span class="urg-kind">${refKind}</span></button></li>`;
-    }).join("");
+    };
+    // 줄 순서: 실제 마감 → 오늘 발매 → 시작일 기준. booking_opens_at 은 시작일에서 거꾸로 잡은 추정치가
+    // 많아서, 추정 발매 줄이 진짜 마감 줄 위에 오지 않게 한다. 상한은 그대로 (상위 5 + 발매 최대 3).
+    // Row order: real deadlines → opens today → start-date rows (opens dates are often estimates).
+    const top = urgentList.slice(0, 5);
+    const deadlineHTML = top.filter(r => r.refKind === "마감").map(itemHTML).join("");
+    const startHTML = top.filter(r => r.refKind !== "마감").map(itemHTML).join("");
     const opensHTML = opensToday.slice(0, 3).map(p =>
       `<li class="urg-opens"><button type="button" class="urg-item" data-idx="${combined.indexOf(p)}"><strong>🆕 오늘 발매</strong> ${escape(p.title.slice(0, 40))}</button></li>`
     ).join("");
     urgentAlertHTML = `<div class="urgent-alert">
       <div class="urg-title">🚨 이번주 마감·발매 ${urgentList.length + opensToday.length}건</div>
-      <ul class="urg-list">${opensHTML}${urgentItems}</ul>
+      <ul class="urg-list">${deadlineHTML}${opensHTML}${startHTML}</ul>
       ${urgentList.length > 5 ? `<div class="urg-more">+${urgentList.length - 5}건 더 — ④번 카드에서 전체 보기</div>` : ""}
     </div>`;
   }
