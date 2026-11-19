@@ -80,6 +80,8 @@ _EVENT_LABEL = re.compile(
     r"(?:\s*[/및·,]\s*[가-힣]{1,4})?"          # '일시/장소 :' '일시 및 장소:'
     r"\s*(?:은|는)?\s*[:：│|∣\]】>)]?\s*$"
 )
+# 항목명 끝부분 = 바로 앞 한 낱말 + 일시/기간 … ('행사 일시:', '신청기간:', '접수 일시:')
+_LABEL_TAIL = re.compile(r"[가-힣]*\s?" + _EVENT_LABEL.pattern)
 _BARE_LABEL = re.compile(r"(?:일\s*시|기\s*간|일\s*정|날\s*짜|일\s*자)\s*[:：│|∣]?")
 # 맨 '기간:' 위의 소제목이 '신청안내' '사전예약 (40명 선착순!)' 류면 그 기간은 접수 기간
 _REJECT_HEADING = re.compile(r"(?:사전|온라인|참가|참여)?\s*(?:신청|접수|모집|예약|예매|공모)")
@@ -185,10 +187,13 @@ def _label_of(text: str, lo: int, s: int, prev_label: str | None) -> str:
     if prev_label and lo > 0 and _CONTINUATION.match(pre):
         return prev_label  # '9. 2.(수), 9. 4.(금)' — 앞 항목에 이어지는 날짜
     seg, _ = _last_segment(pre)
-    if _REJECT_LABEL.search(seg):
+    tail = _LABEL_TAIL.search(seg)
+    if not tail:
+        return "reject" if _REJECT_LABEL.search(seg) else "none"
+    # 항목명 자체(바로 앞 낱말 + 일시/기간 …)만 본다: '참가 신청 및 행사 일시:' 는 행사 일시,
+    # '신청 기간:' '접수 일시:' 는 접수 쪽. / judge the label word itself, not words before it
+    if _REJECT_LABEL.search(tail.group(0)):
         return "reject"
-    if not _EVENT_LABEL.search(seg):
-        return "none"
     if _BARE_LABEL.fullmatch(seg):
         # 맨 '기간:' 은 바로 위 소제목을 본다: '✅ 사전예약 ✔️ 기간: 7. 13.' 은 예약 기간
         # / a bare '기간:' inherits the heading above it ('사전예약', '신청안내' …)

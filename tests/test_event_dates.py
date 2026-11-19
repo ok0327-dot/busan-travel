@@ -236,6 +236,18 @@ class YearInference(unittest.TestCase):
         self.assertIsNone(extract_event_period("x", "일시: 2026. 11. 21.(토)", None))
         self.assertIsNone(extract_event_period("x", "일시: 2026. 11. 21.(토)", "not-a-date"))
 
+    def test_label_word_decides_not_words_before_it(self):
+        # Codex 리뷰: '참가 신청 및 행사 일시:' 는 앞의 '신청' 때문에 버리면 안 된다
+        ok = EventPeriod("2026-10-24", "2026-10-24", "label")
+        for desc in ("참가 신청 및 행사 일시: 2026. 10. 24.(토)",
+                     "행사 일시: 2026. 10. 24.(토)",
+                     "신청기간: 10. 1.(목) / 행사 일시: 2026. 10. 24.(토)"):
+            with self.subTest(desc):
+                self.assertEqual(extract_event_period("축제 안내", desc, "2026-10-01"), ok)
+        for desc in ("접수 일시: 10. 1.", "신청 기간: 2026. 10. 24.(토)", "사전 신청 기간: 10. 24.(토)"):
+            with self.subTest(desc):
+                self.assertIsNone(extract_event_period("축제 안내", desc, "2026-10-01"))
+
     def test_too_long_or_too_far(self):
         self.assertIsNone(extract_event_period("x", "기간: 2026. 1. 1. ~ 12. 31.", "2026-01-01"))  # 1년짜리
         self.assertIsNone(extract_event_period("x", "일시: 2027. 12. 1.", "2026-01-01"))          # 너무 먼 미래
