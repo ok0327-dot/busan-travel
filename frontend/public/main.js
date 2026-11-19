@@ -1961,6 +1961,19 @@ function _familyPriority(p) {
   return (p.priority ?? 0) + (_isFamilyEvent(p) ? 2 : 0) - (_isTradeEvent(p) ? 3 : 0);
 }
 
+// 행사 기간 [start, end||start] 이 대상 날짜와 겹치는가. 대상이 토요일이면 토~일 이틀을 본다.
+// 왜: 금요일 스냅샷 7주를 재생해 보니 Top 5 35칸 중 19칸이 그 주말에 열리지 않는 행사(최대 60일 뒤)였다.
+// Why: replaying 7 Friday snapshots, 19/35 Top-5 slots were events not held on the target weekend.
+function _inTargetWindow(p, target) {
+  const s = parseDate(p.start);
+  if (!s) return false;
+  const e = parseDate(p.end) || s;
+  const t0 = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const t1 = new Date(t0);
+  if (target.getDay() === 6) t1.setDate(t1.getDate() + 1);
+  return s <= t1 && e >= t0;
+}
+
 // 같은 행사가 출처별로 여러 번 수집됨 ("부산불꽃축제" / "제21회 부산불꽃축제" / "아름다운 …, 부산불꽃축제").
 // 시작일이 같고, 정규화 제목 하나가 다른 하나를 포함하면 같은 행사로 보고 priority 높은 쪽만 남긴다.
 function _eventTitleCore(t) {
@@ -1992,11 +2005,15 @@ function renderTodayHighlights(target) {
     if (kind === "active") active.push({ ...poi, _k: "active" });
     else if (kind === "upcoming") upcoming.push({ ...poi, _k: "upcoming" });
   }
-  // Hero 통합 정렬: 가족 보정 priority DESC, 같으면 시작일 ASC (임박 우선) → 중복 행사 제거
+  // Hero 통합 정렬: ① 대상 날짜(토요일이면 토~일)에 열리는 행사 먼저 → ② 가족 보정 priority DESC
+  // → ③ 종료일 ASC (곧 끝나는 것 우선), 같으면 시작일 ASC → 중복 행사 제거
   const combined = _dedupeEvents([...active, ...upcoming].sort((a, b) => {
+    const wa = _inTargetWindow(a, target), wb = _inTargetWindow(b, target);
+    if (wa !== wb) return wa ? -1 : 1;
     const pa = _familyPriority(a), pb = _familyPriority(b);
     if (pa !== pb) return pb - pa;
-    return (a.start || "").localeCompare(b.start || "");
+    return (a.end || a.start || "").localeCompare(b.end || b.start || "")
+      || (a.start || "").localeCompare(b.start || "");
   }));
   const hero = combined.slice(0, 5);
   const tail = combined.slice(5);
@@ -2213,15 +2230,17 @@ function renderTodayHighlights(target) {
   let tailHTML = "";
   if (tail.length) {
     const initial = 3;
+    // data-idx 는 combined 원본 인덱스 — tail 은 hero 바로 뒤에서 시작하므로 hero.length 만큼 밀어 준다
+    const tailOffset = hero.length;
     const firstBatch = tail.slice(0, initial);
     const extra = tail.slice(initial);
     const extraHTML = extra.length
-      ? `<div class="chip-extra" hidden>${extra.map((p, i) => chipHTML(p, i + initial + 3, target)).join("")}</div>
+      ? `<div class="chip-extra" hidden>${extra.map((p, i) => chipHTML(p, i + initial + tailOffset, target)).join("")}</div>
          <button class="chip-more" type="button">+${extra.length}건 더 보기</button>`
       : "";
     tailHTML = `<div class="highlight-section">
       <div class="hs-title">📋 그 외 행사 ${tail.length}건</div>
-      <div class="chip-list">${firstBatch.map((p, i) => chipHTML(p, i + 3, target)).join("")}</div>
+      <div class="chip-list">${firstBatch.map((p, i) => chipHTML(p, i + tailOffset, target)).join("")}</div>
       ${extraHTML}
     </div>`;
   }
