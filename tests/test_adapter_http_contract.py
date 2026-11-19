@@ -6,6 +6,8 @@ adapter's real HTTP stack runs end-to-end.
 
 1) 출력 불변 / output unchanged — expected.json 은 **교체 전 코드**가 같은 녹화본에서 낸 출력이다.
    교체 후 코드가 한 필드라도 다르게 내면 빨간불.
+   단, 2026-11 블로그 행사 날짜 추출(sources/_event_dates.py) 로 naver_blogs 6건의
+   start_date/end_date 만 의도적으로 갱신했다 (게시일 → 본문의 행사 일시).
 2) 계약 동작 / contract behaviour — 일시 실패 재시도, 실패를 stderr 로 알림, API 키 비노출.
    requests 예외 문구는 쿼리스트링(ServiceKey 포함)을 그대로 담는다. Actions 로그는 러너가 가려
    주지만(원문·URL 인코딩형 모두) 로컬 실행 등 러너 밖은 아니다 → 원문·인코딩형 둘 다 없어야 통과.
