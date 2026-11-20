@@ -193,9 +193,30 @@ class IsOverseasEvent(unittest.TestCase):
         # 장소가 하나라도 부산이면 부산 행사 / any Busan venue keeps the event
         self.assertFalse(is_overseas_event(
             "[공연] 대만 타이베이 교류 공연", "장소: 대만 타이베이 국가음악청 ✅ 장소: 부산문화회관 대극장"))
+        # (합성) 국내 지명은 낱말 첫머리만 — '초대전' 의 '대전' 은 국내 신호가 아니다
+        self.assertTrue(is_overseas_event("[전시] 부산 작가 초대전", "장소: 일본 도쿄 긴자 갤러리 초대전"))
+        # 장소 값이 해외 지명으로 시작해도 부산 지명이 같이 있으면 부산
+        self.assertFalse(is_overseas_event("중국 문화 체험", "장소: 중국 문화의 거리(부산 차이나타운)"))
         # 낱말 가운데 낀 나라 이름은 지명으로 세지 않는다 / country name inside a word is not a place
         self.assertFalse(is_overseas_event("특별전", "장소: 주부산일본국총영사관 홍보실"))
         self.assertFalse(is_overseas_event("[공연] 2026 단독일정 발표", "유럽 투어 일정을 공개합니다"))
+
+
+    def test_domestic_venue_is_not_abroad(self):
+        """(합성) 국내(부산 밖) 장소는 해외가 아니다 — 행사 여부는 다른 규칙 몫.
+        / Domestic venues outside Busan are not abroad (Codex review, 2026-11-21)."""
+        for title, desc in [
+            # 장소 값 안 어딘가에 나라 이름 — 해외 지명으로 시작하지 않는다
+            ("부산 국제전", "장소: 서울시립미술관 중국현대미술 특별전"),
+            ("일본 근대 판화전", "장소: 대구미술관 일본관"),
+            ("일본 작가 기획전", "장소: 경주예술의전당 일본 작가 기획전"),
+            ("중국 작가 초대전", "장소: 갤러리 이듬 2층 중국 작가 초대전"),   # 지명 없는 미상 장소
+            # 해외 지명으로 시작해도 국내 지명·국내 기관 꼴이 있으면 국내
+            ("일본 근대 판화전", "장소: 일본 근대 판화 특별전, 서울시립미술관"),
+            ("중국 현대미술전", "장소: 중국 현대미술 특별전 (국립현대미술관 과천)"),
+        ]:
+            with self.subTest(desc):
+                self.assertFalse(is_overseas_event(title, desc))
 
 
 class NaverBlogsApply(unittest.TestCase):

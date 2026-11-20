@@ -12,7 +12,9 @@ are not shown as weekend events the family can go to (pure, no I/O).
 
 규칙 / Rules (보수적 — 애매하면 False, 즉 행사로 남긴다):
   1) 본문에 '장소:' 항목이 있으면 그것으로 판정한다(가장 확실한 신호).
-     모든 장소 값이 해외 지명이고 부산 지명이 없을 때만 True. 장소가 하나라도 부산·국내·미상이면 False.
+     모든 장소 값이 해외 지명으로 **시작**하고('중국 리수이 사진 박물관', 앞의 날짜는 건너뜀)
+     부산·국내 지명(서울·대구·경주 …)이나 국내 기관 꼴(시립·국립 … 미술관, 예술의전당)이 없을 때만 True.
+     장소가 하나라도 부산·국내·미상이면 False ('서울시립미술관 중국현대미술 특별전', '대구미술관 일본관').
   2) '장소:' 항목이 없으면 제목에 해외 지명(나라·도시·'해외')이 있고,
      제목이나 본문에 '해외로 가서 하는' 표현이 있을 때만 True:
        - 해외 지명 + 조사 + 동사: '리수이 국제 사진제에 참여', '타이베이 ○○공원에서 열린', '타이베이에 도착'
@@ -62,6 +64,18 @@ _VALUE_STOP_RE = re.compile(
     r"[✅☑✔•■□◆◇▶▷►※|\n\r]|\s{2,}|\s·\s|\s[가-힣]{1,6}\s*[:：]"   # 다음 기호·다음 항목명에서 끊는다
 )
 _VALUE_MAX = 40
+# 장소 값 앞의 날짜·시간 ('기간/장소 : 2026. 12. 5.(토) ~ 12. 20.(일) / 일본 …') — 요일은 괄호 안만
+_LEADING_DATE_RE = re.compile(r"^(?:[\d\s.,:~∼～\-–/]|\([월화수목금토일](?:요일)?\))*")
+# 장소 값이 해외 지명으로 **시작**할 때만 해외 ('중국 리수이 사진 박물관', '영국 글래스고 …')
+_FOREIGN_FIRST_RE = re.compile(r"^[\s(\[「『<]*" + _FOREIGN)
+# 국내(부산 밖) 지명·국내 기관 꼴 — 있으면 해외로 보지 않는다 / domestic signals
+# 지명은 낱말 첫머리에서만 ('초대전' 의 '대전', '방청도장' 의 '청도' 방지)
+_DOMESTIC_RE = re.compile(
+    r"(?<![가-힣])(?:서울|경기도|인천|대구|대전|광주|울산|세종|강원|충북|충남|충청|전북|전남|전라|경북|"
+    r"경남|경상|제주|서귀포|김해|창원|양산|거제|통영|진주|경주|포항|수원|성남|고양|용인|부천|안산|안양|"
+    r"청주|천안|전주|군산|여수|순천|목포|춘천|원주|강릉|속초|구미|안동|밀양|사천)"
+    r"|예술의\s*전당|(?:시립|도립|국립|구립|군립)\s*[가-힣]{0,8}(?:미술관|박물관|도서관|극장|공연장|아트센터|회관)"
+)
 
 # 해외로 가서 하는 일 / "doing it abroad"
 _GAP = r"[^.!?。\n]{0,20}?"   # 같은 문장 안 20자 이내 / same sentence, ≤20 chars
@@ -87,6 +101,14 @@ def _venue_values(text: str) -> list[str]:
     return values
 
 
+def _abroad_venue(value: str) -> bool:
+    """장소 값이 해외인가: 해외 지명으로 시작하고, 부산·국내 지명이나 국내 기관 꼴이 없을 때만.
+    / A venue is abroad only if it starts with a foreign place and has no Busan/domestic signal."""
+    place = _LEADING_DATE_RE.sub("", value)
+    return bool(_FOREIGN_FIRST_RE.search(place)) and not _BUSAN_RE.search(value) \
+        and not _DOMESTIC_RE.search(value)
+
+
 def is_overseas_event(title: str | None, description: str | None) -> bool:
     """행사가 해외에서 열리면 True (장소 항목 → 제목의 해외 지명 + 해외 활동 표현 순).
     / True when the post is about something held abroad (venue field first, then title signals)."""
@@ -95,7 +117,7 @@ def is_overseas_event(title: str | None, description: str | None) -> bool:
 
     values = _venue_values(text)
     if values:
-        return all(_FOREIGN_RE.search(v) and not _BUSAN_RE.search(v) for v in values)
+        return all(_abroad_venue(v) for v in values)
 
     if not _FOREIGN_RE.search(title):
         return False
