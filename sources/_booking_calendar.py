@@ -155,4 +155,50 @@ def apply_calendar(ev: Any, *, anchor: date | None = None) -> bool:
     return True
 
 
-__all__ = ["apply_calendar"]
+def backfill_calendar_dates(conn: "sqlite3.Connection", anchor: date | None = None) -> int:
+    """소스가 더 이상 반환하지 않는 festival 이벤트의 null start_date 를 DB에서 직접 보강.
+
+    apply_calendar 는 소스가 해당 이벤트를 반환할 때만 실행되므로,
+    소스 API 가 행사를 제거하거나 변경한 경우 DB 의 null start_date 가 수정되지 않는다.
+    이 함수는 DB 에서 category='festival' AND start_date IS NULL 인 행을 찾아
+    booking_calendar.json exact_dates 로 직접 보강한다.
+
+    Returns: updated row count.
+    """
+    import sqlite3
+
+    anchor = anchor or date.today()
+    rows = conn.execute(
+        "SELECT id, title, end_date, booking_opens_at FROM events "
+        "WHERE category='festival' AND start_date IS NULL"
+    ).fetchall()
+
+    updated = 0
+    for row in rows:
+        entry = _match_calendar(row["title"])
+        if not entry:
+            continue
+        exact = _resolve_exact_dates(entry.get("exact_dates"), anchor)
+        if not exact:
+            continue
+        start = exact[0]
+        end = exact[1]
+        offset = entry.get("booking_offset_days", 30)
+        try:
+            opens = (date.fromisoformat(start) - timedelta(days=offset)).isoformat()
+        except ValueError:
+            opens = None
+        conn.execute(
+            "UPDATE events SET start_date=?, end_date=COALESCE(end_date,?), "
+            "booking_opens_at=COALESCE(booking_opens_at,?), booking_required=1 "
+            "WHERE id=?",
+            (start, end, opens, row["id"]),
+        )
+        updated += 1
+
+    if updated:
+        conn.commit()
+    return updated
+
+
+__all__ = ["apply_calendar", "backfill_calendar_dates"]
