@@ -12,6 +12,7 @@ import re
 import sys
 
 from sources._adapter import HTTPSession, report
+from sources._overseas import is_overseas_event
 from storage.db import Event
 
 BASE = "https://art.busan.go.kr"
@@ -92,6 +93,11 @@ def _fetch_list(list_url: str, view_keyword: str) -> list[Event]:
         if detail.get("works"):
             desc_bits.append(f"작품수: {detail['works']}")
         description = " · ".join(desc_bits) if desc_bits else None
+        # 미술관이 해외에서 여는 전시('해외전' · 장소: 중국 금일미술관)는 부산시립미술관 좌표로 내보내면
+        # 부산 전시처럼 보인다 → 싣지 않는다. / skip the museum's exhibitions held abroad.
+        if is_overseas_event(title, description):
+            print(f"[{SOURCE}] skip overseas: {title} ({detail.get('place')})", file=sys.stderr)
+            continue
 
         events.append(Event(
             source=SOURCE,
