@@ -2066,12 +2066,20 @@ function _eventTitleCore(t) {
     .replace(/[^0-9A-Za-z가-힣]/g, "")
     .toLowerCase();
 }
+// 제목이 전혀 다른 출처별 중복(bexco "국제게임전시회 지스타 2026" / vb_schedule "G-STAR 2026",
+// "영화로 물드는 부산의 9월, 부산국제영화제" / dureraum_film "2026 BIFF")은 위 제목 규칙으로 안 잡혀 Top 5 한 칸을
+// 낭비했다 → 긴급 박스와 같은 _sameEventLikely(시작·종료일 동일 + 같은 카테고리·다른 출처·장소명 포함)도 본다.
+// 정렬된 입력에서 앞(순위 높은) 것을 남기고 순서는 그대로.
+// Also drop items _sameEventLikely to an already-kept one (cross-source duplicates with unrelated titles);
+// the earlier (higher-ranked) item wins and order is preserved.
 function _dedupeEvents(sorted) {
   const kept = [];
   for (const p of sorted) {
     const core = _eventTitleCore(p.title);
-    const dup = core.length >= 4 && kept.some(k =>
-      k.start === p.start && k._core.length >= 4 && (k._core.includes(core) || core.includes(k._core)));
+    const dup = kept.some(k =>
+      (core.length >= 4 && k.start === p.start && k._core.length >= 4 &&
+        (k._core.includes(core) || core.includes(k._core)))
+      || _sameEventLikely(k, p));
     if (!dup) kept.push({ ...p, _core: core });
   }
   return kept;
