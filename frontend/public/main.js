@@ -1509,6 +1509,54 @@ function _bookingPool(combined, maxDays, now = new Date()) {
   return out;
 }
 
+// 출처만 다른 같은 행사인지 (예: bexco "국제게임전시회 지스타 2026" / visitbusan "G-STAR 2026").
+// 보수적으로 판단: 시작·종료일이 모두 같고, ① 정규화 제목이 서로를 포함하거나
+// ② 카테고리가 같고 출처가 다르며 장소명이 서로를 포함할 때만 같은 행사로 본다.
+// 같은 출처끼리는 장소만으로 묶지 않는다 — 미술관·구청 블로그는 같은 날 시작하는 다른 행사를 여러 건 올린다.
+// Same event collected from different sources? Conservative: same start AND end, and either the title
+// cores contain each other, or same category + different source + venue names contain each other.
+function _venueKey(v) {
+  return (v || "").replace(/\((재|사|주)\)/g, "").replace(/[^0-9A-Za-z가-힣]/g, "").toLowerCase();
+}
+function _sameEventLikely(a, b) {
+  if (a === b) return true;
+  if (!a.start || a.start !== b.start || (a.end || a.start) !== (b.end || b.start)) return false;
+  const ca = _eventTitleCore(a.title), cb = _eventTitleCore(b.title);
+  if (ca.length >= 4 && cb.length >= 4 && (ca.includes(cb) || cb.includes(ca))) return true;
+  if (a.category !== b.category || !a.source || !b.source || a.source === b.source) return false;
+  const va = _venueKey(a.venue), vb = _venueKey(b.venue);
+  return va.length >= 3 && vb.length >= 3 && (va.includes(vb) || vb.includes(va));
+}
+// 같은 행사로 보이는 항목은 앞의 것 하나만 남긴다 (순서 유지). / Keep the first of each same-event group.
+function _uniqueEvents(pois) {
+  const kept = [];
+  for (const p of pois) if (!kept.some(k => _sameEventLikely(k, p))) kept.push(p);
+  return kept;
+}
+
+// 🚨 긴급 박스 전용 순서·중복 정리 (D-30 섹션은 _bookingPool 의 카테고리순 결과를 그대로 쓴다).
+// ① 실제 마감일이 있는 건("마감")을 먼저 daysTo 오름차순, ② 마감일 없이 시작일 기준인 건("시작")은 그 뒤.
+//    같은 날이면 카테고리 순(축제>전시>공연). 마감일 없는 축제가 "오늘 시작"으로 5칸을 채워
+//    진짜 마감 건을 "+N건 더" 뒤로 밀어내지 않게 한다.
+// ② "🆕 오늘 발매"로 이미 보이는 행사의 "시작" 줄은 뺀다. ③ 출처만 다른 같은 행사는 앞의 것 하나만 남긴다.
+// Urgent box only: real deadlines first (daysTo ASC), then start-date items; drop "시작" rows already shown
+// as "opens today", and collapse cross-source duplicates of the same event.
+function _urgentBookingList(urgentPool, opensToday = []) {
+  const sorted = [...urgentPool].sort((a, b) => {
+    const ka = a.refKind === "마감" ? 0 : 1, kb = b.refKind === "마감" ? 0 : 1;
+    if (ka !== kb) return ka - kb;
+    if (a.daysTo !== b.daysTo) return a.daysTo - b.daysTo;
+    return (_BOOKING_CATEGORY_ORDER[a.poi.category] || 9) - (_BOOKING_CATEGORY_ORDER[b.poi.category] || 9);
+  });
+  const kept = [];
+  for (const r of sorted) {
+    if (r.refKind === "시작" && opensToday.some(o => _sameEventLikely(o, r.poi))) continue;
+    if (kept.some(k => _sameEventLikely(k.poi, r.poi))) continue;
+    kept.push(r);
+  }
+  return kept;
+}
+
 // ───────── AI Pick 카드 (Phase D) — ai-summary.json 4 segment ─────────
 function _aiSegmentKey(target) {
   const ai = window.__aiSummary;
@@ -2036,8 +2084,10 @@ function renderTodayHighlights(target) {
   const reservations = _bookingPool(combined, 30, today);
 
   // 오늘 발매 ("🆕 오늘 티켓 오픈") — booking_opens_at == 실제 오늘 (target 날짜 아님)
+  // 출처만 다른 같은 행사가 둘 다 오늘 발매면 한 줄·한 건으로 (앞쪽 = 정렬상 우선인 것 유지)
+  // Collapse cross-source duplicates so one event counts and renders once.
   const todayIso = _localIso(today);
-  const opensToday = combined.filter(p => p.booking_opens_at === todayIso);
+  const opensToday = _uniqueEvents(combined.filter(p => p.booking_opens_at === todayIso));
 
   const season = (window.__seasonal?.months || {})[month];
   const isToday = target.toDateString() === today.toDateString();
@@ -2054,23 +2104,30 @@ function renderTodayHighlights(target) {
     <div class="hh-sub">${escape(heroSub)} · 추천 ${combined.length}건${reservations.length ? ` · 🗓 사전예약 ${reservations.length}` : ""}</div>
   </div>`;
 
-  // ⓪ 상단 긴급 알림 — D-7 이내 마감 임박 (축제 우선) + 오늘 발매
+  // ⓪ 상단 긴급 알림 — D-7 이내 실제 마감 먼저, 그다음 시작일 기준 + 오늘 발매 (중복 제거)
   // 각 항목은 <button> 이라 탭·키보드(Tab/Enter)로 상세 열기 가능 (클릭 연결은 아래 .urg-item)
   // Each item is a <button> so it opens the detail on tap or keyboard (wired via .urg-item below).
   let urgentAlertHTML = "";
-  if (reservationsUrgent.length || opensToday.length) {
-    const urgentItems = reservationsUrgent.slice(0, 5).map(({ poi, idx, daysTo, refKind }) => {
+  const urgentList = _urgentBookingList(reservationsUrgent, opensToday);
+  if (urgentList.length || opensToday.length) {
+    const itemHTML = ({ poi, idx, daysTo, refKind }) => {
       const grp = _bookingCategoryGroup(poi);
       const dLabel = daysTo === 0 ? "오늘" : `D-${daysTo}`;
       return `<li><button type="button" class="urg-item" data-idx="${idx}"><strong>${dLabel}</strong> <span class="urg-cat">${grp.icon}</span> ${escape(poi.title.slice(0, 40))} <span class="urg-kind">${refKind}</span></button></li>`;
-    }).join("");
+    };
+    // 줄 순서: 실제 마감 → 오늘 발매 → 시작일 기준. booking_opens_at 은 시작일에서 거꾸로 잡은 추정치가
+    // 많아서, 추정 발매 줄이 진짜 마감 줄 위에 오지 않게 한다. 상한은 그대로 (상위 5 + 발매 최대 3).
+    // Row order: real deadlines → opens today → start-date rows (opens dates are often estimates).
+    const top = urgentList.slice(0, 5);
+    const deadlineHTML = top.filter(r => r.refKind === "마감").map(itemHTML).join("");
+    const startHTML = top.filter(r => r.refKind !== "마감").map(itemHTML).join("");
     const opensHTML = opensToday.slice(0, 3).map(p =>
       `<li class="urg-opens"><button type="button" class="urg-item" data-idx="${combined.indexOf(p)}"><strong>🆕 오늘 발매</strong> ${escape(p.title.slice(0, 40))}</button></li>`
     ).join("");
     urgentAlertHTML = `<div class="urgent-alert">
-      <div class="urg-title">🚨 이번주 마감·발매 ${reservationsUrgent.length + opensToday.length}건</div>
-      <ul class="urg-list">${opensHTML}${urgentItems}</ul>
-      ${reservationsUrgent.length > 5 ? `<div class="urg-more">+${reservationsUrgent.length - 5}건 더 — ④번 카드에서 전체 보기</div>` : ""}
+      <div class="urg-title">🚨 이번주 마감·발매 ${urgentList.length + opensToday.length}건</div>
+      <ul class="urg-list">${deadlineHTML}${opensHTML}${startHTML}</ul>
+      ${urgentList.length > 5 ? `<div class="urg-more">+${urgentList.length - 5}건 더 — ④번 카드에서 전체 보기</div>` : ""}
     </div>`;
   }
 
