@@ -196,6 +196,22 @@ describe("🔁 중복 행사 — 출처만 다른 같은 행사는 한 번만 / 
     assert.deepEqual(R.chipItems(v).map(c => c.title).filter(t => /G-STAR/i.test(t)), [], "G-STAR 2026 still rendered as a chip");
   });
 
+  // AI 요약이 뺀 쪽 제목을 써도(ai-summary 10-06·10-10·10-11 에 "2026 BIFF") 남은 항목 상세로 연결돼야 한다.
+  // AI picks that use a dropped duplicate's title must still link to the kept item.
+  test("AI 추천 제목: 뺀 중복 제목도 남은 항목으로 연결 / _resolveAiTitle maps dropped-duplicate titles to the kept item", () => {
+    const cases = [
+      ["2026-10-09", "2026-10-09", "2026 BIFF", "부산국제영화제"],
+      ["2026-11-21", "2026-11-21", "G-STAR 2026", "지스타"],
+    ];
+    for (const [snap, day, aiTitle, keptKey] of cases) {
+      const v = R.replay(fixtureOrFail(snap), day);
+      const hit = v.ctx._resolveAiTitle(aiTitle, v.locals.combined);
+      assert.ok(hit && (hit.title || "").includes(keptKey),
+        `${snap}: _resolveAiTitle("${aiTitle}") → ${hit ? `"${short(hit.title)}"` : "null"}, expected the kept ${keptKey} item`);
+      assert.ok(v.locals.combined.includes(hit), `${snap}: resolved item is not in the ranked list`);
+    }
+  });
+
   test("10-09 (금) 20:00: 2026 BIFF and 부산국제영화제 are not both listed", () => {
     const v = R.replay(fixtureOrFail("2026-10-09"), "2026-10-09");
     const ranked = Array.from(v.locals.combined, p => p.title);  // 샌드박스 배열 → 이 realm 배열 (deepEqual 용)

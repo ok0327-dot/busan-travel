@@ -36,6 +36,7 @@ export const DAY_MS = 86400000;
 export const REQUIRED_FUNCTIONS = [
   "renderTodayHighlights", "parseDate", "classifyFestival", "resolvePreset", "defaultPreset",
   "_bookingRequired", "_bookingPool", "heroCardHTML", "chipHTML", "escape", "_sameEventLikely",
+  "_resolveAiTitle",
 ];
 // renderTodayHighlights 안에서 이 문장 바로 앞에 지역 변수 캡처를 심는다
 export const CAPTURE_MARKER = "$list.innerHTML =";
