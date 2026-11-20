@@ -794,10 +794,20 @@ async function init() {
     horizonMonths.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
   const loadableMonths = monthsByCount.filter(m => horizonMonths.has(m));
-  const eventFiles = await Promise.all(
-    loadableMonths.map(m => fetchJson(`./data/events-${m}.json`).catch(() => ({ events: [] })))
+  // 월별 파일은 '시작월' 기준이라 2개월+ 전에 시작해 아직 열리는 행사(부산비엔날레 등)가 위 범위에서 빠진다.
+  // export 가 따로 내보내는 작은 진행 중 파일(events-ongoing.json, 수십 KB)을 함께 받아 id 로 중복 제거.
+  // manifest 에 키가 없으면(다음 매일 export 전) 요청 자체를 건너뛴다.
+  // Why: shards are keyed by start month, so long-running events that started 2+ months ago were never loaded.
+  const hasOngoing = (manifest.counts?.events_ongoing || 0) > 0;
+  const [ongoingFile, ...eventFiles] = await Promise.all([
+    hasOngoing ? fetchJson("./data/events-ongoing.json").catch(() => ({ events: [] })) : { events: [] },
+    ...loadableMonths.map(m => fetchJson(`./data/events-${m}.json`).catch(() => ({ events: [] }))),
+  ]);
+  const shardEvents = eventFiles.flatMap(f => f.events || []);
+  const shardIds = new Set(shardEvents.map(e => e.id));
+  const allEvents = shardEvents.concat(
+    (ongoingFile.events || []).filter(e => e.id == null || !shardIds.has(e.id))
   );
-  const allEvents = eventFiles.flatMap(f => f.events || []);
   // festival 은 이벤트 단위 마커, exhibition/performance 는 venue 로 aggregate
   // → 한 venue(F1963, 영화의전당 등) 에 여러 전시가 있을 때 마커 1개로 묶고
   //   클릭 시 현재 열리는 전시/공연 목록을 보여주기 위함
@@ -2032,6 +2042,21 @@ function _inTargetWindow(p, target) {
   return s <= t1 && e >= t0;
 }
 
+// 31일 넘게 이어지는 행사의 '시기' — 0: 31일 이하 행사, 1: 장기 행사지만 시작 14일 이내 또는 마지막 7일,
+// 2: 장기 행사의 한복판(상설전·반년 공연 등 — 이번 주말이 특별할 이유가 없음).
+// 왜: events-ongoing.json 으로 몇 달째 열리는 행사가 후보에 들어오자 그 주말만 열리는 가족 행사
+// (라라라 페스티벌·부산펫쇼)를 Top 5 에서 밀어냈다. 장기 행사는 개막 직후·막바지에만 '이번 주말' 가치가 있다.
+// Why: once long-running events were loaded, mid-run ones pushed weekend-only family events out of the Top 5.
+function _longRunPhase(p, target) {
+  const s = parseDate(p.start);
+  if (!s) return 0;
+  const e = parseDate(p.end) || s;
+  if ((e - s) / 86400000 + 1 <= 31) return 0;
+  const t0 = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const sinceStart = Math.round((t0 - s) / 86400000), untilEnd = Math.round((e - t0) / 86400000);
+  return sinceStart < 14 || untilEnd < 7 ? 1 : 2;
+}
+
 // 같은 행사가 출처별로 여러 번 수집됨 ("부산불꽃축제" / "제21회 부산불꽃축제" / "아름다운 …, 부산불꽃축제").
 // 시작일이 같고, 정규화 제목 하나가 다른 하나를 포함하면 같은 행사로 보고 priority 높은 쪽만 남긴다.
 function _eventTitleCore(t) {
@@ -2063,13 +2088,17 @@ function renderTodayHighlights(target) {
     if (kind === "active") active.push({ ...poi, _k: "active" });
     else if (kind === "upcoming") upcoming.push({ ...poi, _k: "upcoming" });
   }
-  // Hero 통합 정렬: ① 대상 날짜(토요일이면 토~일)에 열리는 행사 먼저 → ② 가족 보정 priority DESC
-  // → ③ 종료일 ASC (곧 끝나는 것 우선), 같으면 시작일 ASC → 중복 행사 제거
+  // Hero 통합 정렬: ① 대상 날짜(토요일이면 토~일)에 열리는 행사 먼저 → ② 장기 행사 한복판은 뒤로
+  // → ③ 가족 보정 priority DESC → ④ 같으면 짧은 행사가 장기 행사(개막·막바지)보다 앞
+  // → ⑤ 종료일 ASC (곧 끝나는 것 우선), 같으면 시작일 ASC → 중복 행사 제거
   const combined = _dedupeEvents([...active, ...upcoming].sort((a, b) => {
     const wa = _inTargetWindow(a, target), wb = _inTargetWindow(b, target);
     if (wa !== wb) return wa ? -1 : 1;
+    const la = _longRunPhase(a, target), lb = _longRunPhase(b, target);
+    if ((la === 2) !== (lb === 2)) return la === 2 ? 1 : -1;
     const pa = _familyPriority(a), pb = _familyPriority(b);
     if (pa !== pb) return pb - pa;
+    if (la !== lb) return la - lb;
     return (a.end || a.start || "").localeCompare(b.end || b.start || "")
       || (a.start || "").localeCompare(b.start || "");
   }));

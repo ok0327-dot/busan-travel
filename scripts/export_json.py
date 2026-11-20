@@ -4,6 +4,7 @@
   places.json          고정 POI (맛집/명소/테마)
   beaches.json         해수욕장 (수질 정보 포함, 명소로 병합 렌더)
   events-YYYY-MM.json  월별 이벤트 (축제/공연, start_date 기준)
+  events-ongoing.json  이번 달 이전 시작 + 아직 진행 중인 행사 (월별 파일 로드 범위 밖 보완)
   weather-short.json   단기예보 (모든 격자 × 3시간 간격)
   weather-mid.json     중기예보 (부산 단일, D+3~D+10)
   air-quality.json     대기질 측정소별 최신값
@@ -17,7 +18,7 @@ import re
 import sqlite3
 import sys
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -371,8 +372,45 @@ def export_courses(conn: sqlite3.Connection) -> int:
     return len(rows)
 
 
-def export_events(conn: sqlite3.Connection) -> dict[str, int]:
-    """월별 분할 + 날짜 없는 것은 events-undated.json.
+# 진행 중 행사 보조 파일 — 프론트는 시작월 기준 월별 파일 중 (오늘-1개월)~(오늘+6개월)만 받는다.
+# 그래서 2개월 이상 전에 시작해 아직 열리는 행사(예: 8월 시작·11/1 종료 부산비엔날레)는 10월 주말에 통째로 빠졌다.
+# 이번 달 1일 이전에 시작했고 오늘(KST) 이후 끝나는 행사만 따로 모아 작은 파일 하나로 내보낸다.
+# 지난달 시작분까지 넣는 이유: 월이 바뀐 직후(다음 export 전) 프론트의 로드 범위가 한 달 밀려도 빠지지 않게.
+# Why: shards are keyed by START month and the frontend only loads (today-1mo)..(today+6mo), so events that
+# started 2+ months ago but are still running were never loaded. This small file carries them; ids overlap
+# with the previous-month shard on purpose (month-rollover safety) and the frontend dedupes by id.
+ONGOING_CATEGORIES = ("festival", "exhibition", "performance")  # 프론트 allEventPoi 와 동일
+KST = timezone(timedelta(hours=9))
+
+
+def select_ongoing_events(events, today: date) -> list[dict]:
+    """export 된 이벤트 dict 들 중 '이번 달 이전 시작 + 오늘 이후 종료' 인 행사만 골라 반환 (순수 함수).
+
+    events: _jsonable() 결과 dict 의 iterable (월별 파일의 events 배열과 같은 스키마)
+    today:  기준일 (KST). start < 이번 달 1일 AND end >= today 인 festival/exhibition/performance.
+    end 가 없으면 단일일 행사로 보고 제외 (이미 지난 달에 끝남).
+    정렬: (start, id) — 매일 CI 커밋 diff 를 안정적으로 유지.
+    """
+    month_start = today.replace(day=1).isoformat()
+    today_iso = today.isoformat()
+    out = []
+    for e in events:
+        if e.get("category") not in ONGOING_CATEGORIES:
+            continue
+        start = (e.get("start") or "")[:10]
+        end = (e.get("end") or "")[:10]
+        if len(start) != 10 or len(end) != 10:
+            continue
+        if start < month_start and end >= today_iso:
+            out.append(e)
+    out.sort(key=lambda e: (e.get("start") or "", str(e.get("id"))))
+    return out
+
+
+def export_events(conn: sqlite3.Connection) -> tuple[dict[str, int], int]:
+    """월별 분할 + 날짜 없는 것은 events-undated.json + 진행 중 보조 파일 events-ongoing.json.
+
+    반환: (월별 건수 dict → manifest counts.events_by_month, events-ongoing.json 건수).
 
     blog_post 는 TOUR_NEGATIVE_KEYWORDS 로 1차 필터링해 관광 무관 시정 공지 제거.
     exhibition/performance 는 sources/_venues.py 의 is_major venue 통과 건만 keep
@@ -381,12 +419,12 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
 
     P3 노이즈 정리: end_date 가 today-14일 이전인 종료 행사는 export 에서 제외.
     """
-    from datetime import timedelta
     expired_cutoff = (date.today() - timedelta(days=14)).isoformat()
     by_month: dict[str, list] = defaultdict(list)
     blog_kept = blog_dropped = 0
     minor_dropped = 0
     expired_dropped = 0
+    kept_rows: list[dict] = []
     for r in conn.execute(
         "SELECT * FROM events WHERE category IN ('festival','blog_post','exhibition','performance') "
         "ORDER BY start_date"
@@ -413,6 +451,7 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
         else:
             key = "undated"
         by_month[key].append(row)
+        kept_rows.append(row)
     print(f"[blog filter] kept={blog_kept} dropped={blog_dropped}")
     print(f"[venue filter] exhibition/performance minor dropped={minor_dropped}")
     print(f"[expired filter] end_date<{expired_cutoff} dropped={expired_dropped}")
@@ -424,7 +463,16 @@ def export_events(conn: sqlite3.Connection) -> dict[str, int]:
             encoding="utf-8",
         )
         result[key] = len(rows)
-    return result
+    # 진행 중 보조 파일은 0건이어도 매번 덮어쓴다 (어제 내용이 남아 끝난 행사가 계속 보이지 않게)
+    today_kst = datetime.now(KST).date()
+    ongoing = select_ongoing_events(kept_rows, today_kst)
+    (OUT_DIR / "events-ongoing.json").write_text(
+        json.dumps({"count": len(ongoing), "as_of": today_kst.isoformat(), "events": ongoing},
+                   ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    print(f"[ongoing] start<{today_kst.replace(day=1)} & end>={today_kst} → {len(ongoing)}")
+    return result, len(ongoing)
 
 
 def export_weather_short(conn: sqlite3.Connection) -> int:
@@ -561,7 +609,8 @@ def main():
 
     if args.scope in ("all", "events"):
         counts["places"] = export_places(conn)
-        counts["events_by_month"] = export_events(conn)
+        # events_ongoing 은 events_by_month 와 별도 키 — 월 키(YYYY-MM)만 기대하는 소비자를 건드리지 않는다
+        counts["events_by_month"], counts["events_ongoing"] = export_events(conn)
         counts["courses"] = export_courses(conn)
         counts["guides"] = export_guides(conn)
         counts["beaches"] = export_beaches(conn)
