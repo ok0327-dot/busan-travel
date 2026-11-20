@@ -6,16 +6,22 @@
 
 RSS pattern: https://rss.blog.naver.com/{id}.xml
 Each entry: title, link (.../{blogid}/{postid}), pubDate, category, description(HTML)
+
+날짜 / dates: pubDate 는 게시일이다. 본문에 '일시: 2026. 10. 24.(토)' 같은 행사 일시가 있으면
+start_date/end_date 를 그 기간으로 쓰고(sources/_event_dates.py), 게시일은 raw["published"] 에 남는다.
+행사 일시를 확실히 찾은 '가볼 만한 행사' blog_post 는 festival 로 올린다(_promote).
 """
 from __future__ import annotations
 
 import re
+from datetime import date
 from email.utils import parsedate_to_datetime
 
 import feedparser
 
 from config import NAVER_OFFICIAL_BLOGS
 from sources._adapter import HTTPSession, report
+from sources._event_dates import EventPeriod, extract_event_period
 from storage.db import Event
 
 SOURCE = "naver_blogs"
@@ -39,8 +45,36 @@ _CITY_TRAVEL_NOISE = ("모집", "공모", "설명회", "간담회", "위촉", "�
 _TAG_RE = re.compile(r"<[^>]+>")
 _POST_ID_RE = re.compile(r"/(\d+)(?:\?|$)")
 
+# 행사 날짜를 찾은 blog_post 를 festival 로 올리는 조건 (보수적 — 잘못 올리면 주말 추천이 오염된다).
+# festival 로만 올린다: performance/exhibition 은 export 의 is_major_venue 필터가 블로그 venue
+# ('Haeundae-gu' 등)를 떨어뜨려 화면에서 아예 사라진다.
+# / Promote only to festival — blog performance/exhibition rows are dropped by export's venue filter.
+_ATTENDABLE_TITLE = re.compile(
+    r"축제|페스티벌|페스타|연극|인형극|공연|음악회|콘서트|버스킹|체험|행사|마켓|장터|놀이|놀자|"
+    r"전시|영화제|예술제|문화제|한마당|운동회|야시장"
+)
+_NOT_ATTENDABLE_TITLE = re.compile(
+    r"모집|공모|후기|결과|성료|취소|연기|수상|선정|접수|신청(?!사)|교육|강좌|강의|수강|특강|아카데미|"
+    r"프로그램|설명회|간담회|포럼|세미나|채용|일자리|취업|창업|휴관|휴무|통제|공사|점검|스케치|"
+    r"다녀왔|다녀온|훈련|설문|조사|투표|환급|유치|혜택|이벤트|챌린지|모음|총정리|라인업|가볼만한|"
+    r"추천|임산부|어르신|시니어|중장년"
+)
+# 여러 행사를 묶은 글·소식지 — 날짜를 하나로 줄일 수 없다 / multi-event roundups & newsletters
+_ROUNDUP_TITLE = re.compile(r"모음|총정리|라인업|알리미|한눈에")
+# 제목이 모집·신청 글이면 카테고리와 무관하게 게시일을 유지한다. 이미 festival 로 분류된
+# '○○축제 자원봉사자 모집' 이 행사일로 옮겨지면 그 주말 Top 5 에 끼어들기 때문.
+# ('신청사' 같은 낱말은 제외) / recruitment titles keep the post date, whatever the category.
+_RECRUIT_TITLE = re.compile(
+    r"모집|공모|자원\s*봉사|봉사자|참여자|참가자|서포터즈|선정|선발|공고|접수|신청(?!사)|채용|당첨"
+)
+# 본문이 '참가자 모집' 글이면 날짜가 있어도 누구나 가는 행사가 아니다 / sign-up-only programmes
+_RECRUIT_BODY = re.compile(
+    r"모집합니다|모집해요|모집\s*중|참여자\s*모집|참가자\s*모집|수강\s*신청|수강생|선정\s*가[족정]|선발"
+)
+PROMOTE_MAX_SPAN_DAYS = 31  # 한 달 넘게 이어지는 건 대개 강좌·프로그램 / longer = programme series
 
-def _strip_html(s: str | None, limit: int = 400) -> str | None:
+
+def _strip_html(s: str | None, limit: int | None = 400) -> str | None:
     if not s:
         return None
     text = _TAG_RE.sub("", s).strip()
@@ -61,6 +95,39 @@ def _classify(category: str | None, title: str) -> str:
     if any(k in blob for k in ["공연", "콘서트", "뮤지컬", "performance"]):
         return "performance"
     return "blog_post"
+
+
+def _event_period(title: str, text: str | None, post_date: str | None) -> EventPeriod | None:
+    """글에서 행사 기간을 찾는다. 항목명 없이 문장 속에서만 찾은 날짜(basis='text')는
+    제목이 행사 안내일 때만(후기·모음·모집 글 제외) 믿는다.
+    / Unlabelled dates count only for event-announcement titles."""
+    if _ROUNDUP_TITLE.search(title):
+        return None  # '7월 행사 모음.zip' — 첫 행사 날짜가 글 전체의 날짜가 아니다 / roundup posts
+    if _RECRUIT_TITLE.search(title):
+        return None  # 모집·신청 글은 게시일 유지 → 승격도 없음 / sign-up posts keep the post date
+    period = extract_event_period(title, text, post_date)
+    if period and period.basis == "text" and (
+        not _ATTENDABLE_TITLE.search(title) or _NOT_ATTENDABLE_TITLE.search(title)
+    ):
+        return None
+    return period
+
+
+def _promote(category: str, title: str, text: str | None, period: EventPeriod | None) -> str:
+    """blog_post → festival: 항목명(일시·기간)이나 제목에서 날짜를 찾았고(한 달 이내), 제목이 가볼 수
+    있는 행사이며 모집·후기·교육·프로그램 글이 아닐 때만.
+    / Only with a labelled/title date (≤31 days), an attendable title and no sign-up/review signals."""
+    if category != "blog_post" or period is None or period.basis not in ("title", "label"):
+        return category
+    span = (date.fromisoformat(period.end) - date.fromisoformat(period.start)).days
+    if (
+        span <= PROMOTE_MAX_SPAN_DAYS
+        and _ATTENDABLE_TITLE.search(title)
+        and not _NOT_ATTENDABLE_TITLE.search(title)
+        and not _RECRUIT_BODY.search(text or "")
+    ):
+        return "festival"
+    return category
 
 
 def _iso(pubdate: str | None) -> str | None:
@@ -100,15 +167,23 @@ def fetch() -> list[Event]:
                 _title = entry.get("title", "")
                 if not any(n in _title for n in _CITY_TRAVEL_NOISE):
                     src_id = CITY_TRAVEL_SOURCE_ID  # 모집/공모 아닌 알짜 여행글만 승격
+            title = entry.get("title", "").strip()
+            text = _strip_html(entry.get("summary") or entry.get("description"), limit=None)
+            post_date = _iso(entry.get("published"))
+            # 본문에 행사 일시가 있으면 그 기간을, 없으면 예전처럼 게시일을 쓴다.
+            # 게시일은 raw["published"] 에 그대로 남는다.
+            # / Event period from the post body when found, else the post date (kept in raw).
+            period = _event_period(title, text, post_date)
             events.append(Event(
                 source=f"{SOURCE_PREFIX}:{src_id}",
                 source_id=str(post_id),
-                category=_classify(category, entry.get("title", "")),
-                title=entry.get("title", "").strip(),
-                start_date=_iso(entry.get("published")),
+                category=_promote(_classify(category, entry.get("title", "")), title, text, period),
+                title=title,
+                start_date=period.start if period else post_date,
+                end_date=period.end if period else None,
                 venue=label,
                 url=entry.get("link"),
-                description=_strip_html(entry.get("summary") or entry.get("description")),
+                description=text[:400] if text else None,
                 raw={"blog": blog_id, "category": category, "published": entry.get("published")},
             ))
     return report(SOURCE, events)
