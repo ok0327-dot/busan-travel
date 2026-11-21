@@ -4,11 +4,13 @@
 //   git show <sha>:frontend/public/data/{manifest.json, events-YYYY-MM.json}
 //
 // usage (repo root):
-//   node tests/js/build_replay_fixtures.mjs                    # 기본 7주 + 이미 있는 fixture 전부 다시 생성
+//   node tests/js/build_replay_fixtures.mjs                    # 기본 8개 + 이미 있는 fixture 전부 다시 생성
 //                                                              # (각 fixture 에 기록된 commit·days 로) / rebuild all
 //   node tests/js/build_replay_fixtures.mjs 2026-11-27=abc1234 # 새 금요일 추가 / add one Friday (clock = that day 20:00 KST)
 //   node tests/js/build_replay_fixtures.mjs 2026-11-26=abc1234@2026-11-26,2026-11-27
 //                                                              # 목요일 데이터를 목·금 두 시각으로 재생 / Thu data replayed Thu+Fri
+//   node tests/js/build_replay_fixtures.mjs --hour=10 2026-11-21=17c4524
+//                                                              # 재생 시각(KST 시) 지정 — 기본 20시 / replay hour (default 20)
 //
 // 무엇을 담나 / What goes into a fixture:
 //   shards          — 앱 init 이 그 주에 실제로 불러오는 달(오늘 −1 ~ +6개월, manifest.events_by_month 의 n>0 키)의
@@ -17,9 +19,13 @@
 //                     (정렬이 안정 정렬이라 동점일 때 원본 순서가 결과를 정한다).
 //                     The months main.js init loads that week; past events are dropped (they can never be
 //                     active/upcoming); original order is preserved because the ranking sort is stable.
-//   ongoing_shards  — 그보다 오래된 달의 행사 중 end >= 첫 재생일인 것 (장기 진행 행사). 기본 풀에는 넣지 않는다.
-//                     "진행 중 행사 로딩" 변경을 테스트할 때 replay_lib 의 includeOngoing 옵션으로 켠다.
-//                     Older-month events still running on replay day — NOT in the default pool; see includeOngoing.
+//   ongoing_shards  — 그보다 오래된 달의 행사 중 end >= 첫 재생일인 것 (장기 진행 행사).
+//                     events-ongoing.json 이 없던 커밋(PR #79 이전)에서는 replay_lib 가 이것으로 그 파일을 흉내 낸다.
+//                     Older-month events still running on replay day; replay_lib simulates events-ongoing.json from them.
+//   ongoing_file    — 커밋에 events-ongoing.json 이 있으면(PR #79 이후) 그 내용 그대로 + manifest 의
+//                     counts.events_ongoing (앱은 이 값이 0 보다 클 때만 파일을 받는다). 없으면 키 자체를 넣지 않는다
+//                     → 옛 fixture 는 다시 만들어도 바이트가 같다.
+//                     The real events-ongoing.json when the commit has one (key omitted otherwise).
 //   events_by_month — manifest 의 월별 개수 (앱이 불러올 달을 정하는 근거).
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -40,7 +46,9 @@ const FIELDS = [
   "source", "first_seen", "description", "popularity_score",
 ];
 // 기본 스냅샷 — 각 금요일(11-19 는 목요일 데이터) 자동 수집 커밋.
-// Default snapshots: the auto-update data commit of each Friday (11-19 is Thursday data).
+// 11-21 은 PR #79(events-ongoing.json)·#82 병합 뒤 첫 데이터를 토요일 오전 10시에 재생한다.
+// Default snapshots: the auto-update data commit of each Friday (11-19 is Thursday data);
+// 11-21 = first post-#79 data, replayed Saturday 10:00 KST.
 const DEFAULTS = [
   { snapshot: "2026-10-09", sha: "652f27f" },
   { snapshot: "2026-10-16", sha: "de2eac0" },
@@ -49,6 +57,7 @@ const DEFAULTS = [
   { snapshot: "2026-11-06", sha: "399be0e" },
   { snapshot: "2026-11-13", sha: "9b91097" },
   { snapshot: "2026-11-19", sha: "b4aa9b8", days: ["2026-11-19", "2026-11-20"] },
+  { snapshot: "2026-11-21", sha: "17c4524", hour: 10 },
 ];
 
 const git = (...args) => execFileSync("git", args, { cwd: REPO, maxBuffer: 256 * 1024 * 1024, encoding: "utf8" });
@@ -71,10 +80,10 @@ function trim(e) {
   return o;
 }
 
-function parseArg(arg) {
+function parseArg(arg, hour) {
   const m = /^(\d{4}-\d{2}-\d{2})=([0-9a-fA-F]{7,40})(?:@([\d,-]+))?$/.exec(arg);
   if (!m) throw new Error(`bad argument "${arg}" — expected YYYY-MM-DD=<sha>[@day1,day2]`);
-  return { snapshot: m[1], sha: m[2], days: m[3] ? m[3].split(",") : undefined };
+  return { snapshot: m[1], sha: m[2], days: m[3] ? m[3].split(",") : undefined, hour };
 }
 
 // 행사 배열을 한 줄에 한 건씩 — diff 를 읽기 쉽게 / one event per line for readable diffs
@@ -84,7 +93,18 @@ function serialize(fx) {
   keys.forEach((k, ki) => {
     const comma = ki < keys.length - 1 ? "," : "";
     const v = fx[k];
-    if (k === "shards" || k === "ongoing_shards") {
+    if (k === "ongoing_file") {
+      lines.push(`  ${JSON.stringify(k)}: {`);
+      const { events, ...meta } = v;
+      for (const [mk, mv] of Object.entries(meta)) lines.push(`    ${JSON.stringify(mk)}: ${JSON.stringify(mv)},`);
+      if (!events.length) lines.push(`    "events": []`);
+      else {
+        lines.push(`    "events": [`);
+        events.forEach((e, ei) => lines.push(`      ${JSON.stringify(e)}${ei < events.length - 1 ? "," : ""}`));
+        lines.push(`    ]`);
+      }
+      lines.push(`  }${comma}`);
+    } else if (k === "shards" || k === "ongoing_shards") {
       const months = Object.keys(v);
       lines.push(`  ${JSON.stringify(k)}: {`);
       months.forEach((mo, mi) => {
@@ -104,8 +124,9 @@ function serialize(fx) {
   return lines.join("\n") + "\n";
 }
 
-function build({ snapshot, sha, days }) {
+function build({ snapshot, sha, days, hour }) {
   days = days || [snapshot];
+  hour = hour ?? 20;
   const fullSha = git("rev-parse", "--verify", `${sha}^{commit}`).trim();
   const manifest = showJson(fullSha, "manifest.json");
   const byMonth = manifest.counts?.events_by_month || {};
@@ -147,13 +168,23 @@ function build({ snapshot, sha, days }) {
     commit: fullSha,
     data_generated_at: manifest.generated_at || null,
     days,
-    replay_hour_kst: 20,
+    replay_hour_kst: hour,
     dropped_past_events: dropped,
     fields: FIELDS,
     events_by_month: byMonth,
     shards,
     ongoing_shards: ongoing,
   };
+  // PR #79 이후 커밋: 앱이 실제로 받는 events-ongoing.json 을 그대로 담는다 (main.js init 과 같은 파일)
+  // Post-#79 commits: keep the real events-ongoing.json the app fetches.
+  if (listed.has("events-ongoing.json")) {
+    const of = showJson(fullSha, "events-ongoing.json");
+    fx.ongoing_file = {
+      manifest_events_ongoing: manifest.counts?.events_ongoing ?? 0,
+      as_of: of.as_of ?? null,
+      events: (of.events || []).filter(e => CATEGORIES.includes(e.category)).map(trim),
+    };
+  }
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const file = path.join(OUT_DIR, `${snapshot}.json`);
   const text = serialize(fx);
@@ -161,8 +192,9 @@ function build({ snapshot, sha, days }) {
   fs.writeFileSync(file, text);
   const n = Object.values(shards).reduce((a, v) => a + v.length, 0);
   const no = Object.values(ongoing).reduce((a, v) => a + v.length, 0);
-  console.log(`${snapshot} ${fullSha.slice(0, 7)} days=${days.join(",")} months=${Object.keys(shards).join(",")} ` +
-    `events=${n} (dropped past ${dropped}) ongoing_extra=${no} -> ${path.relative(REPO, file)} ${(Buffer.byteLength(text) / 1024).toFixed(0)}KB`);
+  const nf = fx.ongoing_file ? ` ongoing_file=${fx.ongoing_file.events.length}` : "";
+  console.log(`${snapshot} ${fullSha.slice(0, 7)} days=${days.join(",")} @${hour}h months=${Object.keys(shards).join(",")} ` +
+    `events=${n} (dropped past ${dropped}) ongoing_extra=${no}${nf} -> ${path.relative(REPO, file)} ${(Buffer.byteLength(text) / 1024).toFixed(0)}KB`);
 }
 
 // 이미 만들어 둔 fixture 도 기록된 commit·days 로 다시 만들 수 있게 / existing fixtures rebuild from their own commit
@@ -170,13 +202,17 @@ function existing() {
   if (!fs.existsSync(OUT_DIR)) return [];
   return fs.readdirSync(OUT_DIR).filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).map(f => {
     const j = JSON.parse(fs.readFileSync(path.join(OUT_DIR, f), "utf8"));
-    return { snapshot: j.snapshot, sha: j.commit, days: j.days };
+    return { snapshot: j.snapshot, sha: j.commit, days: j.days, hour: j.replay_hour_kst };
   });
 }
 
-const args = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const hourArg = argv.find(a => a.startsWith("--hour="));
+const hour = hourArg ? Number(hourArg.slice(7)) : undefined;
+if (hourArg && !(Number.isInteger(hour) && hour >= 0 && hour <= 23)) throw new Error(`bad ${hourArg} — expected --hour=0..23`);
+const args = argv.filter(a => !a.startsWith("--hour="));
 let targets;
-if (args.length) targets = args.map(parseArg);
+if (args.length) targets = args.map(a => parseArg(a, hour));
 else {
   const bySnap = new Map(existing().map(t => [t.snapshot, t]));
   for (const t of DEFAULTS) bySnap.set(t.snapshot, t);

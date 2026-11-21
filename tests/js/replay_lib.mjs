@@ -15,7 +15,8 @@
 // 시간대 / Timezone: 모든 날짜 계산은 KST 로컬 시간이어야 한다. 이 모듈이 맨 처음에 TZ 를 Asia/Seoul 로
 // 맞추고 확인하지만, 명령도 `TZ=Asia/Seoul node --test tests/js/` 로 돌리는 것을 권장한다.
 // Env: MAIN_JS=<path> 로 다른 main.js(예: 수정 전 버전)를 재생할 수 있다.
-//      REPLAY_INCLUDE_ONGOING=1 이면 오래된 달의 진행 중 행사도 풀에 넣는다 (아래 buildPool 참고).
+//      REPLAY_INCLUDE_ONGOING=0 이면 진행 중 행사 파일(events-ongoing.json)을 풀에서 뺀다 — 기본은 앱처럼 넣는다
+//      (아래 buildPool 참고). / set REPLAY_INCLUDE_ONGOING=0 to leave events-ongoing.json out of the pool.
 process.env.TZ = "Asia/Seoul";
 
 import fs from "node:fs";
@@ -34,15 +35,17 @@ export const DAY_MS = 86400000;
 // Functions the harness calls by name; a missing one means main.js was refactored → update this file.
 export const REQUIRED_FUNCTIONS = [
   "renderTodayHighlights", "parseDate", "classifyFestival", "resolvePreset", "defaultPreset",
-  "_bookingRequired", "_bookingPool", "heroCardHTML", "chipHTML", "escape",
+  "_bookingRequired", "_bookingPool", "heroCardHTML", "chipHTML", "escape", "_sameEventLikely",
+  "_resolveAiTitle",
 ];
 // renderTodayHighlights 안에서 이 문장 바로 앞에 지역 변수 캡처를 심는다
 export const CAPTURE_MARKER = "$list.innerHTML =";
 export const CAPTURE_LOCALS = ["combined", "hero", "tail", "reservationsUrgent", "reservations", "opensToday", "today"];
 
-// 진행 중 장기 행사(오래된 달 shard) 를 풀에 넣을지 — 현재 main.js init 은 안 넣는다(false).
-// "진행 중 행사 로딩" 변경이 main.js 에 들어오면 이 기본값을 true 로 바꾸고 buildPool 을 새 init 과 맞춘다.
-export const INCLUDE_ONGOING_DEFAULT = process.env.REPLAY_INCLUDE_ONGOING === "1";
+// 진행 중 장기 행사 파일(events-ongoing.json)을 풀에 넣을지 — PR #79 이후 main.js init 은 넣는다(true).
+// REPLAY_INCLUDE_ONGOING=0 이면 끈다 (PR #79 이전 init 과 비교할 때).
+// Since PR #79 main.js init merges events-ongoing.json → on by default; REPLAY_INCLUDE_ONGOING=0 turns it off.
+export const INCLUDE_ONGOING_DEFAULT = process.env.REPLAY_INCLUDE_ONGOING !== "0";
 
 {
   const probe = new Date(Date.UTC(2026, 10, 20, 11, 0, 0));  // 2026-11-20 20:00 KST
@@ -392,12 +395,41 @@ export const parseYmd = (s) => {
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
 };
 
+// scripts/export_json.py select_ongoing_events 와 같은 규칙 (순수 문자열 연산):
+//   festival/exhibition/performance 중 start < 이번 달 1일 AND end >= 오늘 (둘 다 YYYY-MM-DD 10자),
+//   정렬 (start, String(id)). 이전 달 shard 와 일부러 겹친다 — 앱이 id 로 중복 제거.
+// Same rule as the exporter's select_ongoing_events.
+export function selectOngoingEvents(events, todayIso) {
+  const monthStart = `${todayIso.slice(0, 7)}-01`;
+  const key = (e) => [(e.start || ""), String(e.id)];
+  return events.filter(e => {
+    if (!EVENT_CATEGORIES.includes(e.category)) return false;
+    const s = (e.start || "").slice(0, 10), t = (e.end || "").slice(0, 10);
+    return s.length === 10 && t.length === 10 && s < monthStart && t >= todayIso;
+  }).sort((a, b) => {
+    const [sa, ia] = key(a), [sb, ib] = key(b);
+    return sa < sb ? -1 : sa > sb ? 1 : ia < ib ? -1 : ia > ib ? 1 : 0;
+  });
+}
+
+// 앱이 받는 events-ongoing.json 의 events (받지 않으면 []):
+//   fixture 에 ongoing_file(실제 파일, PR #79 이후 커밋)이 있으면 그대로 — 앱처럼 manifest counts.events_ongoing > 0
+//   일 때만. 없으면(PR #79 이전 커밋) fixture 의 모든 행사(shards + ongoing_shards)에 exporter 규칙을 적용해
+//   "그날 export 가 만들었을" 파일을 흉내 낸다 (기준일 = 재생일).
+// The events-ongoing.json payload the app would load: the real file when the fixture has one, otherwise
+// simulated from the fixture's events with the exporter rule (as of the replay day).
+export function ongoingFileEvents(fx, now) {
+  if (fx.ongoing_file) return (fx.ongoing_file.manifest_events_ongoing || 0) > 0 ? fx.ongoing_file.events : [];
+  const all = [...Object.values(fx.shards || {}), ...Object.values(fx.ongoing_shards || {})].flat();
+  return selectOngoingEvents(all, localIso(now));
+}
+
 // main.js init 과 같은 방식으로 allEventPoi 를 만든다:
 //   manifest.events_by_month 에서 n>0 & YYYY-MM 키 → 정렬 → (오늘 −1 ~ +6개월) 안의 달만 → 각 shard 의 events 이어 붙임
+//   → (includeOngoing) 그 뒤에 events-ongoing.json 행사 중 id 가 shard 에 없는 것(id 가 없으면 그대로)을 이어 붙임
 //   → festival/exhibition/performance 만.
-// includeOngoing=true 면 그보다 오래된 달 shard 에서 end >= 오늘인 행사를 (달 순서대로) 앞에 붙인다 —
-//   "진행 중 장기 행사 로딩" 변경(병렬 작업)을 시험할 스위치. 그 변경이 들어오면 이 부분을 새 init 과 똑같이 맞출 것.
-// Mirrors main.js init; includeOngoing additionally prepends older-shard events still running today.
+// includeOngoing=false 는 PR #79 이전 init (shard 만).
+// Mirrors main.js init: shard events first, then events-ongoing.json events whose id is not in the shards.
 export function buildPool(fx, now, { includeOngoing = INCLUDE_ONGOING_DEFAULT } = {}) {
   const months = Object.entries(fx.events_by_month || {})
     .filter(([k, n]) => n > 0 && /^\d{4}-\d{2}$/.test(k))
@@ -414,13 +446,11 @@ export function buildPool(fx, now, { includeOngoing = INCLUDE_ONGOING_DEFAULT } 
     throw new Error(`[replay_lib] fixture ${fx.snapshot} has no shard for ${missing.join(", ")} (clock ${localIso(now)}) — ` +
       "rebuild it with tests/js/build_replay_fixtures.mjs including this day");
   }
-  let events = loadable.flatMap(m => fx.shards[m]);
+  const shardEvents = loadable.flatMap(m => fx.shards[m]);
+  let events = shardEvents;
   if (includeOngoing) {
-    const todayIso = localIso(now);
-    const first = [...horizon].sort()[0];
-    const older = Object.keys(fx.ongoing_shards || {}).filter(m => m < first).sort()
-      .flatMap(m => fx.ongoing_shards[m].filter(e => (e.end || "") >= todayIso));
-    events = [...older, ...events];
+    const shardIds = new Set(shardEvents.map(e => e.id));
+    events = shardEvents.concat(ongoingFileEvents(fx, now).filter(e => e.id == null || !shardIds.has(e.id)));
   }
   // 앱이 행사 객체를 건드려도 다른 재생에 새지 않도록 얕은 복사 / shallow copies per replay
   return events.filter(e => EVENT_CATEGORIES.includes(e.category)).map(e => ({ ...e }));

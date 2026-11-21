@@ -1,6 +1,7 @@
 // 금요일 스냅샷 재생 회귀 테스트 — "목·금 저녁에 이번 주말 계획" 화면이 망가지지 않았는지.
 // Weekend replay regression tests: replays real Friday data snapshots (tests/fixtures/weekend_replay)
-// through the CURRENT frontend/public/main.js renderTodayHighlights at 20:00 KST.
+// through the CURRENT frontend/public/main.js renderTodayHighlights at each fixture's replay hour
+// (20:00 KST Thu/Fri; the 11-21 Saturday fixture at 10:00).
 //
 // 정확한 순서 스냅샷이 아니라 "불변 조건(invariant)" 만 검사한다 → 랭킹·예약 상자 정렬을 고쳐도 계속 통과해야 한다.
 // Invariants only (no exact order snapshots), so ranking / urgent-box ordering changes keep passing.
@@ -16,6 +17,7 @@ const { labels, baseline, minTotal } = R.loadLabels();
 const bySnap = Object.fromEntries(fixtures.map(fx => [fx.snapshot, fx]));
 // Top 5 P@5 는 금요일 시각(fixture.days 의 마지막)으로 잰다. 11-19 목요일 데이터는 11-20(금) 20:00 으로.
 const primaryDay = (fx) => fx.days[fx.days.length - 1];
+const clock = (fx, day) => `${day} ${String(fx.replay_hour_kst ?? 20).padStart(2, "0")}:00 KST`;
 const isFamilyPick = (fx, p) => (labels[fx.snapshot] || []).some(k => (p?.title || "").includes(k));
 const short = (s, n = 28) => (s || "").slice(0, n);
 // 화면 제목과 행사 제목 비교 — 공백은 정규화 / compare shown title vs event title, whitespace-normalized
@@ -28,7 +30,7 @@ function fixtureOrFail(snapshot) {
 }
 
 test("fixtures present and main.js loads", (t) => {
-  assert.ok(fixtures.length >= 7, `expected >= 7 weekend fixtures, found ${fixtures.length}`);
+  assert.ok(fixtures.length >= 8, `expected >= 8 weekend fixtures, found ${fixtures.length}`);
   const v = R.replay(fixtures[0], fixtures[0].days[0]);
   assert.ok(Array.isArray(v.locals.combined), "renderTodayHighlights no longer has a local `combined` — update CAPTURE_LOCALS in replay_lib");
   assert.ok(v.list.querySelector(".hero-card"), "no .hero-card rendered — hero markup changed? update heroItems() in replay_lib");
@@ -39,7 +41,7 @@ test("fixtures present and main.js loads", (t) => {
 describe("⭐ Top 5 — 그 주말에 열리는 행사만 / only events held on the target weekend", () => {
   for (const fx of fixtures) {
     for (const day of fx.days) {
-      test(`${fx.snapshot} @ ${day} 20:00 KST`, () => {
+      test(`${fx.snapshot} @ ${clock(fx, day)}`, () => {
         const v = R.replay(fx, day);
         const hero = R.heroItems(v);
         assert.ok(hero.length > 0, "no Top-5 cards rendered");
@@ -157,18 +159,91 @@ describe("🚨 예약 긴급 알림 — D-day 는 실제 오늘 기준 / booking
   });
 });
 
+// 출처만 다른 같은 행사(bexco "국제게임전시회 지스타 2026" / visitbusan "G-STAR 2026")가 Top 5·그 외 목록에
+// 두 번 나오면 한 칸을 낭비한다. 판정은 main.js 의 _sameEventLikely 그대로 (긴급 상자와 같은 기준).
+// Cross-source duplicates must appear once in the ranked list (Top 5 + tail), judged by main.js _sameEventLikely.
+describe("🔁 중복 행사 — 출처만 다른 같은 행사는 한 번만 / cross-source duplicates appear once", () => {
+  for (const fx of fixtures) {
+    for (const day of fx.days) {
+      test(`${fx.snapshot} @ ${clock(fx, day)}: no two Top-5/tail items are _sameEventLikely`, () => {
+        const v = R.replay(fx, day);
+        const { hero, tail } = v.locals;
+        assert.ok(Array.isArray(hero) && Array.isArray(tail), "locals `hero`/`tail` not captured — update CAPTURE_LOCALS in replay_lib");
+        const ranked = [...hero, ...tail];
+        const pairs = [];
+        for (let i = 0; i < ranked.length; i++) {
+          for (let j = i + 1; j < ranked.length; j++) {
+            const a = ranked[i], b = ranked[j];
+            if (v.ctx._sameEventLikely(a, b)) {
+              pairs.push(`#${i + 1} "${short(a.title)}" [${a.source}] = #${j + 1} "${short(b.title)}" [${b.source}] (${a.start}~${a.end || ""})`);
+            }
+          }
+        }
+        assert.deepEqual(pairs, [], `${pairs.length} cross-source duplicate pair(s) left in the ranked list`);
+      });
+    }
+  }
+
+  test("11-21 (토) 10:00: Top 5 has 인형극축제·장수탕 선녀님, and G-STAR 2026 is not a separate item", () => {
+    const v = R.replay(fixtureOrFail("2026-11-21"), "2026-11-21");
+    const top = R.heroItems(v).map(h => h.poi?.title || h.title);
+    const shown = top.map(t => short(t, 16)).join(" | ");
+    assert.ok(top.some(t => /해운대.*아마추어 인형극축제/.test(t)), `해운대 아마추어 인형극축제 not in Top 5: ${shown}`);
+    assert.ok(top.some(t => t.includes("장수탕 선녀님")), `장수탕 선녀님 not in Top 5: ${shown}`);
+    const ranked = Array.from(v.locals.combined, p => p.title);  // 샌드박스 배열 → 이 realm 배열 (deepEqual 용)
+    assert.ok(ranked.some(t => t.includes("지스타")), "지스타 dropped entirely — the kept duplicate should stay");
+    assert.deepEqual(ranked.filter(t => /G-STAR/i.test(t)), [], "G-STAR 2026 still listed separately from 국제게임전시회 지스타 2026");
+    assert.deepEqual(R.chipItems(v).map(c => c.title).filter(t => /G-STAR/i.test(t)), [], "G-STAR 2026 still rendered as a chip");
+  });
+
+  // AI 요약이 뺀 쪽 제목을 써도(ai-summary 10-06·10-10·10-11 에 "2026 BIFF") 남은 항목 상세로 연결돼야 한다.
+  // AI picks that use a dropped duplicate's title must still link to the kept item.
+  test("AI 추천 제목: 뺀 중복 제목도 남은 항목으로 연결 / _resolveAiTitle maps dropped-duplicate titles to the kept item", () => {
+    const cases = [
+      ["2026-10-09", "2026-10-09", "2026 BIFF", "부산국제영화제"],
+      ["2026-11-21", "2026-11-21", "G-STAR 2026", "지스타"],
+    ];
+    for (const [snap, day, aiTitle, keptKey] of cases) {
+      const v = R.replay(fixtureOrFail(snap), day);
+      const hit = v.ctx._resolveAiTitle(aiTitle, v.locals.combined);
+      assert.ok(hit && (hit.title || "").includes(keptKey),
+        `${snap}: _resolveAiTitle("${aiTitle}") → ${hit ? `"${short(hit.title)}"` : "null"}, expected the kept ${keptKey} item`);
+      assert.ok(v.locals.combined.includes(hit), `${snap}: resolved item is not in the ranked list`);
+    }
+  });
+
+  test("10-09 (금) 20:00: 2026 BIFF and 부산국제영화제 are not both listed", () => {
+    const v = R.replay(fixtureOrFail("2026-10-09"), "2026-10-09");
+    const ranked = Array.from(v.locals.combined, p => p.title);  // 샌드박스 배열 → 이 realm 배열 (deepEqual 용)
+    const biff = ranked.filter(t => /\bBIFF\b/.test(t)), long = ranked.filter(t => t.includes("부산국제영화제"));
+    assert.ok(biff.length + long.length > 0, "neither BIFF title is listed — fixture or ranking changed?");
+    assert.ok(!(biff.length && long.length), `both listed: ${[...long, ...biff].map(t => `"${short(t)}"`).join(", ")}`);
+  });
+});
+
 describe("replay_lib self-checks", () => {
-  test("includeOngoing adds only older-shard events still running today", () => {
+  test("pool = shard events, then events-ongoing.json events whose id is not in the shards (main.js init)", () => {
     for (const fx of fixtures) {
       const day = primaryDay(fx);
-      const now = new Date(Date.parse(`${day}T20:00:00+09:00`));
+      const now = new Date(Date.parse(`${day}T${String(fx.replay_hour_kst ?? 20).padStart(2, "0")}:00:00+09:00`));
       const base = R.buildPool(fx, now, { includeOngoing: false });
       const withOngoing = R.buildPool(fx, now, { includeOngoing: true });
-      const extra = withOngoing.slice(0, withOngoing.length - base.length);
-      assert.ok(extra.length >= 0 && withOngoing.length >= base.length);
-      assert.ok(extra.every(e => (e.end || "") >= day), `${fx.snapshot}: extra event already ended`);
-      assert.deepEqual(withOngoing.slice(extra.length).map(e => e.id), base.map(e => e.id));
+      assert.deepEqual(withOngoing.slice(0, base.length).map(e => e.id), base.map(e => e.id), `${fx.snapshot}: shard events must come first`);
+      const extra = withOngoing.slice(base.length);
+      const baseIds = new Set(base.map(e => e.id));
+      assert.ok(extra.every(e => !baseIds.has(e.id)), `${fx.snapshot}: ongoing event duplicated by id`);
+      assert.ok(extra.every(e => (e.end || "") >= day && (e.start || "") < `${day.slice(0, 7)}-01`),
+        `${fx.snapshot}: ongoing event outside "start < this month, end >= today"`);
+      assert.equal(R.buildPool(fx, now).length, R.INCLUDE_ONGOING_DEFAULT ? withOngoing.length : base.length,
+        "default pool does not follow INCLUDE_ONGOING_DEFAULT");
     }
+  });
+  test("simulated events-ongoing.json (used for pre-#79 fixtures) reproduces the real file on 11-21", () => {
+    const fx = fixtureOrFail("2026-11-21");
+    assert.ok(fx.ongoing_file, "2026-11-21 fixture has no ongoing_file — rebuild it with build_replay_fixtures.mjs");
+    const all = [...Object.values(fx.shards), ...Object.values(fx.ongoing_shards)].flat();
+    const simulated = R.selectOngoingEvents(all, fx.ongoing_file.as_of).map(e => e.id);
+    assert.deepEqual(simulated, fx.ongoing_file.events.map(e => e.id));
   });
   test("top-level extractor matches braces inside strings, templates and regex literals", () => {
     const src = [
