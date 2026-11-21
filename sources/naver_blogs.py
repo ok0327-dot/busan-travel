@@ -10,6 +10,9 @@ Each entry: title, link (.../{blogid}/{postid}), pubDate, category, description(
 날짜 / dates: pubDate 는 게시일이다. 본문에 '일시: 2026. 10. 24.(토)' 같은 행사 일시가 있으면
 start_date/end_date 를 그 기간으로 쓰고(sources/_event_dates.py), 게시일은 raw["published"] 에 남는다.
 행사 일시를 확실히 찾은 '가볼 만한 행사' blog_post 는 festival 로 올린다(_promote).
+
+해외 행사 / held abroad: '「중국 리수이 국제 사진제」 참여' 처럼 해외에서 열리는 행사 소식은
+festival/performance/exhibition 으로 두지 않고 blog_post(읽을거리)로 내린다(sources/_overseas.py).
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ import feedparser
 from config import NAVER_OFFICIAL_BLOGS
 from sources._adapter import HTTPSession, report
 from sources._event_dates import EventPeriod, extract_event_period
+from sources._overseas import is_overseas_event
 from storage.db import Event
 
 SOURCE = "naver_blogs"
@@ -130,6 +134,14 @@ def _promote(category: str, title: str, text: str | None, period: EventPeriod | 
     return category
 
 
+def _abroad_to_post(category: str, title: str, text: str | None) -> str:
+    """해외에서 열리는 행사면 blog_post 로 내린다 — 글은 읽을거리에 남고 주말 행사 추천에서만 빠진다.
+    / Held-abroad events become blog_post: kept for the reading tab, out of weekend picks."""
+    if category != "blog_post" and is_overseas_event(title, text):
+        return "blog_post"
+    return category
+
+
 def _iso(pubdate: str | None) -> str | None:
     if not pubdate:
         return None
@@ -174,10 +186,11 @@ def fetch() -> list[Event]:
             # 게시일은 raw["published"] 에 그대로 남는다.
             # / Event period from the post body when found, else the post date (kept in raw).
             period = _event_period(title, text, post_date)
+            ev_category = _promote(_classify(category, entry.get("title", "")), title, text, period)
             events.append(Event(
                 source=f"{SOURCE_PREFIX}:{src_id}",
                 source_id=str(post_id),
-                category=_promote(_classify(category, entry.get("title", "")), title, text, period),
+                category=_abroad_to_post(ev_category, title, text),
                 title=title,
                 start_date=period.start if period else post_date,
                 end_date=period.end if period else None,
