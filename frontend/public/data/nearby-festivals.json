@@ -1,31 +1,12 @@
 {
-  "generated_at": "2026-11-26T03:56Z",
-  "count": 1,
+  "generated_at": "2026-11-27T04:02Z",
+  "count": 0,
   "confirmed_count": 0,
-  "estimated_count": 1,
+  "estimated_count": 0,
   "regions": [
     "경남",
     "울산",
     "경주"
   ],
-  "festivals": [
-    {
-      "id": "nearby-141375",
-      "category": "festival",
-      "region": "울산",
-      "title": "울주 간절곶 해맞이",
-      "start": "2026-12-31",
-      "end": "2027-01-01",
-      "venue": null,
-      "address": "울산광역시 울주군 서생면 대송리",
-      "image": "http://tong.visitkorea.or.kr/cms/resource/79/3588879_image2_1.jpg",
-      "tel": "052-980-2232",
-      "lat": 35.3591723598,
-      "lon": 129.3619181517,
-      "orig_start": "2025-12-31",
-      "orig_end": "2026-01-01",
-      "estimated": true,
-      "excerpt": "※ 예년(2025년) 일정 기준 추정입니다. 2026년 정확한 개최일은 주최 측 공지를 확인하세요."
-    }
-  ]
+  "festivals": []
 }
